@@ -171,7 +171,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return self._send_bytes(200, "application/json", b'{"ok":true}')
             except Exception as e:
                 return self._send_bytes(400, "application/json", json.dumps({"ok":False,"error":str(e)}).encode())
-        if p.startswith('/api/'):\n            return self._send_bytes(501, 'application/json', b'{\"error\":\"BACKEND_NOT_CONFIGURED\",\"message\":\"Static runtime acceptance host has no model backend\"}')\n        return self._send_bytes(405, 'application/json', b'{\"error\":\"METHOD_NOT_ALLOWED\"}')
+        if p.startswith('/api/'):
+            return self._send_bytes(501, 'application/json', b'{"error":"BACKEND_NOT_CONFIGURED","message":"Static runtime acceptance host has no model backend"}')
+        return self._send_bytes(405, 'application/json', b'{"error":"METHOD_NOT_ALLOWED"}')
 
     def end_headers(self):
         self.send_header("Permissions-Policy", "camera=(self), microphone=(self)")
