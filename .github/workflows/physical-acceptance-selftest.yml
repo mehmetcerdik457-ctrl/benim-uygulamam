@@ -1,0 +1,43 @@
+name: Physical Acceptance Harness Selftest
+on:
+  push:
+    branches: [physical-acceptance-v022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright@1.55.0 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Exercise harness with fake media
+        run: |
+          cat > selftest.mjs <<'NODE'
+          import { chromium } from 'playwright';
+          const base='https://mehmet-physical-acceptance-v022-production.up.railway.app';
+          const browser=await chromium.launch({headless:true,args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
+          const ctx=await browser.newContext();
+          await ctx.grantPermissions(['camera','microphone'],{origin:base});
+          const page=await ctx.newPage();
+          const errs=[];
+          page.on('pageerror',e=>errs.push(String(e)));
+          page.on('console',m=>{if(m.type()==='error')errs.push(m.text())});
+          const r=await page.goto(base+'/',{waitUntil:'networkidle',timeout:60000});
+          if(!r||r.status()!==200) throw new Error('ROOT_NOT_200');
+          await page.click('#start');
+          await page.waitForTimeout(8000);
+          const text=await page.locator('#out').innerText();
+          console.log('HARNESS_OUTPUT='+text.replace(/\n/g,' '));
+          const data=JSON.parse(text);
+          if(data.camera?.status!=='PASS') throw new Error('CAMERA_HARNESS_NOT_PASS '+JSON.stringify(data.camera));
+          if(!['PASS','PARTIAL'].includes(data.microphone?.status)) throw new Error('MIC_HARNESS_BAD '+JSON.stringify(data.microphone));
+          if(errs.length) console.log('BROWSER_ERRORS='+JSON.stringify(errs));
+          console.log('PHYSICAL_ACCEPTANCE_HARNESS_SELFTEST=PASS');
+          await browser.close();
+          NODE
+          node selftest.mjs
