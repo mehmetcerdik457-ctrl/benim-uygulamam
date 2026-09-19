@@ -15,21 +15,41 @@ EXTRACT_DIR = pathlib.Path("/tmp/mehmet_v022")
 ROOT = EXTRACT_DIR / "MEHMET_YARATILIS_PWA_v0.2.2" / "MEHMET_YARATILIS_PWA"
 
 FORENSIC_HTML = r"""<!doctype html><html lang="tr"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
 <title>MEHMET v0.2.2 Adli Kabul</title>
-<style>body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:18px;background:#0b1020;color:#eef2ff}button,a{display:inline-block;font-size:17px;padding:12px 16px;margin:6px;border-radius:10px;background:#25304f;color:#fff;text-decoration:none;border:0}.card{background:#151d32;padding:14px;border-radius:14px;margin:12px 0}pre{white-space:pre-wrap;word-break:break-word}</style>
-</head><body>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:18px;background:#0b1020;color:#eef2ff}
+button,a{display:inline-block;font-size:17px;padding:12px 16px;margin:6px;border-radius:10px;background:#25304f;color:#fff;text-decoration:none;border:0}
+button:disabled{opacity:.45}.card{background:#151d32;padding:14px;border-radius:14px;margin:12px 0}
+pre{white-space:pre-wrap;word-break:break-word}.ok{color:#6ee7a8}.warn{color:#ffd166}
+</style></head><body>
 <h1>MEHMET v0.2.2 · Adli Kabul</h1>
-<p>Bu sayfa aynı origin içindeki MEHMET PWA'nın yalnız kabul-görev kayıtlarını okur. Sohbet veya hafıza metinlerini göndermez.</p>
-<a href="/">MEHMET PWA'YI AÇ</a><button id="scan">KAYITLARI TARA</button>
-<div class="card"><pre id="out">Hazır.</pre></div>
+<p>Exact ürün dosyaları değiştirilmez. Bu sayfa aynı origin'deki yalnız kabul-görev kayıtlarını ve fiziksel test metriklerini raporlar.</p>
+<a href="/">MEHMET PWA'YI AÇ</a>
+<button id="scan">KAYITLARI TARA</button>
+<button id="loop">🔊 TTS + HOPARLÖR LOOPBACK</button>
+<button id="install" disabled>📲 MEHMET'İ KUR</button>
+<button id="heard" disabled>🔊 SESİ DUYDUM</button>
+<div class="card"><div id="status">Hazırlanıyor…</div><pre id="out">Hazır.</pre></div>
 <script>
-const out=document.querySelector('#out');
+const out=document.querySelector('#out'), statusEl=document.querySelector('#status');
+const installBtn=document.querySelector('#install'), heardBtn=document.querySelector('#heard');
 const interesting=new Set(['pwa-install','pwa-install-prompt','camera','camera-capture','microphone','tts','memory-reopen-observed','service-worker','browser-tests']);
+let installPrompt=null;
+let lastTtsReport=null;
+
+function show(x){out.textContent=JSON.stringify(x,null,2)}
+async function post(obj){
+  try{await fetch('/__forensic_report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(obj)})}catch{}
+  show(obj);
+}
 function openDB(){return new Promise((res,rej)=>{const r=indexedDB.open('mehmet_pwa_v1');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function all(db,store){return new Promise((res,rej)=>{if(!db.objectStoreNames.contains(store))return res([]);const r=db.transaction(store).objectStore(store).getAll();r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 async function scan(){
- const report={ts:new Date().toISOString(),ua:navigator.userAgent,secureContext:window.isSecureContext,standaloneNow:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true};
+ const report={kind:'storage-scan',ts:new Date().toISOString(),ua:navigator.userAgent,secureContext:window.isSecureContext,standaloneNow:matchMedia('(display-mode: standalone)').matches||navigator.standalone===true};
  try{
    const db=await openDB();
    const tasks=(await all(db,'tasks')).filter(x=>interesting.has(x.type)).map(x=>({type:x.type,status:x.status||null,detail:String(x.detail||'').slice(0,240),verification:String(x.verification||'').slice(0,240),ts:x.ts||null}));
@@ -41,10 +61,67 @@ async function scan(){
    report.ttsPass=tasks.some(x=>x.type==='tts'&&x.status==='PASS');
    report.reopenPass=tasks.some(x=>x.type==='memory-reopen-observed'&&x.status==='PASS');
  }catch(e){report.error=String(e?.message||e)}
- out.textContent=JSON.stringify(report,null,2);
- try{await fetch('/__forensic_report',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(report)})}catch{}
+ await post(report);
+ return report;
 }
-document.querySelector('#scan').onclick=scan; scan();
+async function measure(an,ms){
+ const arr=new Float32Array(an.fftSize);let max=0,sum=0,n=0,end=performance.now()+ms;
+ while(performance.now()<end){an.getFloatTimeDomainData(arr);let s=0;for(const x of arr)s+=x*x;const rms=Math.sqrt(s/arr.length);max=Math.max(max,rms);sum+=rms;n++;await new Promise(r=>setTimeout(r,40))}
+ return {maxRms:max,avgRms:n?sum/n:0,samples:n};
+}
+async function ttsLoopback(){
+ const report={kind:'tts-loopback',ts:new Date().toISOString(),ua:navigator.userAgent,secureContext:window.isSecureContext};
+ let stream,ctx;
+ try{
+   stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+   const C=window.AudioContext||window.webkitAudioContext;ctx=new C();await ctx.resume();
+   const src=ctx.createMediaStreamSource(stream),an=ctx.createAnalyser();an.fftSize=2048;src.connect(an);
+   report.baseline=await measure(an,700);
+   if(!('speechSynthesis' in window))throw new Error('speechSynthesis unavailable');
+   speechSynthesis.cancel();
+   const u=new SpeechSynthesisUtterance('MEHMET fiziksel ses testi başarılı');u.lang='tr-TR';
+   let started=false,ended=false;
+   const finished=new Promise((res,rej)=>{u.onstart=()=>{started=true};u.onend=()=>{ended=true;res()};u.onerror=e=>rej(new Error(e.error||'tts'));setTimeout(()=>rej(new Error('TTS_TIMEOUT')),15000)});
+   speechSynthesis.speak(u);
+   await new Promise(r=>setTimeout(r,250));
+   report.during=await measure(an,2600);
+   await finished;
+   report.enginePass=started&&ended;
+   const floor=Math.max(0.002,report.baseline.maxRms*1.35);
+   report.loopbackObserved=report.enginePass && report.during.maxRms>floor && report.during.avgRms>Math.max(0.0007,report.baseline.avgRms*1.15);
+   report.status=report.loopbackObserved?'PHYSICAL_LOOPBACK_PASS':(report.enginePass?'ENGINE_PASS_LOOPBACK_UNCERTAIN':'FAIL');
+   lastTtsReport=report;
+   heardBtn.disabled=false;
+ }catch(e){report.status='FAIL';report.error=String(e?.message||e)}
+ finally{stream?.getTracks().forEach(t=>t.stop());try{await ctx?.close()}catch{}}
+ await post(report);
+}
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();installPrompt=e;installBtn.disabled=false;statusEl.textContent='Kurulum istemi hazır.';
+  post({kind:'installability-event',ts:new Date().toISOString(),ua:navigator.userAgent,beforeInstallPrompt:true});
+});
+window.addEventListener('appinstalled',()=>{
+  installPrompt=null;installBtn.disabled=true;statusEl.textContent='PWA kuruldu.';
+  post({kind:'appinstalled',ts:new Date().toISOString(),ua:navigator.userAgent,appinstalled:true,standaloneNow:matchMedia('(display-mode: standalone)').matches});
+  setTimeout(scan,500);
+});
+installBtn.onclick=async()=>{
+  if(!installPrompt){statusEl.textContent='Kurulum istemi henüz gelmedi; Chrome menüsündeki Uygulamayı yükle seçeneğini kullan.';return}
+  installPrompt.prompt();const c=await installPrompt.userChoice;
+  await post({kind:'install-choice',ts:new Date().toISOString(),ua:navigator.userAgent,outcome:c.outcome});
+  if(c.outcome!=='accepted')statusEl.textContent='Kurulum kabul edilmedi.';
+};
+heardBtn.onclick=async()=>{
+  const r={...(lastTtsReport||{}),kind:'tts-heard-confirmation',ts:new Date().toISOString(),ua:navigator.userAgent,heardByUser:true,status:'PHYSICAL_AUDIBLE_PASS'};
+  heardBtn.disabled=true;await post(r);
+};
+document.querySelector('#scan').onclick=scan;
+document.querySelector('#loop').onclick=ttsLoopback;
+(async()=>{
+ try{if('serviceWorker'in navigator){await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready}}
+ catch(e){statusEl.textContent='Service worker hazırlığı: '+String(e?.message||e)}
+ await scan();
+})();
 </script></body></html>"""
 
 print("RUNTIME_BOOT_START", flush=True)
