@@ -6,6 +6,8 @@ import os
 import pathlib
 import socketserver
 import zipfile
+import urllib.error
+import urllib.request
 from urllib.parse import urlparse
 
 EXPECTED_SHA256 = "518d82cceb2843bc4db75d46876f1adc57558b601264bf2e888c9b09232fcbb0"
@@ -13,6 +15,8 @@ BASE_DIR = pathlib.Path(__file__).resolve().parent
 ZIP_PATH = BASE_DIR / "MEHMET_YARATILIS_PWA_v0.2.2.zip"
 EXTRACT_DIR = pathlib.Path("/tmp/mehmet_v022")
 ROOT = EXTRACT_DIR / "MEHMET_YARATILIS_PWA_v0.2.2" / "MEHMET_YARATILIS_PWA"
+AI_BACKEND_URL = os.getenv("AI_BACKEND_URL", "").rstrip("/")
+AI_BACKEND_TIMEOUT = float(os.getenv("AI_BACKEND_TIMEOUT", "50"))
 
 FORENSIC_HTML = r"""<!doctype html><html lang="tr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -155,8 +159,75 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+
+    def _proxy_api(self, method):
+        if not AI_BACKEND_URL:
+            return self._send_bytes(
+                503,
+                "application/json",
+                b'{"error":"BACKEND_NOT_CONFIGURED","message":"AI backend URL is not configured"}',
+            )
+        parsed = urlparse(self.path)
+        target = AI_BACKEND_URL + parsed.path
+        if parsed.query:
+            target += "?" + parsed.query
+
+        body = None
+        headers = {
+            "Accept": "application/json",
+            "X-Forwarded-For": self.client_address[0],
+        }
+        if method == "POST":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                length = 0
+            if length > 0:
+                body = self.rfile.read(length)
+            content_type = self.headers.get("Content-Type")
+            if content_type:
+                headers["Content-Type"] = content_type
+
+        req = urllib.request.Request(target, data=body, method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=AI_BACKEND_TIMEOUT) as response:
+                data = response.read()
+                ctype = response.headers.get("Content-Type", "application/json")
+                request_id = response.headers.get("X-Request-ID")
+                self.send_response(response.status)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Cache-Control", "no-store")
+                if request_id:
+                    self.send_header("X-Request-ID", request_id)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+        except urllib.error.HTTPError as exc:
+            data = exc.read() or b'{"error":"UPSTREAM_HTTP_ERROR"}'
+            ctype = exc.headers.get("Content-Type", "application/json") if exc.headers else "application/json"
+            request_id = exc.headers.get("X-Request-ID") if exc.headers else None
+            self.send_response(exc.code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", "no-store")
+            if request_id:
+                self.send_header("X-Request-ID", request_id)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        except Exception as exc:
+            print("API_PROXY_ERROR="+type(exc).__name__, flush=True)
+            return self._send_bytes(
+                502,
+                "application/json",
+                b'{"error":"BACKEND_UNREACHABLE","message":"Private AI backend is unreachable"}',
+            )
+
     def do_GET(self):
         p = urlparse(self.path).path
+        if p.startswith("/api/"):
+            return self._proxy_api("GET")
         if p == "/__forensic_acceptance":
             return self._send_bytes(200, "text/html; charset=utf-8", FORENSIC_HTML.encode("utf-8"))
         return super().do_GET()
@@ -172,7 +243,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._send_bytes(400, "application/json", json.dumps({"ok":False,"error":str(e)}).encode())
         if p.startswith('/api/'):
-            return self._send_bytes(501, 'application/json', b'{"error":"BACKEND_NOT_CONFIGURED","message":"Static runtime acceptance host has no model backend"}')
+            return self._proxy_api("POST")
         return self._send_bytes(405, 'application/json', b'{"error":"METHOD_NOT_ALLOWED"}')
 
     def end_headers(self):
