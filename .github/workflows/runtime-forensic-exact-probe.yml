@@ -1,0 +1,38 @@
+name: Runtime Forensic Exact Probe
+on:
+  push:
+    branches: [runtime-forensic-v022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify exact core and forensic endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://mehmet-pwa-v022-runtime-production.up.railway.app"
+          check() {
+            path="$1"; bytes="$2"; sha="$3"; type="$4"
+            h="$(mktemp)"; b="$(mktemp)"
+            code="$(curl -fsSL -D "$h" -o "$b" -w '%{http_code}' "$base$path")"
+            gotb="$(wc -c < "$b" | tr -d ' ')"
+            gots="$(sha256sum "$b" | awk '{print $1}')"
+            ct="$(awk 'BEGIN{IGNORECASE=1} /^content-type:/{sub(/\r$/,"");print substr($0,index($0,":")+2)}' "$h" | tail -1)"
+            echo "$path HTTP=$code BYTES=$gotb SHA=$gots CT=$ct"
+            test "$code" = 200
+            test "$gotb" = "$bytes"
+            test "$gots" = "$sha"
+            case "$ct" in "$type"*) ;; *) exit 1;; esac
+          }
+          check "/" 8360 187aeb1b95f95f5c62d2ec27e500814e1cebac33c9c57f479027dbfd30291a9a "text/html"
+          check "/app.js" 25389 7904219a476dc4a515cd14212e3911967416c69bb1ff52f260b8a7d99ea39e2a "application/javascript"
+          check "/styles.css" 5508 f0d458789244f17297e134151af13288053f96231286dd881d454403f2672a0a "text/css"
+          check "/manifest.webmanifest" 926 88a6b09cb5c507705e9241f4bdc092f350aed7753f7cd0e52d4c2991c6155bc4 "application/manifest+json"
+          check "/sw.js" 1423 5d2af76e98fb20ac3b960d0b29a44dd416adb9472078f57e5aa5e0fb6ec2cd5e "application/javascript"
+          forensic="$(curl -fsSL "$base/__forensic_acceptance")"
+          echo "$forensic" | grep -F "MEHMET v0.2.2 · Adli Kabul"
+          echo "$forensic" | grep -F "installEventPass"
+          echo "RUNTIME_FORENSIC_EXACT_PROBE=PASS"
