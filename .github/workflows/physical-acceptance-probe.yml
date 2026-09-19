@@ -1,0 +1,25 @@
+name: Physical Acceptance Endpoint Probe
+on:
+  push:
+    branches: [physical-acceptance-v022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe acceptance service
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://mehmet-physical-acceptance-v022-production.up.railway.app"
+          root="$(mktemp)"
+          code="$(curl -fsSL -o "$root" -w '%{http_code}' "$base/")"
+          echo "ROOT_HTTP=$code"
+          grep -F "MEHMET v0.2.2 · Fiziksel Cihaz Kabul" "$root"
+          health="$(curl -fsSL "$base/health")"
+          echo "HEALTH_BODY=$health"
+          test "$code" = "200"
+          echo "$health" | grep -F '"status":"PASS"'
+          echo "PHYSICAL_ACCEPTANCE_ENDPOINT=PASS"
