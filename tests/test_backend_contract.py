@@ -62,3 +62,16 @@ def test_configured_false_without_key(monkeypatch):
 def test_configured_true_with_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     assert server.configured() is True
+
+
+def test_proxy_configured_false_without_token(monkeypatch):
+    monkeypatch.delenv("AI_BACKEND_PROXY_TOKEN", raising=False)
+    assert server.proxy_configured() is False
+    assert server.proxy_authorized({}) is False
+
+
+def test_proxy_configured_and_authorized(monkeypatch):
+    monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "test-proxy-token")
+    assert server.proxy_configured() is True
+    assert server.proxy_authorized({"X-MEH-Proxy-Token": "test-proxy-token"}) is True
+    assert server.proxy_authorized({"X-MEH-Proxy-Token": "wrong"}) is False

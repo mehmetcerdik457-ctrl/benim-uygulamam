@@ -7,6 +7,7 @@ Provider secrets stay server-side in environment variables.
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import time
 import uuid
@@ -38,6 +39,18 @@ _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
 
 def configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
+
+
+def proxy_configured() -> bool:
+    return bool(os.getenv("AI_BACKEND_PROXY_TOKEN", "").strip())
+
+
+def proxy_authorized(headers: Any) -> bool:
+    expected = os.getenv("AI_BACKEND_PROXY_TOKEN", "").strip()
+    if not expected:
+        return False
+    provided = (headers.get("X-MEH-Proxy-Token") or "").strip()
+    return bool(provided) and hmac.compare_digest(provided, expected)
 
 
 def json_bytes(payload: dict[str, Any]) -> bytes:
@@ -189,6 +202,7 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "PASS",
                     "version": VERSION,
                     "provider_configured": configured(),
+                    "proxy_auth_configured": proxy_configured(),
                     "default_model": DEFAULT_MODEL,
                 },
             )
@@ -266,6 +280,30 @@ class Handler(BaseHTTPRequestHandler):
 
         if path != "/api/chat":
             self._send(404, {"error": "NOT_FOUND", "request_id": request_id}, request_id)
+            return
+
+        if not proxy_configured():
+            self._send(
+                503,
+                {
+                    "error": "PROXY_AUTH_NOT_CONFIGURED",
+                    "message": "Private runtime-to-backend authentication is not configured.",
+                    "request_id": request_id,
+                },
+                request_id,
+            )
+            return
+
+        if not proxy_authorized(self.headers):
+            self._send(
+                401,
+                {
+                    "error": "UNAUTHORIZED_PROXY",
+                    "message": "Private runtime authentication failed.",
+                    "request_id": request_id,
+                },
+                request_id,
+            )
             return
 
         key = client_key(self.headers, self.client_address[0])
