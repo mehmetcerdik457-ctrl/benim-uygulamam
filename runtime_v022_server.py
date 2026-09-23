@@ -9,6 +9,7 @@ import zipfile
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
+from runtime_security import backend_proxy_token, owner_auth_configured, owner_authorized
 
 EXPECTED_SHA256 = "518d82cceb2843bc4db75d46876f1adc57558b601264bf2e888c9b09232fcbb0"
 BASE_DIR = pathlib.Path(__file__).resolve().parent
@@ -151,13 +152,40 @@ mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("text/css", ".css")
 
 class Handler(http.server.SimpleHTTPRequestHandler):
-    def _send_bytes(self, code, ctype, data):
+    def _send_bytes(self, code, ctype, data, extra_headers=None):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
+        for key, value in (extra_headers or {}).items():
+            self.send_header(key, value)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _owner_gate(self, path):
+        if path in {"/__health", "/__forensic_acceptance"}:
+            return True
+
+        if owner_auth_configured():
+            if owner_authorized(self.headers.get("Authorization")):
+                return True
+            self._send_bytes(
+                401,
+                "application/json",
+                b'{"error":"OWNER_AUTH_REQUIRED","message":"Owner authentication required"}',
+                {"WWW-Authenticate": 'Basic realm="MEHMET Owner", charset="UTF-8"'},
+            )
+            return False
+
+        if path in {"/api/chat", "/api/research"}:
+            self._send_bytes(
+                503,
+                "application/json",
+                b'{"error":"OWNER_AUTH_NOT_CONFIGURED","message":"Owner authentication is not configured"}',
+            )
+            return False
+
+        return True
 
 
     def _proxy_api(self, method):
@@ -177,6 +205,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             "Accept": "application/json",
             "X-Forwarded-For": self.client_address[0],
         }
+        if parsed.path in {"/api/chat", "/api/research"}:
+            proxy_token = backend_proxy_token()
+            if not proxy_token:
+                return self._send_bytes(
+                    503,
+                    "application/json",
+                    b'{"error":"PROXY_AUTH_NOT_CONFIGURED","message":"Private backend authentication is not configured"}',
+                )
+            headers["X-MEH-Proxy-Token"] = proxy_token
         if method == "POST":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -226,6 +263,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         p = urlparse(self.path).path
+        if p == "/__health":
+            payload = json.dumps(
+                {
+                    "status": "PASS",
+                    "owner_auth_configured": owner_auth_configured(),
+                    "backend_proxy_configured": bool(backend_proxy_token()),
+                },
+                separators=(",", ":"),
+            ).encode()
+            return self._send_bytes(200, "application/json", payload)
+        if not self._owner_gate(p):
+            return
         if p.startswith("/api/"):
             return self._proxy_api("GET")
         if p == "/__forensic_acceptance":
@@ -243,6 +292,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 return self._send_bytes(400, "application/json", json.dumps({"ok":False,"error":str(e)}).encode())
         if p.startswith('/api/'):
+            if not self._owner_gate(p):
+                return
             return self._proxy_api("POST")
         return self._send_bytes(405, 'application/json', b'{"error":"METHOD_NOT_ALLOWED"}')
 
