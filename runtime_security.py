@@ -30,10 +30,11 @@ def owner_authorized(authorization_header: str | None) -> bool:
     if ":" not in decoded:
         return False
     user, password = decoded.split(":", 1)
-    return hmac.compare_digest(user, expected_user) and hmac.compare_digest(
-        password, expected_password
+    return hmac.compare_digest(user.encode(), expected_user.encode()) and hmac.compare_digest(
+        password.encode(), expected_password.encode()
     )
 
 
 def backend_proxy_token() -> str:
     return os.getenv("AI_BACKEND_PROXY_TOKEN", "").strip()
+

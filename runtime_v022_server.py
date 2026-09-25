@@ -5,6 +5,7 @@ import mimetypes
 import os
 import pathlib
 import socketserver
+import shutil
 import zipfile
 import urllib.error
 import urllib.request
@@ -146,6 +147,9 @@ with zipfile.ZipFile(ZIP_PATH) as zf:
 if not ROOT.is_dir():
     raise SystemExit(f"ROOT_NOT_FOUND={ROOT}")
 
+# Versioned overrides preserve the audited original bundle and the existing DB origin.
+for asset in ("app.js", "sw.js"):
+    shutil.copyfile(BASE_DIR / "runtime_assets" / asset, ROOT / asset)
 os.chdir(ROOT)
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("application/javascript", ".js")
@@ -163,7 +167,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def _owner_gate(self, path):
-        if path in {"/__health", "/__forensic_acceptance"}:
+        if path == "/__health":
             return True
 
         if owner_auth_configured():
@@ -177,7 +181,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             )
             return False
 
-        if path in {"/api/chat", "/api/research"}:
+        if path in {"/api/chat", "/api/research", "/owner-login", "/__forensic_acceptance", "/__forensic_report"}:
             self._send_bytes(
                 503,
                 "application/json",
@@ -219,8 +223,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
                 length = 0
-            if length > 0:
-                body = self.rfile.read(length)
+            if length <= 0 or length > 65536:
+                return self._send_bytes(413, "application/json", b'{"error":"INVALID_BODY_SIZE"}')
+            body = self.rfile.read(length)
             content_type = self.headers.get("Content-Type")
             if content_type:
                 headers["Content-Type"] = content_type
@@ -275,6 +280,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._send_bytes(200, "application/json", payload)
         if not self._owner_gate(p):
             return
+        if p == "/owner-login":
+            return self._send_bytes(303, "text/plain", b"", {"Location": "/"})
+        if p == "/api/owner/status":
+            authenticated = owner_auth_configured() and owner_authorized(self.headers.get("Authorization"))
+            data = {"owner": {"OWNER_ID": os.getenv("OWNER_BASIC_USER", "") if authenticated else "UNPROVISIONED",
+                     "AUTH_LEVEL": "OWNER" if authenticated else "UNPROVISIONED",
+                     "AUTH_METHOD": "HTTP_BASIC_TLS" if authenticated else "UNPROVISIONED"},
+                    "authenticated": authenticated, "runtime": "PWA_OWNER" if authenticated else "P1_BACKEND_ONLY",
+                    "trusted_device": "NOT_IMPLEMENTED"}
+            return self._send_bytes(200, "application/json", json.dumps(data).encode())
         if p.startswith("/api/"):
             return self._proxy_api("GET")
         if p == "/__forensic_acceptance":
@@ -284,8 +299,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
         p = urlparse(self.path).path
         if p == "/__forensic_report":
+            if not self._owner_gate(p):
+                return
             try:
                 n = int(self.headers.get("content-length", "0"))
+                if not 0 < n <= 16384:
+                    return self._send_bytes(413, "application/json", b'{"error":"INVALID_BODY_SIZE"}')
                 obj = json.loads(self.rfile.read(n) or b"{}")
                 print("FORENSIC_ACCEPTANCE_REPORT="+json.dumps(obj,ensure_ascii=False,separators=(",",":")), flush=True)
                 return self._send_bytes(200, "application/json", b'{"ok":true}')
@@ -298,6 +317,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         return self._send_bytes(405, 'application/json', b'{"error":"METHOD_NOT_ALLOWED"}')
 
     def end_headers(self):
+        if urlparse(self.path).path in {"/sw.js", "/app.js"}:
+            self.send_header("Cache-Control", "no-cache")
+        self.send_header("Referrer-Policy", "same-origin")
         self.send_header("Permissions-Policy", "camera=(self), microphone=(self)")
         self.send_header("X-Content-Type-Options", "nosniff")
         super().end_headers()
@@ -311,3 +333,4 @@ print(f"SERVING_ROOT={ROOT}", flush=True)
 print(f"SERVING_PORT={port}", flush=True)
 with socketserver.ThreadingTCPServer(("0.0.0.0", port), Handler) as server:
     server.serve_forever()
+
