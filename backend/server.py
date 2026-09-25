@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
-"""MEHMET AI backend P1.
+"""MEHMET AI backend P2 model router.
 
 Public browser traffic should reach this service through the PWA runtime proxy.
 Provider secrets stay server-side in environment variables.
+
+Router goals:
+- keep OpenAI as the primary high-capability provider;
+- support explicit max/balanced/fast OpenAI profiles;
+- support Hugging Face Inference Providers for open-source models;
+- fail closed when a provider credential is absent;
+- never expose provider credentials to the browser.
 """
 from __future__ import annotations
 
@@ -17,17 +24,45 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-VERSION = "0.1.0"
-OPENAI_URL = "https://api.openai.com/v1/responses"
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
-ALLOWED_MODELS = tuple(
+VERSION = "0.2.0"
+
+OPENAI_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/responses").strip()
+HF_CHAT_URL = os.getenv(
+    "HF_CHAT_URL",
+    "https://router.huggingface.co/v1/chat/completions",
+).strip()
+
+DEFAULT_PROVIDER = os.getenv("AI_DEFAULT_PROVIDER", "openai").strip().lower() or "openai"
+DEFAULT_PROFILE = os.getenv("AI_DEFAULT_PROFILE", "max").strip().lower() or "max"
+
+OPENAI_PROFILE_MODELS = {
+    "max": os.getenv("OPENAI_MODEL_MAX", "gpt-6-astra").strip(),
+    "balanced": os.getenv("OPENAI_MODEL_BALANCED", "gpt-6-sol").strip(),
+    "fast": os.getenv("OPENAI_MODEL_FAST", "gpt-6-luna").strip(),
+}
+OPENAI_ALLOWED_MODELS = tuple(
     x.strip()
     for x in os.getenv(
         "OPENAI_ALLOWED_MODELS",
-        "gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol",
+        "gpt-6-astra,gpt-6-sol,gpt-6-luna,gpt-5.6-sol,gpt-5.6-terra,gpt-5.6-luna",
     ).split(",")
     if x.strip()
 )
+
+HF_PROFILE_MODELS = {
+    "max": os.getenv("HF_MODEL_MAX", "deepseek-ai/DeepSeek-R1:preferred").strip(),
+    "balanced": os.getenv("HF_MODEL_BALANCED", "openai/gpt-oss-20b:preferred").strip(),
+    "fast": os.getenv("HF_MODEL_FAST", "Qwen/Qwen3-8B:preferred").strip(),
+}
+HF_ALLOWED_MODELS = tuple(
+    x.strip()
+    for x in os.getenv(
+        "HF_ALLOWED_MODELS",
+        "deepseek-ai/DeepSeek-R1:preferred,openai/gpt-oss-20b:preferred,Qwen/Qwen3-8B:preferred",
+    ).split(",")
+    if x.strip()
+)
+
 MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "65536"))
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "32000"))
 MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
@@ -37,8 +72,26 @@ RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
 
 
-def configured() -> bool:
+def openai_configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
+
+
+def huggingface_configured() -> bool:
+    return bool(os.getenv("HF_TOKEN", "").strip())
+
+
+def provider_configured(provider: str) -> bool:
+    provider = provider.strip().lower()
+    if provider == "openai":
+        return openai_configured()
+    if provider in {"huggingface", "hf"}:
+        return huggingface_configured()
+    return False
+
+
+def configured() -> bool:
+    """Compatibility helper retained for existing tests/health checks."""
+    return provider_configured(DEFAULT_PROVIDER)
 
 
 def proxy_configured() -> bool:
@@ -79,6 +132,16 @@ def extract_response_text(data: dict[str, Any]) -> str:
     if isinstance(direct, str) and direct.strip():
         return direct.strip()
 
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            message = first.get("message")
+            if isinstance(message, dict):
+                content = message.get("content")
+                if isinstance(content, str) and content.strip():
+                    return content.strip()
+
     chunks: list[str] = []
     for item in data.get("output") or []:
         if not isinstance(item, dict):
@@ -118,12 +181,45 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
     )
 
 
-def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
+def normalize_provider(value: Any) -> str:
+    provider = str(value or DEFAULT_PROVIDER).strip().lower()
+    if provider == "hf":
+        provider = "huggingface"
+    if provider not in {"openai", "huggingface"}:
+        raise ValueError("PROVIDER_NOT_ALLOWED")
+    return provider
+
+
+def normalize_profile(value: Any) -> str:
+    profile = str(value or DEFAULT_PROFILE).strip().lower()
+    if profile not in {"max", "balanced", "fast"}:
+        raise ValueError("PROFILE_NOT_ALLOWED")
+    return profile
+
+
+def select_model(provider: str, requested_model: Any = None, profile: Any = None) -> str:
+    provider = normalize_provider(provider)
+    profile_name = normalize_profile(profile)
+
+    if provider == "openai":
+        allowed = OPENAI_ALLOWED_MODELS
+        default_model = OPENAI_PROFILE_MODELS[profile_name]
+    else:
+        allowed = HF_ALLOWED_MODELS
+        default_model = HF_PROFILE_MODELS[profile_name]
+
+    requested = str(requested_model or "").strip()
+    model = requested or default_model
+    if model not in allowed:
+        raise ValueError("MODEL_NOT_ALLOWED")
+    return model
+
+
+def call_openai(message: str, attachments: list[dict[str, Any]], model: str) -> str:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
     payload = {
         "model": model,
         "input": [
@@ -156,7 +252,54 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     text = extract_response_text(data)
     if not text:
         raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
-    return text, model
+    return text
+
+
+def call_huggingface(message: str, attachments: list[dict[str, Any]], model: str) -> str:
+    token = os.getenv("HF_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": build_input(message, attachments),
+            }
+        ],
+        "max_tokens": MAX_OUTPUT_TOKENS,
+    }
+    req = urllib.request.Request(
+        HF_CHAT_URL,
+        data=json_bytes(payload),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "User-Agent": f"mehmet-ai-backend/{VERSION}",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
+        raw = response.read()
+    data = json.loads(raw)
+    text = extract_response_text(data)
+    if not text:
+        raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
+    return text
+
+
+def call_provider(
+    provider: str,
+    message: str,
+    attachments: list[dict[str, Any]],
+    model: str,
+) -> str:
+    if provider == "openai":
+        return call_openai(message, attachments, model)
+    if provider == "huggingface":
+        return call_huggingface(message, attachments, model)
+    raise ValueError("PROVIDER_NOT_ALLOWED")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -202,8 +345,13 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "PASS",
                     "version": VERSION,
                     "provider_configured": configured(),
+                    "providers_configured": {
+                        "openai": openai_configured(),
+                        "huggingface": huggingface_configured(),
+                    },
                     "proxy_auth_configured": proxy_configured(),
-                    "default_model": DEFAULT_MODEL,
+                    "default_provider": DEFAULT_PROVIDER,
+                    "default_profile": DEFAULT_PROFILE,
                 },
             )
             return
@@ -216,10 +364,18 @@ class Handler(BaseHTTPRequestHandler):
                         {
                             "id": "openai",
                             "label": "OpenAI",
-                            "model": DEFAULT_MODEL,
-                            "configured": configured(),
-                        }
+                            "configured": openai_configured(),
+                            "profiles": OPENAI_PROFILE_MODELS,
+                        },
+                        {
+                            "id": "huggingface",
+                            "label": "Hugging Face / Open Source",
+                            "configured": huggingface_configured(),
+                            "profiles": HF_PROFILE_MODELS,
+                        },
                     ],
+                    "default_provider": DEFAULT_PROVIDER,
+                    "default_profile": DEFAULT_PROFILE,
                     "research_configured": False,
                 },
             )
@@ -229,19 +385,32 @@ class Handler(BaseHTTPRequestHandler):
             self._send(
                 200,
                 {
-                    "default": DEFAULT_MODEL,
-                    "allowed": list(ALLOWED_MODELS),
+                    "default_provider": DEFAULT_PROVIDER,
+                    "default_profile": DEFAULT_PROFILE,
+                    "openai": {
+                        "profiles": OPENAI_PROFILE_MODELS,
+                        "allowed": list(OPENAI_ALLOWED_MODELS),
+                    },
+                    "huggingface": {
+                        "profiles": HF_PROFILE_MODELS,
+                        "allowed": list(HF_ALLOWED_MODELS),
+                    },
                 },
             )
             return
 
         if path == "/api/vault/status":
+            secret_count = sum(
+                1
+                for name in ("OPENAI_API_KEY", "HF_TOKEN", "AI_BACKEND_PROXY_TOKEN")
+                if os.getenv(name, "").strip()
+            )
             self._send(
                 200,
                 {
                     "status": "PASS",
                     "backend": "railway-env",
-                    "configured_secret_count": 1 if configured() else 0,
+                    "configured_secret_count": secret_count,
                 },
             )
             return
@@ -255,7 +424,7 @@ class Handler(BaseHTTPRequestHandler):
                         "AUTH_LEVEL": "UNPROVISIONED",
                         "AUTH_METHOD": "UNPROVISIONED",
                     },
-                    "runtime": "P1_BACKEND_ONLY",
+                    "runtime": "P2_MODEL_ROUTER",
                 },
             )
             return
@@ -328,25 +497,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(400, {"error": str(exc), "request_id": request_id}, request_id)
             return
 
-        provider = body.get("provider")
-        if provider not in (None, "", "openai"):
-            self._send(
-                409,
-                {
-                    "error": "PROVIDER_NOT_CONFIGURED",
-                    "message": "Requested provider is not configured.",
-                    "request_id": request_id,
-                },
-                request_id,
-            )
+        try:
+            provider = normalize_provider(body.get("provider"))
+            profile = normalize_profile(body.get("profile"))
+            model = select_model(provider, body.get("model"), profile)
+        except ValueError as exc:
+            self._send(409, {"error": str(exc), "request_id": request_id}, request_id)
             return
 
-        if not configured():
+        if not provider_configured(provider):
             self._send(
                 503,
                 {
                     "error": "PROVIDER_NOT_CONFIGURED",
-                    "message": "OpenAI provider is not configured.",
+                    "provider": provider,
                     "request_id": request_id,
                 },
                 request_id,
@@ -368,13 +532,17 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            reply, model = call_openai(message, attachments)
+            reply = call_provider(provider, message, attachments, model)
         except urllib.error.HTTPError as exc:
-            print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code}", flush=True)
+            print(
+                f"UPSTREAM_HTTP_ERROR request_id={request_id} provider={provider} status={exc.code}",
+                flush=True,
+            )
             self._send(
                 502,
                 {
                     "error": "UPSTREAM_PROVIDER_ERROR",
+                    "provider": provider,
                     "upstream_status": exc.code,
                     "request_id": request_id,
                 },
@@ -382,20 +550,43 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"UPSTREAM_NETWORK_ERROR request_id={request_id} type={type(exc).__name__}", flush=True)
-            self._send(504, {"error": "UPSTREAM_TIMEOUT", "request_id": request_id}, request_id)
+            print(
+                f"UPSTREAM_NETWORK_ERROR request_id={request_id} provider={provider} type={type(exc).__name__}",
+                flush=True,
+            )
+            self._send(
+                504,
+                {
+                    "error": "UPSTREAM_TIMEOUT",
+                    "provider": provider,
+                    "request_id": request_id,
+                },
+                request_id,
+            )
             return
         except Exception as exc:
             code = str(exc)
-            print(f"CHAT_ERROR request_id={request_id} code={code}", flush=True)
-            self._send(502, {"error": code, "request_id": request_id}, request_id)
+            print(
+                f"CHAT_ERROR request_id={request_id} provider={provider} code={code}",
+                flush=True,
+            )
+            self._send(
+                502,
+                {
+                    "error": code,
+                    "provider": provider,
+                    "request_id": request_id,
+                },
+                request_id,
+            )
             return
 
         self._send(
             200,
             {
                 "text": reply,
-                "provider": "openai",
+                "provider": provider,
+                "profile": profile,
                 "model": model,
                 "request_id": request_id,
             },
@@ -414,8 +605,12 @@ def main() -> None:
                 "event": "backend_start",
                 "version": VERSION,
                 "port": port,
-                "provider_configured": configured(),
-                "model": DEFAULT_MODEL,
+                "default_provider": DEFAULT_PROVIDER,
+                "default_profile": DEFAULT_PROFILE,
+                "providers_configured": {
+                    "openai": openai_configured(),
+                    "huggingface": huggingface_configured(),
+                },
             },
             separators=(",", ":"),
         ),
