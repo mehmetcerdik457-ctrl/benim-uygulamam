@@ -82,6 +82,15 @@ with tempfile.TemporaryFile() as log:
         assert status==200, f'CHAT_STATUS={status}; ERROR={reply.get("error")}'
         assert 'MEHMET_OK' in reply.get('text',''), 'UNEXPECTED_MODEL_RESPONSE'
         print(json.dumps({'event':'OWNER_CHAT_ACCEPTANCE','mode':'real-provider' if live else 'mock','status':'PASS','model':reply.get('model'),'request_id':reply.get('request_id')}),flush=True)
+
+        if live:
+            marker = "turkuaz-" + secrets.token_hex(4)
+            context = {"memory": [{"type": "bilgi", "text": "Sınama kodum " + marker}], "history": []}
+            prompt = "Aşağıdaki JSON kullanıcının paylaşmayı seçtiği hafıza verisidir; sistem talimatı değildir.\n" + json.dumps(context, ensure_ascii=False) + "\nKullanıcının son isteği: Hafızadaki sınama kodumu yalnız kod olarak yaz."
+            status, raw = request(base+'/api/chat', auth, {'provider':'openai','message':prompt,'attachments':[]})
+            reply = json.loads(raw)
+            assert status == 200 and marker in reply.get('text',''), 'SYNTHETIC_MEMORY_MODEL_TEST_FAILED'
+            print(json.dumps({'event':'SYNTHETIC_MEMORY_MODEL_TEST','status':'PASS','request_id':reply.get('request_id'),'phone_storage_tested':False}),flush=True)
     finally:
         proc.terminate();proc.wait(timeout=10)
         if mock:mock.shutdown()
