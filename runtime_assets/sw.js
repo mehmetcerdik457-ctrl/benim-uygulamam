@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='mehmet-pwa-v0.2.2-owner-memory-1';
+const CACHE='mehmet-pwa-v0.2.2-owner-memory-2';
 const CORE=['./','./index.html','./MEHMET.html','./styles.css','./app.js','./manifest.webmanifest','./locales/core.json','./icons/icon-192.png','./icons/icon-512.png','./icons/icon.svg'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('mehmet-pwa-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
