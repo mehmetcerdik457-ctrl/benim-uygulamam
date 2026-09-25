@@ -1,0 +1,55 @@
+name: Model Router Validation
+
+on:
+  push:
+    branches:
+      - ai/model-router-astra-oss-20260925
+  pull_request:
+    branches:
+      - real-ai-backend-p1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Exact checkout evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo "CHECKED_OUT_HEAD=$(git rev-parse HEAD)"
+          git status --short --branch
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile and security self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q backend tests scripts
+          python scripts/security_selftest.py
+
+      - name: Run router contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet pytest
+          python -m pytest -q tests/test_backend_contract.py tests/test_router_http_contract.py
+
+      - name: Secret-pattern guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '(sk-proj-[A-Za-z0-9_-]{16,}|hf_[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.env.example'; then
+            echo "Potential live secret detected"
+            exit 1
+          fi
+          echo "MODEL_ROUTER_SECRET_PATTERN_GUARD=PASS"
