@@ -377,8 +377,9 @@ class Handler(BaseHTTPRequestHandler):
                 safe_codes = {"insufficient_quota", "invalid_api_key", "model_not_found",
                               "permission_denied", "unsupported_country_region_territory",
                               "organization_restricted", "access_terminated", "project_not_found",
-                              "invalid_request_error", "model_not_available"}
-                provider_code = provider_code if provider_code in safe_codes else "UNCLASSIFIED_PROVIDER_ERROR"
+                              "invalid_request_error", "model_not_available", "rate_limit_exceeded", "billing_hard_limit_reached"}
+                provider_type = provider_error.get("type") if isinstance(provider_error, dict) else None
+                provider_code = provider_code if provider_code in safe_codes else (provider_type if provider_type in safe_codes else "UNCLASSIFIED_PROVIDER_ERROR")
             except (ValueError, AttributeError):
                 provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
             print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code} provider_code={provider_code}", flush=True)
