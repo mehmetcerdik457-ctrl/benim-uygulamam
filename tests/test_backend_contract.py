@@ -26,6 +26,11 @@ def test_extract_response_text_direct():
     assert server.extract_response_text({"output_text": "ok"}) == "ok"
 
 
+def test_extract_response_text_openai_compatible_chat():
+    payload = {"choices": [{"message": {"content": "açık kaynak cevap"}}]}
+    assert server.extract_response_text(payload) == "açık kaynak cevap"
+
+
 def test_build_input_keeps_attachment_metadata_only():
     text = server.build_input(
         "incele",
@@ -54,14 +59,45 @@ def test_rate_limit_window(monkeypatch):
     assert server.rate_allowed("x", 161.1)
 
 
-def test_configured_false_without_key(monkeypatch):
+def test_openai_configured(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    assert server.configured() is False
-
-
-def test_configured_true_with_key(monkeypatch):
+    assert server.openai_configured() is False
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
-    assert server.configured() is True
+    assert server.openai_configured() is True
+
+
+def test_huggingface_configured(monkeypatch):
+    monkeypatch.delenv("HF_TOKEN", raising=False)
+    assert server.huggingface_configured() is False
+    monkeypatch.setenv("HF_TOKEN", "test-only-not-a-real-token")
+    assert server.huggingface_configured() is True
+
+
+def test_provider_normalization_and_profiles():
+    assert server.normalize_provider("hf") == "huggingface"
+    assert server.normalize_provider("openai") == "openai"
+    assert server.normalize_profile("max") == "max"
+    assert server.select_model("openai", profile="max") == "gpt-6-astra"
+    assert server.select_model("openai", profile="balanced") == "gpt-6-sol"
+    assert server.select_model("openai", profile="fast") == "gpt-6-luna"
+    assert server.select_model("huggingface", profile="balanced") == "openai/gpt-oss-20b:preferred"
+
+
+def test_provider_and_model_fail_closed():
+    for bad in ("other", "local"):
+        try:
+            server.normalize_provider(bad)
+        except ValueError as exc:
+            assert str(exc) == "PROVIDER_NOT_ALLOWED"
+        else:
+            raise AssertionError("unexpected provider accepted")
+
+    try:
+        server.select_model("openai", requested_model="not-allowed")
+    except ValueError as exc:
+        assert str(exc) == "MODEL_NOT_ALLOWED"
+    else:
+        raise AssertionError("unexpected model accepted")
 
 
 def test_proxy_configured_false_without_token(monkeypatch):
