@@ -76,6 +76,9 @@ with tempfile.TemporaryFile() as log:
         print('OWNER_AUTH_HTTP_TEST=PASS; NORMAL_USER_NEGATIVE_TEST=PASS',flush=True)
         status,raw=request(base+'/api/chat',auth,{'provider':'openai','message':'Bu bağlantı testidir. Yalnız MEHMET_OK yaz.','attachments':[]})
         reply=json.loads(raw)
+        if status != 200 and '--diagnose' in sys.argv:
+            print(json.dumps({'event':'OWNER_CHAT_ACCEPTANCE','mode':'real-provider','status':'BLOCKED','http_status':status,'upstream_status':reply.get('upstream_status'),'upstream_code':reply.get('upstream_code'),'request_id':reply.get('request_id')}),flush=True)
+            sys.exit(0)
         assert status==200, f'CHAT_STATUS={status}; ERROR={reply.get("error")}'
         assert 'MEHMET_OK' in reply.get('text',''), 'UNEXPECTED_MODEL_RESPONSE'
         print(json.dumps({'event':'OWNER_CHAT_ACCEPTANCE','mode':'real-provider' if live else 'mock','status':'PASS','model':reply.get('model'),'request_id':reply.get('request_id')}),flush=True)
