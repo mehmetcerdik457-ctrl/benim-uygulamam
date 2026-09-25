@@ -370,12 +370,24 @@ class Handler(BaseHTTPRequestHandler):
         try:
             reply, model = call_openai(message, attachments)
         except urllib.error.HTTPError as exc:
-            print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code}", flush=True)
+            # Log only a bounded provider error code; never keys or raw response bodies.
+            try:
+                provider_error = json.loads(exc.read(16384)).get("error", {})
+                provider_code = provider_error.get("code") if isinstance(provider_error, dict) else None
+                safe_codes = {"insufficient_quota", "invalid_api_key", "model_not_found",
+                              "permission_denied", "unsupported_country_region_territory",
+                              "organization_restricted", "access_terminated", "project_not_found",
+                              "invalid_request_error", "model_not_available"}
+                provider_code = provider_code if provider_code in safe_codes else "UNCLASSIFIED_PROVIDER_ERROR"
+            except (ValueError, AttributeError):
+                provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
+            print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code} provider_code={provider_code}", flush=True)
             self._send(
                 502,
                 {
                     "error": "UPSTREAM_PROVIDER_ERROR",
                     "upstream_status": exc.code,
+                    "upstream_code": provider_code,
                     "request_id": request_id,
                 },
                 request_id,
