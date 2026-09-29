@@ -76,6 +76,8 @@ def main() -> None:
         mock = ThreadingHTTPServer(("127.0.0.1", 0), MockBackend)
         threading.Thread(target=mock.serve_forever, daemon=True).start()
         env.update(
+            OWNER_BASIC_USER="mehmet-sites-test",
+            OWNER_BASIC_PASSWORD=secrets.token_urlsafe(32),
             SITES_BFF_TOKEN="sites-bff-test-" + secrets.token_urlsafe(32),
             AI_BACKEND_PROXY_TOKEN="sites-bff-local-proxy",
             AI_BACKEND_URL=f"http://127.0.0.1:{mock.server_port}",
