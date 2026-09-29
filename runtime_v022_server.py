@@ -1,4 +1,5 @@
 import hashlib
+import hmac
 import http.server
 import json
 import mimetypes
@@ -169,6 +170,17 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _owner_gate(self, path):
         if path == "/__health":
             return True
+
+        # Dedicated server-to-server Sites credential: chat only, never a browser login.
+        site_token = os.getenv("SITES_BFF_TOKEN", "")
+        supplied = self.headers.get("X-Mehmet-Sites-BFF", "")
+        if supplied:
+            if (path == "/api/chat" and self.command == "POST" and
+                    len(site_token) >= 32 and len(supplied) <= 256 and
+                    hmac.compare_digest(supplied.encode(), site_token.encode())):
+                return True
+            self._send_bytes(403, "application/json", b'{"error":"SITES_BFF_FORBIDDEN"}')
+            return False
 
         if owner_auth_configured():
             if owner_authorized(self.headers.get("Authorization")):
