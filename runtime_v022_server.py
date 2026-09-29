@@ -1,5 +1,4 @@
 import hashlib
-import hmac
 import http.server
 import json
 import mimetypes
@@ -11,7 +10,12 @@ import zipfile
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
-from runtime_security import backend_proxy_token, owner_auth_configured, owner_authorized
+from runtime_security import (
+    backend_proxy_token,
+    owner_auth_configured,
+    owner_authorized,
+    sites_bff_authorized,
+)
 
 EXPECTED_SHA256 = "518d82cceb2843bc4db75d46876f1adc57558b601264bf2e888c9b09232fcbb0"
 BASE_DIR = pathlib.Path(__file__).resolve().parent
@@ -172,12 +176,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return True
 
         # Dedicated server-to-server Sites credential: chat only, never a browser login.
-        site_token = os.getenv("SITES_BFF_TOKEN", "")
         supplied = self.headers.get("X-Mehmet-Sites-BFF", "")
         if supplied:
-            if (path == "/api/chat" and self.command == "POST" and
-                    len(site_token) >= 32 and len(supplied) <= 256 and
-                    hmac.compare_digest(supplied.encode(), site_token.encode())):
+            if sites_bff_authorized(supplied, path, self.command):
                 return True
             self._send_bytes(403, "application/json", b'{"error":"SITES_BFF_FORBIDDEN"}')
             return False
