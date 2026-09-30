@@ -25,6 +25,7 @@ def main() -> None:
             "OWNER_BASIC_USER",
             "OWNER_BASIC_PASSWORD",
             "AI_BACKEND_PROXY_TOKEN",
+            "SITES_BFF_TOKEN",
         )
     }
     try:
@@ -34,10 +35,13 @@ def main() -> None:
         assert runtime_security.owner_auth_configured() is False
         assert runtime_security.owner_authorized(basic("x", "y")) is False
         assert runtime_security.backend_proxy_token() == ""
+        assert runtime_security.sites_bff_configured() is False
+        assert runtime_security.sites_bff_authorized("x" * 48, "/api/chat", "POST") is False
 
         os.environ["OWNER_BASIC_USER"] = "mehmet"
         os.environ["OWNER_BASIC_PASSWORD"] = "selftest-password"
         os.environ["AI_BACKEND_PROXY_TOKEN"] = "selftest-proxy-token"
+        os.environ["SITES_BFF_TOKEN"] = "selftest-sites-bff-token-" + ("x" * 32)
 
         assert runtime_security.owner_auth_configured() is True
         assert runtime_security.owner_authorized(
@@ -47,6 +51,12 @@ def main() -> None:
             basic("mehmet", "wrong")
         ) is False
         assert runtime_security.backend_proxy_token() == "selftest-proxy-token"
+        sites_token = os.environ["SITES_BFF_TOKEN"]
+        assert runtime_security.sites_bff_configured() is True
+        assert runtime_security.sites_bff_authorized(sites_token, "/api/chat", "POST") is True
+        assert runtime_security.sites_bff_authorized(sites_token, "/api/chat", "GET") is False
+        assert runtime_security.sites_bff_authorized(sites_token, "/api/owner/status", "POST") is False
+        assert runtime_security.sites_bff_authorized("wrong-" + sites_token, "/api/chat", "POST") is False
     finally:
         for key, value in saved.items():
             if value is None:

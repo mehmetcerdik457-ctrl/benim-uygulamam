@@ -38,3 +38,19 @@ def owner_authorized(authorization_header: str | None) -> bool:
 def backend_proxy_token() -> str:
     return os.getenv("AI_BACKEND_PROXY_TOKEN", "").strip()
 
+
+
+def sites_bff_configured() -> bool:
+    """Return True only when a production-strength Sites BFF token exists."""
+    return len(os.getenv("SITES_BFF_TOKEN", "").strip()) >= 32
+
+
+def sites_bff_authorized(supplied: str | None, path: str, method: str) -> bool:
+    """Authorize the dedicated Sites server credential for chat only."""
+    expected = os.getenv("SITES_BFF_TOKEN", "").strip()
+    candidate = (supplied or "").strip()
+    if len(expected) < 32 or not candidate or len(candidate) > 256:
+        return False
+    if path != "/api/chat" or (method or "").upper() != "POST":
+        return False
+    return hmac.compare_digest(candidate.encode(), expected.encode())

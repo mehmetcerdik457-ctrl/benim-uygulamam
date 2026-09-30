@@ -1,0 +1,27 @@
+name: Package Sites BFF Hardening
+on:
+  push:
+    branches: [site-bff-hardening-20260929]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          git archive --format=zip --output=dist/MEHMET_SITES_BFF_HARDENING_20260929.zip HEAD
+          sha256sum dist/MEHMET_SITES_BFF_HARDENING_20260929.zip | tee dist/SHA256SUMS.txt
+          printf '%s\n' "HEAD=$(git rev-parse HEAD)" | tee dist/BUILD_INFO.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MEHMET_SITES_BFF_HARDENING_20260929
+          path: |
+            dist/MEHMET_SITES_BFF_HARDENING_20260929.zip
+            dist/SHA256SUMS.txt
+            dist/BUILD_INFO.txt
+          if-no-files-found: error
