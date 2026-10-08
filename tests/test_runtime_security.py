@@ -34,3 +34,24 @@ def test_backend_proxy_token(monkeypatch):
     assert runtime_security.backend_proxy_token() == ""
     monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "internal-test-token")
     assert runtime_security.backend_proxy_token() == "internal-test-token"
+
+
+def test_sites_bff_fails_closed_without_strong_token(monkeypatch):
+    monkeypatch.delenv("SITES_BFF_TOKEN", raising=False)
+    assert runtime_security.sites_bff_configured() is False
+    assert runtime_security.sites_bff_authorized("x" * 40, "/api/chat", "POST") is False
+    monkeypatch.setenv("SITES_BFF_TOKEN", "too-short")
+    assert runtime_security.sites_bff_configured() is False
+    assert runtime_security.sites_bff_authorized("too-short", "/api/chat", "POST") is False
+
+
+def test_sites_bff_is_exact_and_chat_post_only(monkeypatch):
+    token = "s" * 48
+    monkeypatch.setenv("SITES_BFF_TOKEN", token)
+    assert runtime_security.sites_bff_configured() is True
+    assert runtime_security.sites_bff_authorized(token, "/api/chat", "POST") is True
+    assert runtime_security.sites_bff_authorized("x" * 48, "/api/chat", "POST") is False
+    assert runtime_security.sites_bff_authorized(token, "/api/chat", "GET") is False
+    assert runtime_security.sites_bff_authorized(token, "/api/owner/status", "POST") is False
+    assert runtime_security.sites_bff_authorized(token, "/api/research", "POST") is False
+    assert runtime_security.sites_bff_authorized(token + ("x" * 300), "/api/chat", "POST") is False
