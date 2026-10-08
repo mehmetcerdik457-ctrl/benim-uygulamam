@@ -71,8 +71,15 @@ with tempfile.TemporaryFile() as log:
         status,raw=request(base+'/api/owner/status',auth)
         assert status==200 and json.loads(raw)['authenticated']
         assert json.loads(raw)['owner']['AUTH_LEVEL']=='OWNER'
-        assert request(base+'/app.js',auth)[0]==200
-        assert request(base+'/sw.js',auth)[0]==200
+        # WebAPK launches /MEHMET.html (not the /api/health endpoint).
+        # Exercise its protected entrypoint and the assets required to load it.
+        for asset in ('/MEHMET.html', '/index.html', '/manifest.webmanifest', '/app.js', '/sw.js'):
+            status, _ = request(base + asset)
+            assert status == 401, f'ANONYMOUS_ASSET_EXPOSED {asset}: {status}'
+            status, raw = request(base + asset, auth)
+            assert status == 200 and raw, f'OWNER_ASSET_BLOCKED {asset}: {status}'
+        assert request(base+'/owner-login')[0] == 401
+        print('WEBAPK_OWNER_ENTRYPOINT_HTTP_TEST=PASS',flush=True)
         print('OWNER_AUTH_HTTP_TEST=PASS; NORMAL_USER_NEGATIVE_TEST=PASS',flush=True)
         status,raw=request(base+'/api/chat',auth,{'provider':'openai','message':'Bu bağlantı testidir. Yalnız MEHMET_OK yaz.','attachments':[]})
         reply=json.loads(raw)
