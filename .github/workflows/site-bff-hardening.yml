@@ -20,5 +20,7 @@ jobs:
           python -m pytest -q tests/test_runtime_security.py
       - name: Deployment security self-test
         run: python scripts/runtime_security_selftest.py
+      - name: WebAPK launch login and owner chat mock acceptance
+        run: python scripts/owner_acceptance.py
       - name: Sites BFF local HTTP acceptance
         run: python scripts/sites_bff_acceptance.py
