@@ -27,6 +27,16 @@ jobs:
         run: docker compose -f compose.omega.yml config -q
         env:
           OMEGA_DEV_DB_PASSWORD: "CI_PLACEHOLDER_NOT_REAL"
+      - name: Start disposable demo and verify live health
+        env:
+          OMEGA_DEV_DB_PASSWORD: "CI_PLACEHOLDER_NOT_REAL"
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'docker compose -f compose.omega.yml down --remove-orphans' EXIT
+          docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 180
+          curl --fail --show-error --silent --retry 5 --retry-delay 2 http://127.0.0.1:18080/health | python3 -c 'import json,sys; x=json.load(sys.stdin); assert x["status"]=="ok" and x["production_ready"] is False'
+          echo "OMEGA_MVI_COMPOSE_HEALTH=PASS"
       - name: Confirm no production mode
         run: |
           grep -F 'production_ready' omega_mvi/app/main.py
