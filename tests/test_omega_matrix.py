@@ -18,10 +18,10 @@ def specification_requirements():
     phase = None
     out = {}
     for line in SPEC.read_text(encoding="utf-8").splitlines():
-        match = re.match(r"^##\\s+(FAZ\\s+(?:0|I|II|III|IV|V|VI|VII|VIII|IX))\\b", line)
+        match = re.match(r"^##\s+(FAZ\s+(?:0|I|II|III|IV|V|VI|VII|VIII|IX))\b", line)
         if match:
             phase = match.group(1)
-        match = re.match(r"^(\\d{1,3})\\.\\s+(.+)$", line)
+        match = re.match(r"^(\d{1,3})\.\s+(.+)$", line)
         if match and phase:
             n = int(match.group(1))
             if 1 <= n <= 100:
@@ -59,7 +59,7 @@ def test_statuses_are_bounded_and_done_requires_evidence():
 def test_dependencies_earlier_and_no_private_inventory():
     for n, row in enumerate(matrix_rows(), start=1):
         if row["Dependency"]:
-            assert re.fullmatch(r"OMEGA-\\d{3}", row["Dependency"])
+            assert re.fullmatch(r"OMEGA-\d{3}", row["Dependency"])
             assert 1 <= int(row["Dependency"][-3:]) < n
         assert "OPENAI_API_KEY=" not in str(row)
         assert "ghp_" not in str(row)
