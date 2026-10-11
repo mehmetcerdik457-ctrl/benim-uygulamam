@@ -70,7 +70,7 @@ def get(conn,task_id,owner=None):
     else:
         if not isinstance(owner,str) or _OWNER.fullmatch(owner) is None:
             raise ValueError("invalid verified owner")
-        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata FROM omega_tasks WHERE task_id=%s AND owner=%s",(task_id,owner)).fetchone()
+        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata,budget_limit_minor,budget_currency,permissions,deadline_utc FROM omega_tasks WHERE task_id=%s AND owner=%s",(task_id,owner)).fetchone()
     if row is None: return None
     return dict(zip(("task_id","owner","state","trace_id","metadata","budget_limit_minor","budget_currency","permissions","deadline_utc"),row))
 
