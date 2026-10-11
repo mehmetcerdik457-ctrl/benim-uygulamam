@@ -38,7 +38,7 @@ _KNOWN_CREDENTIAL = re.compile(
     re.IGNORECASE,
 )
 _OPAQUE_FRAGMENT = re.compile(
-    r"(?<![A-Z0-9])[A-Z0-9][A-Z0-9._~+/-=]{22,}[A-Z0-9](?![A-Z0-9])",
+    r"(?<![A-Z0-9])[A-Z0-9][A-Z0-9._~+/=-]{22,}[A-Z0-9](?![A-Z0-9])",
     re.IGNORECASE,
 )
 
