@@ -6,6 +6,7 @@ on:
     paths:
       - 'scripts/omega_ops_isolated_restore.sh'
       - 'tests/test_omega_ops_contract.py'
+      - 'scripts/omega_ops_source_inventory.py'
       - 'docs/OMEGA_OPERATIONS_RECOVERY_EVIDENCE.md'
       - '.github/workflows/omega-ops-recovery.yml'
 
@@ -28,6 +29,8 @@ jobs:
         run: |
           bash -n scripts/omega_ops_isolated_restore.sh
           python3 -m unittest discover -s tests -p 'test_omega_ops_contract.py' -v
+      - name: Bounded source pins and supply chain NOTRUN inventory
+        run: python3 scripts/omega_ops_source_inventory.py
       - name: Create random throwaway marker and database password
         run: |
           pw="$(openssl rand -hex 18)"
