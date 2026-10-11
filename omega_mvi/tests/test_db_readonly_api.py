@@ -74,3 +74,20 @@ def test_real_postgres_reader_role_cannot_read_details_or_write(ready_demo):
         ]:
             with pytest.raises(psycopg.Error):
                 low.execute(statement,params)
+
+
+def test_live_http_dashboard_assets_and_csp_with_real_postgres(ready_demo):
+    # Uses same real PostgreSQL and same FastAPI container as owner-isolation tests.
+    origin="http://api:8000"
+    root=httpx.get(origin+"/",timeout=5)
+    assert root.status_code==200
+    assert "Türkçe güvenli müfettiş" in root.text
+    assert "unsafe-inline" not in root.headers["content-security-policy"]
+    assert "script-src 'self'" in root.headers["content-security-policy"]
+    js=httpx.get(origin+"/assets/dashboard.js",timeout=5)
+    css=httpx.get(origin+"/assets/dashboard.css",timeout=5)
+    assert js.status_code==200 and css.status_code==200
+    assert "textContent" in js.text and "innerHTML" not in js.text
+    assert "/api/demo/task-status" in js.text
+    assert "stylesheet" in root.text
+    assert httpx.post(origin+"/api/execute",json={"target":"synthetic"},timeout=5).status_code==403
