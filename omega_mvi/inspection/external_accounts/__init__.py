@@ -157,7 +157,8 @@ def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
 
     `fetch_page(folder_id, page_token)` MUST be an adapter restricted to an
     authorized Drive files.list metadata query for this exact folder. It must
-    return {status: 200, files: [...], next_page_token: str | None} using
+    return {status: 200, files: [...], next_page_token: str | None,
+            incomplete_search: False} using
     minimal fields. This layer cannot establish the adapter's OAuth scopes;
     it *does* fail closed on incomplete/duplicated/malformed pages.
     """
@@ -175,6 +176,8 @@ def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
         if type(response) is not dict or response.get("status") != 200:
             raise InventoryIncomplete("Drive metadata response not verified")
         files = response.get("files")
+        if response.get("incomplete_search") is not False:
+            raise InventoryIncomplete("Drive provider reported incomplete/unknown search")
         if type(files) is not list or len(files) > 100:
             raise InventoryIncomplete("Invalid Drive metadata page size")
         if "next_page_token" not in response:
