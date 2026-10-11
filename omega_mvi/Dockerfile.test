@@ -7,5 +7,7 @@ RUN python -m pip install --no-cache-dir -r requirements-test.txt
 COPY app /app/app
 COPY db /app/db
 COPY tests /app/tests
+COPY model_adapter /app/model_adapter
+COPY approval /app/approval
 USER 10001:10001
-CMD ["python","-m","pytest","-q","-rs","tests/test_postgres_integration.py","tests/test_p0_security.py"]
+CMD ["python","-m","pytest","-q","-rs","tests/test_postgres_integration.py","tests/test_p0_security.py","tests/test_task_controls.py","model_adapter/test_adapter.py","approval/test_contract.py"]
