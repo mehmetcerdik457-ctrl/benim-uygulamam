@@ -44,9 +44,15 @@ Central non-secret reporting location: [Issue #25](https://github.com/mehmetcerd
 - `drive_metadata_only`: mandatory exact folder ID allowlist,
   previously obtained **complete** metadata pages, verified direct parent,
   in-memory ID/MIME projection and MIME counts only. No names, owners,
-  permissions, descriptions, file bytes or downloads. Not yet wired to live
-  Drive pagination. Drive metadata may itself be sensitive: do not print
-  IDs in public issues, logs, RAG or LLM context.
+  permissions, descriptions, file bytes or downloads. New
+  `drive_metadata_pages` checks every provider page for explicit
+  `incomplete_search=False`, exact folder-parent membership, bounded
+  next-page tokens, no repeated items/tokens, and returns **only aggregate
+  MIME counts**, never file IDs or page tokens. The adapter must map
+  Google Drive's `incompleteSearch` and `nextPageToken` fields and must
+  itself prove the exact folder query and least-privilege OAuth scope;
+  **live Drive pagination is not connected**. Metadata may itself be
+  sensitive: never print raw IDs in public issues/logs/RAG/LLM.
 
 `omega_mvi/inspection/external_accounts/secret_findings.py`:
 - Maps detector identifiers (hints, NOT actual validity checks) to GitHub,
@@ -57,10 +63,13 @@ Central non-secret reporting location: [Issue #25](https://github.com/mehmetcerd
   SUSPECTED_UNVERIFIED classification. **No secret match, raw token, hash
   or password fields.** Records are created only from pre-classified detector
   IDs; the module performs no scanning itself.
-- Remediation state transitions cannot label revocation/rotation verified
-  without supplied owner-approval and provider-verification flags; even with
-  flags, the module does not independently validate evidence or call provider
-  APIs. Actual verified status remains **UNKNOWN** for real accounts.
+- Verified remediation states (`REVOKED_VERIFIED`, `ROTATED_VERIFIED`,
+  `FALSE_POSITIVE_VERIFIED`) are **impossible to set** through this
+  untrusted helper, even if a caller asserts `owner_approved=True` and
+  `provider_verified=True`. These are forgeable booleans, not proof.
+  An independent owner-private provider-attestation mechanism is a
+  prerequisite. The module does not call any provider API. Actual verified
+  status remains **UNKNOWN** for all real accounts.
 
 ## Official manual rotation / revocation playbooks (OMEGA-018)
 
@@ -74,8 +83,12 @@ Distinguish *suspected* pattern, *confirmed compromised*, *replaced* and
    prepare a least-privilege replacement via GitHub Settings and update
    consumers in their approved secret stores; use the corresponding GitHub
    token or app authorization revocation control. Review active
-   integrations/audit trail. Mass revoke is destructive and requires owner
-   approval. [GitHub credential revocation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/revoking-your-credentials).
+   integrations/audit trail. Note that GitHub's "Revoke all" page
+   describes **enterprise-wide bulk/SSO actions**, not ordinary PAT
+   revocation; do not select bulk controls for one leaked PAT.
+   [GitHub personal access token management](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens),
+   [token expiration/revocation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/token-expiration-and-revocation),
+   [emergency bulk revocation (separate, high impact)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/revoking-your-credentials).
 2. **Google Cloud service account key:** Prefer keyless workload federation
    where applicable. Owner scopes service account and workloads, arranges
    replacement, updates consumers, **disables** old key, tests business
@@ -97,7 +110,7 @@ Distinguish *suspected* pattern, *confirmed compromised*, *replaced* and
 5. **OpenAI API key:** Owner identifies affected project, creates a new
    project-scoped key as needed, updates consumers, then uses API Keys page
    to delete old key. Deletion can break dependents.
-   [OpenAI official help](https://help.openai.com/en/articles/4936850-where-do-i-find-my-op).
+   [OpenAI exposed-key guidance](https://help.openai.com/en/articles/8304786-keeping-your-openai-account-secure).
 6. **GitLab personal/project token:** Owner selects exact token type
    and uses the corresponding token Rotate/Revoke controls. Rotation
    invalidates the previous token immediately and requires consumer
@@ -123,7 +136,8 @@ Store in a secured owner-controlled system, **not** this public repository.
 - Synthetic tests: `tests/test_omega_external_accounts.py`: allowlist,
   cross-repo denial, Link validation and two-page behavior, rate-limit
   fail-closed, Drive parent isolation and no byte/title projection,
-  provider mapping, risk and remediation status guards.
+  provider-incomplete-search and duplicate-token detection, provider
+  mapping, risk and remediation status guards, forged verified-state denial.
 - This code is not yet a live GitHub/Drive production integration. Must
   independently review the exact commit, run branch CI and verify no
   other specialists' files changed; obtain explicit owner approval before
@@ -131,9 +145,11 @@ Store in a secured owner-controlled system, **not** this public repository.
 - OMEGA-011: **PARTIAL** (live target metadata, offline integration tests;
   fork API/list and rate limit headers not fully verified).
 - OMEGA-012: **UNKNOWN / NOT RUN** (no GCP permission established).
-- OMEGA-013: **PARTIAL CODE / LIVE UNKNOWN** (scope-safe fixture workflow,
-  no explicit folder allowlist and no live folder listing).
+- OMEGA-013: **PARTIAL CODE / LIVE UNKNOWN** (scope-safe, two-page tested
+  metadata-only helper, no explicitly approved real folder and no live
+  folder listing or OAuth scope verification).
 - OMEGA-017: **PARTIAL** (schema and synthetic tests, no actual secret scan
   finding and no real provider confirmation).
-- OMEGA-018: **PROCEDURE DRAFT** (official instructions, no actual rotations
-  or revocations, no owner/provider approval proof).
+- OMEGA-018: **PROCEDURE DRAFT** (official instructions cross-checked
+  2026-10-11; no actual rotations or revocations; forged boolean-only
+  `VERIFIED` transitions blocked; no owner/provider approval proof).
