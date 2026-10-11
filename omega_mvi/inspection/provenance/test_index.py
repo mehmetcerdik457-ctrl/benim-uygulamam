@@ -1,12 +1,14 @@
 """Offline synthetic tests; never touch owner disks or external services."""
 import copy
+import hashlib
 import pytest
-from omega_mvi.inspection.provenance import make_fixture_record, build_index, compare_indices
+from omega_mvi.inspection.provenance import make_fixture_record, build_index, compare_indices, _digest
 
 
 def fields(data=b"hello", **overrides):
     metadata = dict(kind="regular_file", size_bytes=len(data), mtime_ns=100,
-                    mode=0o600, uid=1000, gid=1000, acl_sha256=None, xattr_sha256=None)
+                    mode=0o600, uid=1000, gid=1000, acl_sha256=hashlib.sha256(b"").hexdigest(),
+                    xattr_sha256=hashlib.sha256(b"").hexdigest())
     metadata.update(overrides)
     return dict(source_ref="synthetic://case-01", relative_path="safe/file.txt",
                 source_version="v1", data=data, metadata=metadata,
@@ -109,3 +111,103 @@ def test_added_and_removed_and_duplicate_identity():
     assert compare_indices(a, b)["removed"] == ["synthetic://case-01/safe/file.txt"]
     with pytest.raises(ValueError):
         build_index([record(), record()], version=1)
+
+
+def test_orphan_version_or_restarted_genesis_rejected():
+    with pytest.raises(ValueError):
+        build_index([record()], version=2)
+    genesis = build_index([record()], version=1)
+    with pytest.raises(ValueError):
+        build_index([record()], version=1, previous=genesis)
+
+
+def test_unknown_acl_and_xattr_fail_closed():
+    for key in ("acl_sha256", "xattr_sha256"):
+        args = fields()
+        args["metadata"][key] = None
+        with pytest.raises(ValueError, match="ACL/xattr"):
+            make_fixture_record(**args)
+    args = fields()
+    args["metadata"]["mode"] = True
+    with pytest.raises(ValueError):
+        make_fixture_record(**args)
+
+
+@pytest.mark.parametrize("path", ["a\nb", "a\x00b", "a?b", "a/b/../c", "a/./c", "a//b"])
+def test_malformed_synthetic_paths_rejected(path):
+    args = fields()
+    args["relative_path"] = path
+    with pytest.raises(ValueError):
+        make_fixture_record(**args)
+
+
+@pytest.mark.parametrize("owner", ["owner:", "owner:sensitive email@example.net", "not-owner", None])
+def test_opaque_owner_ref_rejected(owner):
+    args = fields()
+    args["owner_ref"] = owner
+    with pytest.raises(ValueError):
+        make_fixture_record(**args)
+
+
+@pytest.mark.parametrize("timestamp", ["2026-10-11T10:00:00", "not-a-time", "", None])
+def test_verification_requires_real_timezone(timestamp):
+    args = fields()
+    args["verified_at"] = timestamp
+    with pytest.raises(ValueError):
+        make_fixture_record(**args)
+
+
+@pytest.mark.parametrize("name,value", [
+    ("relative_path", "../private"),
+    ("source_ref", "synthetic://../../escaped"),
+    ("source_version", "../bad"),
+    ("owner_ref", "owner:"),
+    ("retention_days", True),
+    ("retention_days", -1),
+    ("access_level", "restricted"),
+    ("verified_at", "2026-10-11T10:00:00"),
+])
+def test_recomputed_hash_cannot_legalize_bad_fixture_field(name, value):
+    forged = record()
+    forged[name] = value
+    tmp = dict(forged)
+    tmp.pop("record_sha256")
+    forged["record_sha256"] = _digest(tmp)
+    with pytest.raises(ValueError):
+        build_index([forged], version=1)
+
+
+def test_recomputed_hash_cannot_legalize_extra_field():
+    forged = record()
+    forged["unexpected"] = "ignored-by-some-consumers"
+    tmp = dict(forged)
+    tmp.pop("record_sha256")
+    forged["record_sha256"] = _digest(tmp)
+    with pytest.raises(ValueError):
+        build_index([forged], version=1)
+
+
+def test_tampered_genesis_index_rehashed_still_rejected():
+    original = build_index([record()], version=1)
+    forged = copy.deepcopy(original)
+    forged["version"] = 2
+    forged["previous_index_sha256"] = None
+    tmp = dict(forged)
+    tmp.pop("index_sha256")
+    forged["index_sha256"] = _digest(tmp)
+    with pytest.raises(ValueError):
+        compare_indices(forged, original)
+
+
+def test_verified_utc_timestamp_canonicalized():
+    args = fields()
+    args["verified_at"] = "2026-10-11T13:00:00+03:00"
+    assert make_fixture_record(**args)["verified_at"] == "2026-10-11T10:00:00Z"
+
+
+def test_synthetic_record_count_limit_and_data_limit():
+    args = fields(b"x" * (1024 * 1024 + 1))
+    with pytest.raises(ValueError):
+        make_fixture_record(**args)
+    with pytest.raises(ValueError):
+        build_index([record()] * 1001, version=1)
