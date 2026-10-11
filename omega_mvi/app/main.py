@@ -1,6 +1,7 @@
 """OMEGA Phase 0 demonstration: health only, no provider integrations."""
 
 from fastapi import FastAPI, HTTPException
+from omega_mvi.inspection.service import build_synthetic_snapshot
 
 app = FastAPI(title="OMEGA demo", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -22,6 +23,14 @@ def health():
 @app.get("/api/readiness")
 def readiness():
     return {"production_ready": False, "reasons": ["phase_0_unaccepted", "mvi_unverified"]}
+
+
+@app.get("/api/inspection/demo")
+def synthetic_inspection():
+    try:
+        return build_synthetic_snapshot()
+    except Exception:
+        raise HTTPException(status_code=503, detail="Synthetic inspection unavailable") from None
 
 
 @app.post("/api/chat")
