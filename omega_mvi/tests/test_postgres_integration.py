@@ -10,8 +10,12 @@ from db.test_api import factory
 
 @pytest.fixture
 def connection():
-    url = os.environ["OMEGA_DATABASE_URL"]
-    sentinel = os.environ["OMEGA_TEST_DB_SENTINEL"]
+    url = os.environ.get("OMEGA_DATABASE_URL")
+    sentinel = os.environ.get("OMEGA_TEST_DB_SENTINEL")
+    if not url or not sentinel:
+        if os.environ.get("OMEGA_REQUIRE_REAL_DB")=="1":
+            pytest.fail("dedicated PostgreSQL CI must provide real disposable DB")
+        pytest.skip("non-integration workflow: real DB assertions run only in dedicated PostgreSQL job")
     with psycopg.connect(url,autocommit=True,connect_timeout=3) as conn:
         assert_disposable_target(url,sentinel,conn)
         apply(conn,"down",database_url=url,sentinel=sentinel)
