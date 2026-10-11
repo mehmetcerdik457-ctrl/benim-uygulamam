@@ -40,6 +40,8 @@ jobs:
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
       - name: Probe runner-host loopback; preserve BLOCKED acceptance status
         run: python3 scripts/omega_probe_runner_loopback.py
+      - name: Classify runner-host binding, internal network and TCP without claiming owner acceptance
+        run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Seed disposable DB guard token (never real data)
         run: |
           docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1),marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1,'${OMEGA_TEST_DB_SENTINEL}');"
