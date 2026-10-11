@@ -20,7 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Set demo-only ephemeral database password
-        run: echo "OMEGA_DEV_DB_PASSWORD=$(openssl rand -hex 18)" >> "$GITHUB_ENV"
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
       - name: Launch isolated PostgreSQL
         run: docker compose -f compose.omega.yml up -d --wait --wait-timeout 120 db
       - name: Real DB read/write, migration and rollback
