@@ -1,0 +1,43 @@
+schema_version: 1
+project: project-omega
+scope:
+  repository: mehmetcerdik457-ctrl/benim-uygulamam
+  visibility: public
+  allowed_actions:
+    - read files in this repository checkout
+    - make reviewed changes on the task branch
+    - run repository tests and read-only local environment probes
+  prohibited_or_unapproved:
+    - accessing repositories or accounts beyond this repository
+    - changing GitHub settings, branch protections, or repository visibility
+    - using GitHub, Google Cloud, Drive, or other provider APIs
+    - scanning local folders, mounted disks, or user data outside this checkout
+    - creating, rotating, revoking, or testing credentials
+    - deploying services or performing externally visible operations
+  authorization_status:
+    github_account_access: unverified
+    github_api_permissions: unverified
+    google_cloud: not_authorized_or_provisioned
+    google_drive: not_authorized_or_provisioned
+    external_integrations: not_authorized_or_provisioned
+environment:
+  observed_at: "2026-10-11"
+  context: isolated task runner; not representative of the owner's target machine
+  operating_system: "Linux x86_64 (Ubuntu-based runner)"
+  python: "3.12.3"
+  cpu: "4 visible vCPUs; AMD EPYC 7763 host"
+  memory: "15 GiB visible"
+  filesystem: "145 GiB root filesystem; 85 GiB available at observation"
+  gpu: "No NVIDIA GPU visible via nvidia-smi; other accelerators unverified"
+  docker_cli: present
+  github_cli: present; authentication and permissions unverified
+  network: "Interfaces present; connectivity, firewall, and exposed services unverified"
+  target_hardware: unknown
+policy:
+  default_mode: read_only
+  default_execution_mode: dry_run
+  destructive_or_external_actions_require_human_approval: true
+  secret_values_may_enter_llm_context: false
+  secret_values_may_enter_git_or_rag: false
+  model_output_grants_authority: false
+  unknown_permissions_are_denied: true
