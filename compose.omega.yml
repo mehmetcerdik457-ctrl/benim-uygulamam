@@ -6,6 +6,8 @@ services:
       context: ./omega_mvi
     environment:
       OMEGA_MODE: mock
+      OMEGA_DEMO_READS_ENABLED: ${OMEGA_DEMO_READS_ENABLED:-false}
+      OMEGA_DEMO_READER_URL: postgresql://omega_demo_reader:${OMEGA_DEMO_READER_PASSWORD:-}@db:5432/omega_demo
       OMEGA_EXTERNAL_API_ENABLED: "false"
       OMEGA_OWNER_DEVICE: UNKNOWN
     ports:
@@ -40,6 +42,8 @@ services:
       OMEGA_TEST_DB_SENTINEL: ${OMEGA_TEST_DB_SENTINEL:-}
       OMEGA_REQUIRE_REAL_DB: "1"
       OMEGA_TEST_RUNTIME_PASSWORD: ${OMEGA_TEST_RUNTIME_PASSWORD:-}
+      OMEGA_DEMO_READER_PASSWORD: ${OMEGA_DEMO_READER_PASSWORD:-}
+      OMEGA_REQUIRE_COMBINED_E2E: ${OMEGA_REQUIRE_COMBINED_E2E:-0}
     depends_on:
       db:
         condition: service_healthy
