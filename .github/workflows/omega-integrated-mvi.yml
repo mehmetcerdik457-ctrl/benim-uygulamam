@@ -1,0 +1,53 @@
+name: OMEGA integrated safe MVI
+
+on:
+  push:
+    branches: [omega/integration-mvi-safe-20261011]
+  pull_request:
+    paths:
+      - 'omega_mvi/**'
+      - 'docs/OMEGA_REQUIREMENTS_MATRIX.csv'
+      - 'docs/PROJECT_OMEGA_MASTER_SPEC_V2.md'
+      - 'compose.omega.yml'
+      - '.github/workflows/omega-integrated-mvi.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Generate disposable fixture credentials only
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+          marker="$(openssl rand -hex 16)"
+          echo "::add-mask::$marker"
+          echo "OMEGA_TEST_DB_SENTINEL=$marker" >> "$GITHUB_ENV"
+          runtime_password="$(openssl rand -hex 18)"
+          echo "::add-mask::$runtime_password"
+          echo "OMEGA_TEST_RUNTIME_PASSWORD=$runtime_password" >> "$GITHUB_ENV"
+      - name: Validate the ONE isolated Compose configuration
+        run: docker compose -f compose.omega.yml config -q
+      - name: Start real temporary PostgreSQL and local FastAPI
+        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+      - name: Insert independent test database identity marker
+        run: |
+          docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1), marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1, '${OMEGA_TEST_DB_SENTINEL}');"
+      - name: Real DB and security plus model adapter approval UI integration
+        run: |
+          docker compose -f compose.omega.yml --profile integration run --build --rm tests
+      - name: Verify the live API health and Turkish UI INSIDE isolated container
+        run: |
+          docker compose -f compose.omega.yml exec -T api python -c "import urllib.request; from urllib.parse import urljoin; base='http://127.0.0.1:8000/'; health=urllib.request.urlopen(base+'api/health', timeout=5).read().decode(); ui=urllib.request.urlopen(base,timeout=5).read().decode(); assert '\"production_ready\":false' in health.replace(' ',''); assert 'PROJECT OMEGA' in ui; assert 'Türkçe' in ui; print('OMEGA_INTEGRATION_API_UI=PASS')"
+      - name: Legacy backend, matrix, model, approval and dashboard regressions
+        run: |
+          python3 -m pip install --quiet -r omega_mvi/requirements-test.txt
+          python3 -m pytest -q tests omega_mvi/tests/test_mvi_health.py omega_mvi/tests/test_dashboard_tr.py omega_mvi/model_adapter/test_adapter.py omega_mvi/approval/test_contract.py
+      - name: Cleanup disposable containers and volumes
+        if: always()
+        run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans
