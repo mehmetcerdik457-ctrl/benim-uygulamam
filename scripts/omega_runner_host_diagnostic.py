@@ -113,12 +113,12 @@ def diagnose(*, runner=subprocess.run, connector=socket.create_connection,
     else:
         verdict = "BLOCKED_NOT_ACCEPTED"
     # Distinguish observed failure from unproven causal explanation.
-    if tcp == "REFUSED":
+    if binding == "MISSING":
+        cause = "HOST_PORT_MAPPING_MISSING_UPSTREAM_CAUSE_UNKNOWN"
+    elif tcp == "REFUSED":
         cause = "TCP_CONNECTION_REFUSED_ROOT_CAUSE_UNKNOWN"
     elif tcp == "TIMEOUT":
         cause = "TCP_TIMEOUT_ROOT_CAUSE_UNKNOWN"
-    elif binding == "MISSING":
-        cause = "HOST_PORT_MAPPING_MISSING"
     elif tcp == "ERROR":
         cause = "TCP_ERROR_ROOT_CAUSE_UNKNOWN"
     elif http_status == "BLOCKED":

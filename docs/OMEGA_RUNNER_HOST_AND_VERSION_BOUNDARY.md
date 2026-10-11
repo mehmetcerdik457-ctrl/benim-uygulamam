@@ -50,3 +50,22 @@ No 476/457 account asset, machine, disk, snapshot, subscription or debt result i
 ## Remaining acceptance blockers
 
 Verified identity / scoped permissions; atomic human approval with durable anti-replay controls; authorized GitHub integration; actual local model integration; full secret history scanning and image/dependency CVE review; tested independent restore and key recovery; branch protection and independent human review. All remain open. Do not merge to main or deploy.
+
+## New runner-host evidence (independent gate)
+
+At PR #58 candidate `cffd6a8fcd7e4d33177420a059273d87ac79e87a`,
+[GitHub Actions run 38124310806](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38124310806)
+job `114425358977` produced:
+
+```text
+OMEGA_PORT_POLICY=PASS
+OMEGA_RUNNER_HOST_BINDING=MISSING
+OMEGA_RUNNER_HOST_NETWORK=INTERNAL
+OMEGA_RUNNER_HOST_CONTAINER=PASS
+OMEGA_RUNNER_HOST_TCP=REFUSED
+OMEGA_RUNNER_HOST_HTTP=BLOCKED
+OMEGA_RUNNER_HOST_VERDICT=BLOCKED_NOT_ACCEPTED
+exit code 2 (required host acceptance)
+```
+
+This proves the **effective Docker-reported publication is missing at the runner** and TCP is refused, while the container and internal network remain healthy. **Why** Docker does not expose the declared localhost mapping remains UNKNOWN; never attribute this conclusively to `internal: true` without a controlled technical cause test. No isolation/bind/security setting has been relaxed. No owner device was contacted. The separate host acceptance workflow's FAILURE is an accurate open blocker, **not** a regression of the independent container-internal PostgreSQL/FastAPI E2E.

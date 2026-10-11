@@ -112,3 +112,16 @@ def test_missing_docker_does_not_claim_host_pass():
     assert result["verdict"] == "BLOCKED_NOT_ACCEPTED"
     assert result["binding"] == "UNVERIFIED"
     assert result["network"] == "UNVERIFIED"
+
+def test_effective_docker_port_mapping_missing_is_specific_blocker():
+    normal = runner_factory()
+    def no_binding(args, **kwargs):
+        if args[:3] == ["docker", "inspect", "--format"] and "Ports" in args[3]:
+            return Result(json.dumps({"8000/tcp": None}))
+        return normal(args, **kwargs)
+    report = h.diagnose(runner=no_binding, connector=refused)
+    assert report["network"] == "INTERNAL"
+    assert report["binding"] == "MISSING"
+    assert report["tcp"] == "REFUSED"
+    assert report["cause"] == "HOST_PORT_MAPPING_MISSING_UPSTREAM_CAUSE_UNKNOWN"
+    assert report["verdict"] == "BLOCKED_NOT_ACCEPTED"
