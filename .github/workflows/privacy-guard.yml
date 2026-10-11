@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           markers='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|sk-(proj-)?[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]{20,}'
-          if git grep -I -n -E "$markers" -- .; then
+          if git grep -I -q -E "$markers" -- .; then
             echo "Potential credential material detected."
             exit 1
           fi
