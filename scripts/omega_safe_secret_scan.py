@@ -7,8 +7,8 @@ PATTERNS = (r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
             r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY")
 
 def scan_quiet(*, cwd=None, runner=subprocess.run):
-    # No shell expansion and no line/filename output, even on a match.
-    result=runner(["git","grep","-I","-q","-E",PATTERNS,"--","."],
+    # Text and binary tracked blobs are scanned; no shell expansion, path, line or value output.
+    result=runner(["git","grep","-a","-q","-E",PATTERNS,"--","."],
                   cwd=cwd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
     if result.returncode==0:
         return False
