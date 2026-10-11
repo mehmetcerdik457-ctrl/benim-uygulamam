@@ -19,3 +19,22 @@ def test_invalid_controls_never_become_authority(bad):
           "deadline_utc":datetime.now(timezone.utc)+timedelta(hours=1),**bad}
     with pytest.raises(PermissionError):
         require_authenticated_task_permission(task,verified_principal="fixture-owner",action="execute")
+
+
+@pytest.mark.parametrize("override,reason",[
+    ({"budget_limit_minor":-3},"INVALID_BUDGET"),
+    ({"permissions":["execute:write"]},"SCOPE_DENIED"),
+    ({"deadline_utc":datetime.now(timezone.utc)-timedelta(minutes=1)},"DEADLINE_EXPIRED"),
+])
+def test_budget_permission_expiry_are_explicitly_fail_closed(override,reason):
+    task={"owner":"fixture-owner","budget_limit_minor":0,"budget_currency":"USD",
+          "permissions":["inventory:read"],"deadline_utc":datetime.now(timezone.utc)+timedelta(minutes=20),
+          **override}
+    with pytest.raises(PermissionError, match=reason):
+        require_authenticated_task_permission(task,verified_principal="fake-owner",action="inventory:read")
+
+def test_spending_over_budget_denied_even_with_plausible_owner_claim():
+    task={"owner":"fixture-owner","budget_limit_minor":10,"budget_currency":"USD",
+          "permissions":["inventory:read"],"deadline_utc":datetime.now(timezone.utc)+timedelta(minutes=20)}
+    with pytest.raises(PermissionError,match="BUDGET_EXHAUSTED"):
+        require_authenticated_task_permission(task,verified_principal="fake-owner",action="inventory:read",spent_minor=11)
