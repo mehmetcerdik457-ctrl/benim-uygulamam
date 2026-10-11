@@ -96,6 +96,9 @@ def test_029_encrypted_fixture_restore_and_tamper_rejection():
         restore_synthetic_backup(bytes(corrupted), key)
     with pytest.raises(SecurityDenied, match="INVALID_FIXTURE_ENVELOPE"):
         restore_synthetic_backup(envelope[:15], key)
+    # Refuse unbounded attacker-controlled envelope before attempting decryption.
+    with pytest.raises(SecurityDenied, match="INVALID_FIXTURE_ENVELOPE"):
+        restore_synthetic_backup(envelope + b"x" * (1024 * 1024 + 1), key)
     with pytest.raises(SecurityDenied, match="NON_SYNTHETIC_BACKUP_DENIED"):
         encrypt_synthetic_backup(b"production-data", key)
 
