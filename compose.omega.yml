@@ -5,6 +5,7 @@ services:
     build:
       context: ./omega_mvi
     environment:
+      OMEGA_DATABASE_URL: postgresql://omega_demo:${OMEGA_DEV_DB_PASSWORD}@db:5432/omega_demo
       OMEGA_MODE: mock
       OMEGA_EXTERNAL_API_ENABLED: "false"
       OMEGA_OWNER_DEVICE: UNKNOWN
