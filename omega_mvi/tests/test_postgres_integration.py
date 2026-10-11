@@ -46,7 +46,7 @@ def test_direct_update_rejected_and_integrity(connection):
     with pytest.raises(psycopg.Error):
         connection.execute("UPDATE omega_tasks SET state='RUNNING' WHERE task_id=%s",(tid,))
     assert store.get(connection,tid)["state"]=="CREATED"
-    with pytest.raises(psycopg.Error):
+    with pytest.raises(ValueError):
         store.create(connection,"fixture-owner",uuid4(),{"secret":"never-index"})
 
 def test_live_api_create_and_get_and_fail_closed(connection):
