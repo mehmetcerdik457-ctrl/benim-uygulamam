@@ -1,0 +1,29 @@
+name: OMEGA Inspection Integrated
+on:
+  push:
+    branches:
+      - omega/integration-inspection-p0-20261011
+  pull_request:
+    paths:
+      - 'omega_mvi/inspection/**'
+      - 'tests/test_inspection_retrieval.py'
+      - 'tests/test_pr_review.py'
+      - '.github/workflows/omega-inspection-integrated.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspection-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run imported module tests
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q omega_mvi/inspection/github_inventory/test_github_inventory.py omega_mvi/inspection/redaction/test_redaction.py tests/test_inspection_retrieval.py tests/test_pr_review.py
