@@ -27,7 +27,7 @@ def test_migration_roundtrip_and_idempotence(connection):
     url=os.environ["OMEGA_DATABASE_URL"]
     sentinel=os.environ["OMEGA_TEST_DB_SENTINEL"]
     assert apply(connection,"up",database_url=url,sentinel=sentinel) is False
-    assert [r[0] for r in connection.execute("SELECT version FROM omega_schema_version ORDER BY version").fetchall()] == [1,2]
+    assert [r[0] for r in connection.execute("SELECT version FROM omega_schema_version ORDER BY version").fetchall()] == [1,2,3]
     assert apply(connection,"down",database_url=url,sentinel=sentinel) is True
     assert apply(connection,"down",database_url=url,sentinel=sentinel) is False
     assert apply(connection,"up",database_url=url,sentinel=sentinel) is True
