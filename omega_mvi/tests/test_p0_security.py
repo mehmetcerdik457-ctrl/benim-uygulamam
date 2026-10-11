@@ -31,8 +31,12 @@ def test_invalid_database_guard_before_any_sql():
 
 @pytest.fixture
 def isolated_db():
-    url=os.environ["OMEGA_DATABASE_URL"]  # missing DB is a test failure, NOT a skip
-    sentinel=os.environ["OMEGA_TEST_DB_SENTINEL"]
+    url=os.environ.get("OMEGA_DATABASE_URL")
+    sentinel=os.environ.get("OMEGA_TEST_DB_SENTINEL")
+    if not url or not sentinel:
+        if os.environ.get("OMEGA_REQUIRE_REAL_DB")=="1":
+            pytest.fail("dedicated PostgreSQL job requires disposable DB")
+        pytest.skip("not an integration run: authoritative PostgreSQL job enforces no skips")
     with psycopg.connect(url,autocommit=True,connect_timeout=3) as conn:
         assert_disposable_target(url,sentinel,conn)
         apply(conn,"down",database_url=url,sentinel=sentinel)
