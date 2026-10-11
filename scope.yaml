@@ -1,0 +1,40 @@
+schema_version: "1.0"
+project: PROJECT_OMEGA
+policy:
+  default_mode: read_only
+  dry_run: true
+  default_decision: deny
+  human_approval_required_for:
+    - cross_repository_write
+    - secret_access_or_rotation
+    - permission_change
+    - public_disclosure
+    - backup_upload
+    - external_side_effect
+    - payment
+    - production_deployment
+    - merge
+    - deletion
+github:
+  reference_repository: "mehmetcerdik457-ctrl/benim-uygulamam"
+  initial_mode: read_only
+  additional_repositories: "discover_metadata_only; do not modify"
+google_drive:
+  mode: metadata_only
+  backup_mode: disabled_until_client_side_encryption_verified
+  contents_of_secret_documents: forbidden
+google_cloud:
+  status: access_not_verified
+  mode: denied_until_separately_scoped
+local_device:
+  status: not_connected
+  mode: denied_until_separately_scoped
+data:
+  default_classification: internal
+  secret_values_in_repo: forbidden
+  secret_values_in_logs: forbidden
+  secret_values_in_llm_context: forbidden
+  secret_values_in_index: forbidden
+validation:
+  production_ready: false
+  acceptance_evidence_required: true
