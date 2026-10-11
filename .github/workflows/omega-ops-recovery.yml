@@ -1,0 +1,40 @@
+name: OMEGA ops isolated recovery evidence
+on:
+  push:
+    branches: [omega/ops-recovery-audit-20261011]
+  pull_request:
+    paths:
+      - 'scripts/omega_ops_isolated_restore.sh'
+      - 'tests/test_omega_ops_contract.py'
+      - 'docs/OMEGA_OPERATIONS_RECOVERY_EVIDENCE.md'
+      - '.github/workflows/omega-ops-recovery.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-recovery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Guard against tracked secret disclosures
+        run: |
+          python3 scripts/omega_privacy_filename_check.py
+          python3 scripts/omega_safe_secret_scan.py
+      - name: Offline safety contract checks and shell syntax
+        run: |
+          bash -n scripts/omega_ops_isolated_restore.sh
+          python3 -m unittest discover -s tests -p 'test_omega_ops_contract.py' -v
+      - name: Create random throwaway marker and database password
+        run: |
+          pw="$(openssl rand -hex 18)"
+          marker="$(openssl rand -hex 16)"
+          echo "::add-mask::$pw"
+          echo "::add-mask::$marker"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+          echo "OMEGA_TEST_DB_SENTINEL=$marker" >> "$GITHUB_ENV"
+      - name: Real synthetic-only PostgreSQL backup restore and migration rollback
+        run: bash scripts/omega_ops_isolated_restore.sh
