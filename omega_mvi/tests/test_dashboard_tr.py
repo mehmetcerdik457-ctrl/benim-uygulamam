@@ -1,5 +1,7 @@
 from pathlib import Path
+import sys
 from fastapi.testclient import TestClient
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from app.main import app
 def test_turkish_dashboard_is_local_and_execution_denied():
     client=TestClient(app)
