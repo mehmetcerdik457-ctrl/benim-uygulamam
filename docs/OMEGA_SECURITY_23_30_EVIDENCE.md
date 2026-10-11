@@ -35,3 +35,14 @@ PYTHONPATH=.:omega_mvi python -m pytest -q tests/test_omega_security_offline.py
 Before the review-branch publication, the same isolated source files were executed locally: **7 passed**, no real account, network calls or recovery keys. This is not a GitHub Actions result. Re-run at the final review-branch full SHA and inspect its workflow logs.
 
 Rollback: close draft PR and delete only its isolated branch. No live permissions, secret values, databases or backups are modified.
+
+## Incremental continuation: offline signed-claim adversarial test expansion
+
+- Added `omega_mvi/security/oidc_fixture.py` and `tests/test_omega_oidc_fixture.py`: verification of **test-only** Ed25519-signed JWT-shaped claims using a fixed `.invalid` issuer, exact audience, finite synthetic key allowlist, issuer/audience/scope/nonce/time checks, in-memory replay rejection and PKCE S256/state comparison.
+- Negative test cases include `alg=none`, `alg=HS256`, attacker-supplied `jku`/`jwk`, wrong signing key, wrong audience/issuer/nonce, expired/future claims, oversized lifetime, replay, audience confusion, different scope and corrupted JWT. Real `require_live_oidc()` **continues to deny** even a valid signed fixture.
+- Tightened `restore_synthetic_backup` envelope upper bound before attempting AES-GCM decryption and added a negative oversized-input test. This is not a real database restore or recovery-key test.
+- Added `.github/workflows/omega-security-fixtures.yml`: test-specific read-only GitHub Actions job, no production secrets, pinned actions and test dependencies; runs the two fixture suites without relying on skipped database tests.
+- Local isolated test command: `PYTHONPATH=. python -m pytest -q -ra tests/test_omega_security_offline.py tests/test_omega_oidc_fixture.py` → **29 passed**, no skipped tests. The authoritative GitHub Actions workflow results must still be checked at the final exact HEAD SHA after this documentation change.
+- **Critical limitation:** This intentionally hand-scoped simulator is *not a reusable production JWT/OIDC verifier*. A true implementation must use vetted IdP libraries, real provider configuration, remote JWKS lifecycle and key rotation, secure session handling, durable replay and revocation, resource-level authorization and human approval. None are activated by this PR.
+
+Security acceptance remains **NOT ACCEPTED (6/6)**; the six requirement statuses in the authoritative matrix remain unchanged. Test progress does not indicate production readiness.
