@@ -37,3 +37,10 @@ def test_valid_git_repo_without_secrets_passes_even_with_binary_fixture():
         Path(tmp,"safe.bin").write_bytes(b"example\x00public metadata\x00")
         subprocess.run(["git","add","safe.bin"],cwd=tmp,check=True,capture_output=True)
         assert scan_quiet(cwd=tmp) is True
+
+def test_command_start_failure_does_not_log_system_paths(capsys):
+    def command_failed(*args, **kwargs):
+        raise FileNotFoundError("internal-disallowed-path")
+    assert scan_quiet(runner=command_failed) is False
+    captured=capsys.readouterr()
+    assert captured.out=="" and captured.err==""

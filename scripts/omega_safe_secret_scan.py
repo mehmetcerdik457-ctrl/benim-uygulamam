@@ -8,8 +8,11 @@ PATTERNS = (r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
 
 def scan_quiet(*, cwd=None, runner=subprocess.run):
     # Text and binary tracked blobs are scanned; no shell expansion, path, line or value output.
-    result=runner(["git","grep","-a","-q","-E",PATTERNS,"--","."],
-                  cwd=cwd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+    try:
+        result=runner(["git","grep","-a","-q","-E",PATTERNS,"--","."],
+                      cwd=cwd,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+    except OSError:
+        return False  # Missing git executable or I/O error always denies.
     if result.returncode==0:
         return False
     if result.returncode==1:
