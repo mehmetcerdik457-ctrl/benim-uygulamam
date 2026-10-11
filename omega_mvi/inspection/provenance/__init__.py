@@ -14,6 +14,52 @@ SCHEMA_VERSION = "omega.synthetic-provenance.v1"
 _ALLOWED_CLASSES = frozenset({"public", "internal", "confidential"})
 _METADATA_FIELDS = frozenset({"kind", "size_bytes", "mtime_ns", "mode", "uid", "gid", "acl_sha256", "xattr_sha256"})
 _HEX = frozenset("0123456789abcdef")
+_SAFE_PART = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-")
+_RECORD_FIELDS = frozenset({
+    "schema_version", "source_ref", "relative_path", "source_version", "owner_ref",
+    "access_level", "verified_at", "retention_days", "evidence_scope",
+    "content_sha256", "metadata", "metadata_sha256", "record_sha256",
+})
+_INDEX_FIELDS = frozenset({
+    "schema_version", "version", "previous_index_sha256", "entries", "index_sha256",
+})
+_MAX_RECORDS = 1000
+
+
+def _safe_component(value: object, maximum: int) -> bool:
+    return (type(value) is str and 0 < len(value) <= maximum
+            and all(char in _SAFE_PART for char in value))
+
+
+def _validate_identity(source_ref: object, relative_path: object,
+                       source_version: object, owner_ref: object) -> None:
+    if not isinstance(source_ref, str) or not source_ref.startswith("synthetic://"):
+        raise PermissionError("synthetic fixture source required")
+    source_name = source_ref[len("synthetic://"):]
+    if (len(source_ref) > 256 or not source_name or source_name.startswith("/")
+            or not all(_safe_component(part, 128) for part in source_name.split("/"))):
+        raise PermissionError("untrusted synthetic fixture source")
+    if (type(relative_path) is not str or len(relative_path) > 256
+            or not relative_path or relative_path.startswith("/")
+            or not all(_safe_component(part, 128) for part in relative_path.split("/"))):
+        raise ValueError("unsafe fixture relative path")
+    if not _safe_component(source_version, 128):
+        raise ValueError("invalid source version")
+    if (not isinstance(owner_ref, str) or not owner_ref.startswith("owner:")
+            or not _safe_component(owner_ref[6:], 122)):
+        raise ValueError("invalid opaque synthetic owner")
+
+
+def _verified_at_utc(verified_at: object) -> str:
+    try:
+        if not isinstance(verified_at, str):
+            raise ValueError("invalid verification timestamp")
+        dt = datetime.fromisoformat(verified_at.replace("Z", "+00:00"))
+        if dt.tzinfo is None or dt.utcoffset() is None:
+            raise ValueError("timezone required")
+        return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError("timezone-aware ISO-8601 required") from exc
 
 
 def _digest(value: Any) -> str:
@@ -38,8 +84,8 @@ def normalize_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     if result["mode"] > 0o7777:
         raise ValueError("invalid mode")
     for key in ("acl_sha256", "xattr_sha256"):
-        if result[key] is not None and not _is_sha256(result[key]):
-            raise ValueError("invalid metadata digest")
+        if not _is_sha256(result[key]):
+            raise ValueError("verified ACL/xattr digest mandatory; unknown means BLOCKED")
     return result
 
 
@@ -47,31 +93,16 @@ def make_fixture_record(*, source_ref: str, relative_path: str, source_version: 
                         data: bytes, metadata: Mapping[str, Any], owner_ref: str,
                         access_level: str, verified_at: str, retention_days: int) -> dict[str, Any]:
     """Hash only caller-supplied synthetic data. Never read a path or persist bytes."""
-    if not isinstance(source_ref, str) or not source_ref.startswith("synthetic://") or len(source_ref) > 256:
-        raise PermissionError("live source not authorized; synthetic fixture only")
-    if not isinstance(relative_path, str) or (not relative_path or len(relative_path) > 256
-          or relative_path.startswith("/") or "\\" in relative_path
-          or any(p in ("", ".", "..") for p in relative_path.split("/"))):
-        raise ValueError("invalid relative path")
+    _validate_identity(source_ref, relative_path, source_version, owner_ref)
     if type(data) is not bytes:
         raise ValueError("fixture must be bytes")
     if len(data) > 1024 * 1024:
         raise ValueError("fixture too large")
-    if not source_version or not isinstance(source_version, str) or len(source_version) > 128:
-        raise ValueError("source version is required")
-    if not owner_ref or not isinstance(owner_ref, str) or len(owner_ref) > 128:
-        raise ValueError("opaque owner reference required")
     if access_level not in _ALLOWED_CLASSES:
         raise PermissionError("restricted/unknown data must never enter this index")
     if type(retention_days) is not int or not 1 <= retention_days <= 3650:
         raise ValueError("explicit bounded retention is required")
-    try:
-        dt = datetime.fromisoformat(verified_at.replace("Z", "+00:00"))
-    except (TypeError, AttributeError, ValueError) as exc:
-        raise ValueError("verified_at must be timezone-aware ISO-8601") from exc
-    if dt.tzinfo is None or dt.utcoffset() is None:
-        raise ValueError("verified_at must be timezone-aware")
-    canonical = dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    canonical = _verified_at_utc(verified_at)
     meta = normalize_metadata(metadata)
     if meta["size_bytes"] != len(data):
         raise ValueError("metadata size does not match the fixture")
@@ -94,16 +125,27 @@ def make_fixture_record(*, source_ref: str, relative_path: str, source_version: 
 
 
 def _validate_record(record: dict[str, Any]) -> None:
-    if (not isinstance(record, dict) or record.get("schema_version") != SCHEMA_VERSION
-            or record.get("evidence_scope") != "synthetic_fixture_only_not_owner_device"
-            or not str(record.get("source_ref", "")).startswith("synthetic://")
-            or record.get("access_level") not in _ALLOWED_CLASSES
-            or not _is_sha256(record.get("content_sha256"))
-            or normalize_metadata(record.get("metadata")) != record.get("metadata")
-            or record.get("metadata_sha256") != _digest(record["metadata"])):
-        raise ValueError("invalid provenance record")
+    """Validate all caller-controlled fields, not only their recomputable hash."""
+    if type(record) is not dict or set(record) != _RECORD_FIELDS:
+        raise ValueError("invalid provenance schema")
+    try:
+        _validate_identity(record["source_ref"], record["relative_path"],
+                           record["source_version"], record["owner_ref"])
+        if (record["schema_version"] != SCHEMA_VERSION
+                or record["evidence_scope"] != "synthetic_fixture_only_not_owner_device"
+                or record["access_level"] not in _ALLOWED_CLASSES
+                or type(record["retention_days"]) is not int
+                or not 1 <= record["retention_days"] <= 3650
+                or record["verified_at"] != _verified_at_utc(record["verified_at"])
+                or not _is_sha256(record["content_sha256"])):
+            raise ValueError("invalid provenance field")
+        meta = normalize_metadata(record["metadata"])
+        if record["metadata"] != meta or record["metadata_sha256"] != _digest(meta):
+            raise ValueError("invalid metadata integrity")
+    except (PermissionError, TypeError, ValueError) as exc:
+        raise ValueError("invalid provenance record") from exc
     canonical = dict(record)
-    digest = canonical.pop("record_sha256", None)
+    digest = canonical.pop("record_sha256")
     if not _is_sha256(digest) or digest != _digest(canonical):
         raise ValueError("provenance integrity mismatch")
 
@@ -113,10 +155,14 @@ def build_index(records: list[dict[str, Any]], *, version: int,
     """Immutable-by-value version chain. Version is a caller-controlled sequence."""
     if type(version) is not int or version < 1:
         raise ValueError("version must be a positive integer")
+    if previous is None and version != 1:
+        raise ValueError("genesis index must start at version 1")
     if previous is not None:
         _validate_index(previous)
         if version != previous["version"] + 1:
             raise ValueError("version must increment exactly once")
+    if type(records) is not list or len(records) > _MAX_RECORDS:
+        raise ValueError("synthetic fixture record count limit exceeded")
     items = {}
     for record in records:
         _validate_record(record)
@@ -135,18 +181,25 @@ def build_index(records: list[dict[str, Any]], *, version: int,
 
 
 def _validate_index(index: dict[str, Any]) -> None:
-    if not isinstance(index, dict) or index.get("schema_version") != SCHEMA_VERSION:
-        raise ValueError("invalid index")
-    canonical = dict(index)
-    actual_hash = canonical.pop("index_sha256", None)
-    if not _is_sha256(actual_hash) or actual_hash != _digest(canonical):
-        raise ValueError("index integrity mismatch")
-    if not isinstance(index.get("entries"), dict):
-        raise ValueError("invalid entries")
-    for key, record in index["entries"].items():
+    if (type(index) is not dict or set(index) != _INDEX_FIELDS
+            or index["schema_version"] != SCHEMA_VERSION
+            or type(index["version"]) is not int or index["version"] < 1):
+        raise ValueError("invalid index schema or version")
+    prior = index["previous_index_sha256"]
+    if (index["version"] == 1 and prior is not None) or (
+            index["version"] > 1 and not _is_sha256(prior)):
+        raise ValueError("invalid genesis/previous index link")
+    entries = index["entries"]
+    if type(entries) is not dict or len(entries) > _MAX_RECORDS:
+        raise ValueError("invalid index entries")
+    for key, record in entries.items():
         _validate_record(record)
         if key != record["source_ref"] + "/" + record["relative_path"]:
             raise ValueError("record identity mismatch")
+    canonical = dict(index)
+    actual_hash = canonical.pop("index_sha256")
+    if not _is_sha256(actual_hash) or actual_hash != _digest(canonical):
+        raise ValueError("index integrity mismatch")
 
 
 def compare_indices(old: dict[str, Any], new: dict[str, Any]) -> dict[str, list[str]]:
