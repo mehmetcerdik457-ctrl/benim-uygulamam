@@ -1,13 +1,24 @@
 name: CI
-
 on:
   push:
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   baseline:
-    uses: mehmetcerdik457-ctrl/.github/.github/workflows/reusable-python-baseline.yml@fea0cdba87dd09c88648eb29302e65c32ba7fd44
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python
+        run: python -m compileall -q .
+      - name: Run repository tests
+        run: |
+          python -m pip install --quiet pytest
+          python -m pytest -q
