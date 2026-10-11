@@ -1,0 +1,28 @@
+name: OMEGA zero-job diagnostic CI
+
+on:
+  push:
+    branches: [omega/ci-zero-job-preflight-20261011]
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/omega_ci_preflight.py'
+      - 'tests/test_omega_ci_preflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admission-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Assert a real GitHub job actually started
+        run: echo "OMEGA_CI_ADMISSION_JOB_CREATED=PASS"
+      - name: Validate workflow YAML and baseline regression without secrets
+        run: |
+          python3 -m pip install --quiet pytest==8.4.1 PyYAML==6.0.2
+          python3 -m pytest -q tests/test_omega_ci_preflight.py tests/test_backend_contract.py
+          python3 scripts/omega_ci_preflight.py
