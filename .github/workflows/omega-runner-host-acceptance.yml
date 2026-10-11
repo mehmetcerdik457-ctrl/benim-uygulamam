@@ -7,6 +7,8 @@ on:
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
       - 'scripts/omega_runner_host_direct_route.py'
+      - 'scripts/omega_ci_ephemeral_loopback_relay.py'
+      - 'tests/test_omega_ci_ephemeral_loopback_relay.py'
       - 'tests/test_omega_runner_host_direct_route.py'
       - 'tests/test_omega_runner_host_port_audit.py'
       - 'tests/test_omega_runner_host_diagnostic.py'
@@ -33,12 +35,16 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v
       - name: Test direct host-to-internal route classifications (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
+      - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
+        run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
         run: python3 scripts/omega_runner_host_direct_route.py
+      - name: Prove temporary CI-only localhost relay and stop before acceptance
+        run: python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
       - name: Enforce requested versus EFFECTIVE Docker host port mapping
         if: success() || failure()
         run: python3 scripts/omega_runner_host_port_audit.py
