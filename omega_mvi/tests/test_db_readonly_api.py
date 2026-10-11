@@ -91,3 +91,26 @@ def test_live_http_dashboard_assets_and_csp_with_real_postgres(ready_demo):
     assert "/api/demo/task-status" in js.text
     assert "stylesheet" in root.text
     assert httpx.post(origin+"/api/execute",json={"target":"synthetic"},timeout=5).status_code==403
+
+
+def test_live_fastapi_dashboard_assets_and_strict_browser_policy(ready_demo):
+    """Real Docker API HTTP, not a mocked TestClient."""
+    origin="http://api:8000"
+    page=httpx.get(origin+"/",timeout=5)
+    assert page.status_code==200
+    policy=page.headers["content-security-policy"]
+    assert "script-src 'self'" in policy and "style-src 'self'" in policy
+    assert "unsafe-inline" not in policy
+    assert page.headers["x-frame-options"]=="DENY"
+    assert 'src="/assets/dashboard.js"' in page.text
+    assert 'href="/assets/dashboard.css"' in page.text
+    js=httpx.get(origin+"/assets/dashboard.js",timeout=5)
+    css=httpx.get(origin+"/assets/dashboard.css",timeout=5)
+    assert js.status_code==200 and css.status_code==200
+    assert js.headers["x-content-type-options"]=="nosniff"
+    assert "textContent" in js.text and "innerHTML" not in js.text
+    assert "/api/demo/task-status" in js.text
+    assert "/api/demo/inspection" in js.text
+    assert "http://" not in js.text and "https://" not in js.text
+    assert "application/javascript" in js.headers["content-type"] or "text/javascript" in js.headers["content-type"]
+    assert "text/css" in css.headers["content-type"]
