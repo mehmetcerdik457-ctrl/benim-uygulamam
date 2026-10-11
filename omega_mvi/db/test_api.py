@@ -5,6 +5,7 @@ supplied SERVER-SIDE for negative tenant-isolation tests only. Without it,
 requests fail closed; no real identity provider is configured.
 """
 from uuid import UUID
+from typing import Literal
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ConfigDict
 import os
@@ -15,7 +16,7 @@ from db.migrate import assert_disposable_target
 class DemoTask(BaseModel):
     model_config=ConfigDict(extra="forbid")
     trace_id: UUID
-    label: str=Field(pattern=r"^[A-Za-z0-9 _-]{1,100}$")
+    label: Literal["mock","synthetic","safe fixture","offline fixture"]
 
 def factory(database_url, verified_identity=None):
     app=FastAPI(docs_url=None,openapi_url=None,redoc_url=None)
