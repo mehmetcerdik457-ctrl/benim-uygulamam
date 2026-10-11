@@ -38,3 +38,23 @@ Docs: https://docs.github.com/en/rest/checks/runs and https://docs.github.com/en
 Offline tests: stale/racing HEAD; draft/fork PR; missing/truncated file patches; action_required and failed workflows; failed/wrong-App/duplicate/missing Checks; unprotected main; stale/agent/self review; superseded approval with CHANGES_REQUESTED; empty reviewer policy. **Not proved:** enforced GitHub branch protection, installed App trust, webhook authenticity, live Check publishing, high-risk CODEOWNERS enforcement, bad-deploy rollback, auditor-outage failure of real merge. Until these are proven, all seven requirement acceptance statuses remain partial or blocked, **none DONE**. In particular, this code cannot prevent merging to unprotected main.
 
 No GitHub merge, Ruleset, permission, deployment or secret-operation is authorized or performed.
+
+
+## 11 October 2026 — hardened evidence collector and Copilot handoff contract
+
+**Source/identity binding correction:** GitHub's actual pull_request workflow result includes `pull_requests[].number`, `pull_requests[].head.sha`, `pull_requests[].base.sha`, and `head_repository.full_name`. The PR gate now verifies all four against the inspected PR and re-checks PR number, state, draft flag, head SHA, base SHA, source and destination repository, and both branch refs after collecting data. Merely matching `head_sha` is not sufficient. Unlinked/ambiguous/failed/blocked workflow runs deny evidence acceptance.
+
+**Conservative diff policy:** Only root `README.md`, `CHANGELOG.md` and documentation Markdown under `docs/` are low-risk by default. Source code, tests, workflow, infrastructure and unknown file paths require SHA-current, explicitly allowlisted human approval. A stacked PR targeting any branch other than `main` cannot be marked main-acceptance, even if its own CI succeeds. `main protected=true` by itself does not prove required rulesets or review enforcement; the verdict remains expressly non-authoritative.
+
+**Supported Copilot API discovery:** Official GitHub docs (public preview) document `POST /agents/repos/{owner}/{repo}/tasks` for cloud agent tasks and REST/GraphQL issue assignment to `copilot-swe-agent[bot]`, including `agent_assignment` metadata. The agent tasks API explicitly supports **user-to-server** credentials, **not** installation access tokens. OMEGA cannot safely repurpose the separate read-only auditor App installation token for delegation. Actual subscription/repository entitlement, policy and suitable authentication are **UNKNOWN**. No remote task, issue assignment or subscription change was attempted.
+
+**New module:** `omega_mvi/copilot_delegation.py` provides a bounded **no-network, non-dispatchable** handoff intent (Issue, trace ID, pinned base commit, base ref, maximum cost and UTC deadline). It neither stores task prompts nor handles credentials. The receipt always has `can_dispatch=False` and blockers for absent owner approval, entitlement, authenticated identity and pre-dispatch SHA revalidation. This is contract scaffolding, **not a completed task delegation adapter**.
+
+**New tests:** `omega_mvi/tests/test_pr_security_gate.py` has **39 synthetic tests**. `omega_mvi/tests/test_copilot_delegation.py` has **11 synthetic tests**. All 50 are intended for the repository's existing CI, and their latest exact-HEAD results must be checked before any PASS claim. Synthetic examples never claim actual production ruleset enforcement.
+
+Official references:
+- https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/use-copilot-agents/cloud-agent/use-cloud-agent-via-the-api
+- https://docs.github.com/en/rest/checks/runs
+- https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/kick-off-a-task
+
+**Non-negotiable:** no installation, user token, live Copilot dispatch, permission expansion, required Checks updates, ruleset creation, release, merge or deployment without explicit owner authorization and separate independent E2E evidence.
