@@ -5,6 +5,7 @@
 <script src="/assets/dashboard.js" defer></script></head><body>
 <header><small>LOCAL-FIRST • READ ONLY • DENY BY DEFAULT</small><h1>PROJECT OMEGA</h1>
 <p>Türkçe güvenli müfettiş — doğrulanmamış üretim işlevleri kapalıdır.</p></header>
+<main id="main-content">
 <section><h2>Canlı sağlık denetimi</h2><p id="health" aria-live="polite">Yerel servisten durum okunuyor…</p>
 <button type="button" id="refresh">Yalnızca durumları yenile</button></section>
 <section><h2>Sentetik denetim modülleri</h2><p id="inspection" aria-live="polite">Denetim sonucu bekleniyor.</p><p id="sources" class="muted"></p></section>
@@ -16,5 +17,6 @@
 <section><h2>MVI bileşenleri</h2><p>PostgreSQL kayıtları yalnızca geçici sentinelli CI veritabanında sınandı.</p>
 <p>İnsan onayı: varsayılan RET. Yerel model: deterministik sahte adaptör.</p>
 <p>Üretime hazırlık: <strong class="warn">KABUL EDİLMEDİ</strong></p></section>
-<small>Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.</small>
+</main>
+<footer><small>Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.</small></footer>
 </body></html>
