@@ -55,7 +55,7 @@ def test_wrong_sentinel_refuses_drop(isolated_db):
     url=os.environ["OMEGA_DATABASE_URL"]
     with pytest.raises(ValueError):
         apply(isolated_db,"down",database_url=url,sentinel="f"*32)
-    assert isolated_db.execute("SELECT count(*) FROM omega_schema_version").fetchone()[0]==3
+    assert isolated_db.execute("SELECT count(*) FROM omega_schema_version").fetchone()[0]==4
 
 
 def test_role_cannot_bypass_session_value_or_function(isolated_db):
