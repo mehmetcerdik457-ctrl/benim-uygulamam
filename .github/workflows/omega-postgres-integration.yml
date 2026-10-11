@@ -27,6 +27,9 @@ jobs:
           marker="$(openssl rand -hex 16)"
           echo "::add-mask::$marker"
           echo "OMEGA_TEST_DB_SENTINEL=$marker" >> "$GITHUB_ENV"
+          runtime_password="$(openssl rand -hex 18)"
+          echo "::add-mask::$runtime_password"
+          echo "OMEGA_TEST_RUNTIME_PASSWORD=$runtime_password" >> "$GITHUB_ENV"
       - name: Launch isolated PostgreSQL
         run: docker compose -f compose.omega.yml up -d --wait --wait-timeout 120 db
       - name: Independently seed disposable DB identity marker
