@@ -23,8 +23,8 @@ def _metadata(data):
         raise ValueError("invalid synthetic kind")
     if "source" in data and data["source"] not in _ALLOWED_SOURCE:
         raise ValueError("invalid synthetic source")
-    if "label" in data and not _LABEL.fullmatch(data["label"]):
-        raise ValueError("label restricted to synthetic ASCII tokens")
+    if "label" in data and data["label"] not in {"mock","synthetic","safe fixture","offline fixture"}:
+        raise ValueError("only predefined, nonidentifying synthetic fixture labels are accepted")
     return data
 
 def create(conn, owner, trace_id, metadata=None):
