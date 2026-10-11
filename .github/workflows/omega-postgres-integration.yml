@@ -1,0 +1,37 @@
+name: OMEGA MVI-02 real PostgreSQL integration
+
+on:
+  push:
+    branches:
+      - omega/mvi-02-postgres-20261011
+  pull_request:
+    paths:
+      - 'omega_mvi/**'
+      - 'compose.omega.yml'
+      - '.github/workflows/omega-postgres-integration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Set demo-only ephemeral database password
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+      - name: Launch isolated PostgreSQL
+        run: docker compose -f compose.omega.yml up -d --wait --wait-timeout 120 db
+      - name: Real DB read/write, migration and rollback
+        run: docker compose -f compose.omega.yml --profile integration run --build --rm tests
+      - name: Existing backend regressions and MVI-01 unit tests
+        run: |
+          python3 -m pip install --quiet -r omega_mvi/requirements-test.txt
+          python3 -m pytest -q tests omega_mvi/tests/test_mvi_health.py
+      - name: Cleanup disposable DB
+        if: always()
+        run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans

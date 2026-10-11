@@ -1,10 +1,11 @@
-# OMEGA MVI Phase-0 demo. Explicit opt-in only; NO production or real data.
+# OMEGA disposable demo only; no user data or production deployment.
 name: omega-mvi-demo
 services:
   api:
     build:
       context: ./omega_mvi
     environment:
+      OMEGA_DATABASE_URL: postgresql://omega_demo:${OMEGA_DEV_DB_PASSWORD}@db:5432/omega_demo
       OMEGA_MODE: mock
       OMEGA_EXTERNAL_API_ENABLED: "false"
       OMEGA_OWNER_DEVICE: UNKNOWN
@@ -29,6 +30,27 @@ services:
       timeout: 3s
       retries: 3
       start_period: 10s
+
+  tests:
+    profiles: ["integration"]
+    build:
+      context: ./omega_mvi
+      dockerfile: Dockerfile.test
+    environment:
+      OMEGA_DATABASE_URL: postgresql://omega_demo:${OMEGA_DEV_DB_PASSWORD}@db:5432/omega_demo
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
 
   db:
     image: postgres:16-alpine
