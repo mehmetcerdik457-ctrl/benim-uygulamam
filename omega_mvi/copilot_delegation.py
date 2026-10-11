@@ -71,6 +71,8 @@ def plan_handoff(
     if (not isinstance(base_ref, str) or base_ref != "main"
             and not re.fullmatch(r"omega/[a-z0-9][a-z0-9._/-]{0,100}", base_ref)):
         raise HandoffDenied("Unapproved base branch format")
+    if base_ref != "main" and any(segment in ("", ".", "..") for segment in base_ref.split("/")):
+        raise HandoffDenied("Traversal or empty branch segment")
     if not isinstance(pinned_base_sha, str) or not SHA.fullmatch(pinned_base_sha):
         raise HandoffDenied("Exact 40-character base SHA required")
     if type(budget_cents) is not int or budget_cents < 0:
