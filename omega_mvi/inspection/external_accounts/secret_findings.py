@@ -61,15 +61,16 @@ def record_remediation(finding, new_status, *, owner_approved=False,
                        provider_verified=False):
     """Record a decision; no API call, credential handling or actual revocation.
 
-    Closed outcomes require both owner authorization and external verification.
-    The function does not itself prove either assertion.
+    Closed outcomes are deliberately disabled until independent provider
+    attestation exists; owner_approved/provider_verified booleans are NOT proof.
     """
     if not isinstance(finding, SafeFinding) or new_status not in STATUSES:
         raise ValueError("Invalid finding/status")
     if new_status in ("ROTATED_VERIFIED", "REVOKED_VERIFIED",
                       "FALSE_POSITIVE_VERIFIED"):
-        if owner_approved is not True or provider_verified is not True:
-            raise PermissionError("Verified status requires owner and provider evidence")
+        # Caller-supplied booleans are forgeable; NEVER publish a verified
+        # provider claim until a separate trusted attestation flow exists.
+        raise PermissionError("Provider-verified outcomes require independent attestation")
     elif new_status == "ROTATION_PLANNED" and owner_approved is not True:
         raise PermissionError("Owner approval required before rotation planning")
     return replace(finding, remediation_status=new_status)
