@@ -12,7 +12,7 @@ import sys
 import psycopg
 
 MIGRATIONS = Path(__file__).with_name("migrations")
-VERSION = 3
+VERSION = 4
 
 
 def assert_disposable_target(database_url, sentinel, connection):
@@ -59,11 +59,11 @@ def apply(conn, direction="up", *, database_url=None, sentinel=None):
             cur.execute("CREATE TABLE IF NOT EXISTS omega_schema_version(version INTEGER PRIMARY KEY)")
             cur.execute("SELECT version FROM omega_schema_version ORDER BY version DESC")
             present = {v for (v,) in cur.fetchall()}
-            versions = (1, 2, 3) if direction == "up" else (3, 2, 1)
+            versions = (1, 2, 3, 4) if direction == "up" else (4, 3, 2, 1)
             for version in versions:
                 if (direction == "up") == (version in present):
                     continue
-                name = {1: "tasks", 2: "security", 3: "task_controls"}[version]
+                name = {1: "tasks", 2: "security", 3: "task_controls", 4: "demo_reader"}[version]
                 script = MIGRATIONS / f"{version:03d}_{name}.{direction}.sql"
                 cur.execute(script.read_text(encoding="utf-8"))
                 if direction == "up":

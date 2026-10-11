@@ -24,7 +24,7 @@ def db():
 
 def test_v3_migration_and_idempotent_rollback(db):
     url=os.environ["OMEGA_DATABASE_URL"]; marker=os.environ["OMEGA_TEST_DB_SENTINEL"]
-    assert [r[0] for r in db.execute("SELECT version FROM omega_schema_version ORDER BY version")]==[1,2,3]
+    assert [r[0] for r in db.execute("SELECT version FROM omega_schema_version ORDER BY version")]==[1,2,3,4]
     assert apply(db,"up",database_url=url,sentinel=marker) is False
     assert apply(db,"down",database_url=url,sentinel=marker) is True
     assert apply(db,"down",database_url=url,sentinel=marker) is False
