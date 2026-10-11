@@ -1,13 +1,42 @@
 name: Privacy Guard
-
 on:
   push:
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   guard:
-    uses: mehmetcerdik457-ctrl/.github/.github/workflows/reusable-privacy-guard.yml@328c770208878e97aa0765265b6201322fa39cd2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reject private state filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_files="$(git ls-files | grep -E '(^|/)\.env($|\.)' || true)"
+          if [ -n "$env_files" ]; then
+            unsafe_env="$(printf '%s\n' "$env_files" | grep -Ev '(^|/)\.env\.(example|sample|template)$' || true)"
+            if [ -n "$unsafe_env" ]; then
+              echo "Forbidden environment file is tracked."
+              exit 1
+            fi
+          fi
+          forbidden='(^|/)(id_(rsa|ed25519)|key\.properties|credentials[^/]*\.json|service[-_]?account[^/]*\.json|.*\.(keystore|jks|pem|p12|pfx|db|sqlite|sqlite3))$'
+          if git ls-files | grep -E "$forbidden"; then
+            echo "Forbidden private-state file is tracked."
+            exit 1
+          fi
+      - name: Scan text files for credential markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          markers='BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|sk-(proj-)?[A-Za-z0-9_-]{20,}|hf_[A-Za-z0-9]{20,}|npm_[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{16,}|xox[baprs]-[A-Za-z0-9-]{20,}'
+          if git grep -I -n -E "$markers" -- .; then
+            echo "Potential credential material detected."
+            exit 1
+          fi
+          echo "PRIVACY_GUARD=PASS"
