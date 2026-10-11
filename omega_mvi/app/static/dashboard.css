@@ -5,9 +5,15 @@ h1{font-size:1.8rem;margin:.2rem 0}h2{font-size:1.1rem;color:#93c5fd}
 section{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin:16px 0}
 .warn{color:#fbbf24}.ok{color:#86efac}.row{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
 small{color:#94a3b8}code{color:#bfdbfe}
-button{background:#334155;color:#fff;padding:10px 14px;border:0;border-radius:7px;cursor:pointer}
-button:focus-visible{outline:2px solid #93c5fd}
+button{background:#334155;color:#fff;padding:10px 14px;min-height:44px;min-width:44px;border:0;border-radius:7px;cursor:pointer}
+button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 .state-list{list-style:none;margin:0;padding:0}
 .state-list li{border-top:1px solid #334155;padding:6px 0}
 .state-list span{font-variant-numeric:tabular-nums}
 .muted{color:#94a3b8}
+
+/* Mobile and assistive-technology safety: preserve keyboard focus across refreshes. */
+*,*::before,*::after{box-sizing:border-box}
+@media(max-width:480px){body{padding:16px 12px}section{padding:16px}.row{gap:12px}button{max-width:100%}}
+@media(forced-colors:active){section{border:1px solid CanvasText}button:focus-visible{outline-color:Highlight}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
