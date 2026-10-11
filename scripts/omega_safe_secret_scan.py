@@ -3,8 +3,8 @@ import subprocess
 import sys
 
 PATTERNS = (r"ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
-            r"AKIA[0-9A-Z]{16}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|"
-            r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY")
+            r"AKIA[0-9A-Z]{16}|sk-(proj-)?[A-Za-z0-9_-]{20,}|"
+            r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY")
 
 def scan_quiet(*, cwd=None, runner=subprocess.run):
     # No shell expansion and no line/filename output, even on a match.
