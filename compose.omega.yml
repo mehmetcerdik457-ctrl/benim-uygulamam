@@ -1,4 +1,4 @@
-# OMEGA MVI Phase-0 demo. Explicit opt-in only; NO production or real data.
+# OMEGA disposable demo only; no user data or production deployment.
 name: omega-mvi-demo
 services:
   api:
@@ -12,7 +12,26 @@ services:
     ports:
       - "127.0.0.1:18080:8000"
     depends_on:
-      tests:
+      db:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  tests:
     profiles: ["integration"]
     build:
       context: ./omega_mvi
@@ -32,25 +51,6 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: "no"
-
-  db:
-        condition: service_healthy
-    networks:
-      - isolated_demo
-    read_only: true
-    tmpfs:
-      - /tmp:rw,noexec,nosuid,size=16m
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    restart: "no"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
 
   db:
     image: postgres:16-alpine
