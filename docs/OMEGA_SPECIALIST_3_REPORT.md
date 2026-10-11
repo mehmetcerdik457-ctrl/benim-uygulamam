@@ -50,3 +50,33 @@ The integration owner should own **all changes to shared** `scope.yaml`, root CI
 ## Security / rollback
 
 No existing sources deleted; no main branch writes, permission changes, paid services, deployments, merging or backup upload. Revert/close only this stacked draft PR to roll back the proposal. Never publish owner-private path-level evidence, actual file hashes, secret data or recovery information in public Issue #25.
+
+---
+
+## Follow-up: adverse provenance tests and corrective audit (2026-10-11)
+
+### Evidence chain preserved — including initial failure
+
+- Original draft head: `d65423521168a94006f07145d8d420d40e4fd4cd`; six workflows SUCCESS, CI 123 PASS / 18 SKIP. This remains historical evidence, **not the current head**.
+- First new strict-validation attempt: `2c71e492120b32fd51ad4be891f271904f4de635`, [CI run 38159098827](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159098827), **FAIL: 5 failed / 146 passed / 18 skipped**. Negative tests exposed acceptance of `.` and `..` path segments. It was **not** an accepted revision.
+- Corrective code commit: `2f480886a0f097362282499afbc67ad00214893c`, [CI run 38159182606](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182606) **SUCCESS: 151 passed / 18 skipped / 1 warning**. Relative-path segments `.` and `..` are now denied for both record creation and independently supplied records. The extra negative tests increased the fixture test count from 13 to **41**.
+- At that **exact corrective code SHA**, GitHub workflow outcomes were **six SUCCESS**: [CI](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182606), [Privacy Guard](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182617), [isolated MVI](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182599), [PostgreSQL](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182575), [integrated MVI](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182547), [E2E](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38159182568). E2E reported **36 DB, 4 HTTP, 106 regression PASS**. **Runner-host remains BLOCKED_NOT_ACCEPTED** with MISSING host binding, REFUSED TCP and BLOCKED HTTP. Workflows succeeding does **not** close the separate host-acceptance gate.
+- This appended documentation requires a new commit; CI must also be rechecked at that **new** head before anyone cites branch-wide status as final.
+
+### Hardening scope and limits (OMEGA-014/019/020)
+
+The offline provenance constructor and validator now both enforce a bounded allowlisted `synthetic://` source, ASCII-only safe fixture components, opaque `owner:` reference, required timestamp with timezone and UTC normalization, positive bounded retention days, strict record/index field sets, and genesis `version=1` plus consecutive hash-linked versions. Explicitly reject missing/unknown ACL and xattr hashes: a verified digest is mandatory even for a synthetic empty metadata representation; **never silently substitute a zero or empty hash for an unreadable real ACL**. SHA-256 records are not digitally signed; an adversary able to rewrite the entire archive may recompute all hashes. A trusted separately stored signed anchor and independent ownership/custody verification remain required.
+
+The module stays I/O-free and never grants permission to read a local disk; it processes only caller-provided tiny disposable byte fixtures. These synthetic tests do not establish absence of race conditions, atime changes, NTFS/Windows semantics, long-path normalization, ACL collection correctness, actual retention deletion or owner approval.
+
+### Additional critical source-code reading (OMEGA-001)
+
+A second bounded GitHub read fetched full UTF-8 file bodies at PR #58 base `044c558b2b28e05929a9acd79a639a32092ab187` for these **ten** previously under-reviewed high-impact paths: `backend/server.py`, `omega_mvi/app/main.py`, `omega_mvi/db/store.py`, `omega_mvi/db/migrate.py`, `omega_mvi/approval/contract.py`, `omega_mvi/inspection/retrieval/__init__.py`, `omega_mvi/inspection/redaction/__init__.py`, `omega_mvi/inspection/pr_review/engine.py`, `omega_mvi/requirements.txt` and `compose.omega.yml`. Function/declaration and endpoint signals were extracted without publishing credential values or raw bodies.
+
+Observed boundaries: the legacy backend has an explicit hosted OpenAI endpoint and cannot be labeled a local model; new FastAPI has `/health`, `/api/readiness` and demo-only endpoints; SQL migrations and the proposal-level approval layer exist but are **not** evidence of a signed owner production identity. The original 107-path Git tree inventory is exhaustive **only at the tracked-path level**, and this added sampling is **not full line-by-line security review of all 107 blobs**, repository history, dependencies, licenses or owner device. License file absence remains unresolved.
+
+### Constrained proposed persistence contract for integration owner only (OMEGA-020)
+
+Do **not** apply a database migration from this specialist branch. Proposed future private `omega_provenance` schema must bind, at minimum: `source_ref` + scoped immutable source ID, privately encrypted normalized path alias and source version, `owner_ref`, effective ACL/access level and classification, UTC collection/last-verification instant, explicit retention policy and expiry/hold state, content SHA-256, canonical metadata SHA-256 and append-only record digest/version. Reject missing provenance or unverified ACL; do not rely on free-form task metadata. Enforce tenant/owner isolation and least-privilege RLS in real PostgreSQL, plus unique source/path/version identity, deny direct mutation of custody events, append-only signed chain with independently verified trust anchors, and separate retention/deletion/revocation gates. Run synthetic migration/rollback/replay/cross-owner/clock-skew tests in a disposable DB before any private owner source is allowed.
+
+**Acceptance stays OPEN:** OMEGA-001 PARTIAL, -005 PARTIAL, -014 BLOCKED, -019 PARTIAL, -020 PARTIAL. No `scope.yaml`, Compose, shared CI, migration or app changes from this specialist. Final integration and owner authorization belong to the coordinator.
