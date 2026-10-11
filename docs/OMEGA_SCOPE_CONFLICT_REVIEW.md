@@ -1,8 +1,8 @@
 # PROJECT OMEGA — Phase 0 Scope Conflict Review
 
-**Status:** DRAFT — independent proposal; not an authorization or approval  
-**Reviewed:** 2026-10-11  
-**Purpose:** Compare the proposed `scope.yaml` in [PR #19](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/19) and [PR #21](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/21) with the repository's current roadmap, state, and security policy.  
+**Status:** DRAFT — independent proposal; not an authorization or approval
+**Reviewed:** 2026-10-11
+**Purpose:** Compare the proposed `scope.yaml` in [PR #19](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/19) and [PR #21](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/21) with the repository's current roadmap, state, and security policy.
 **Evidence basis:** PR #19 head `9150a92bb68eaf4609d0d237cb492e918e7d1c21`; PR #21 head `b84f3b44569fd356e8185c71c4f8daea8963e72d`; baseline documents on the repository's `main` base commit `75cc6109944689522bf261b5d64fdaa6bc5c9c79`.
 
 This review is documentation only. It does not edit either draft `scope.yaml`, change repository settings or grants, access integrations, or authorize implementation. PR descriptions and scope files are proposals, not effective permissions. Repository-document statements below are recorded claims, not independent verification of repository settings or runtime state.
