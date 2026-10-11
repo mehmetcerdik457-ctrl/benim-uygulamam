@@ -4,7 +4,7 @@ from omega_mvi.inspection.knowledge import (
     ControlledIndex, DocumentChange, MemoryEntry, MemoryLedger, ScopeError,
 )
 from omega_mvi.inspection.knowledge.code_graph import analyze_source
-from omega_mvi.inspection.knowledge.benchmark import evaluate, synthetic_lexical_candidates
+from omega_mvi.inspection.knowledge.benchmark import Candidate, evaluate, synthetic_lexical_candidates
 
 S = "synthetic://omega-knowledge/source-A"
 T = "synthetic://omega-knowledge/source-B"
@@ -316,3 +316,44 @@ def test_memory_context_generation_fails_after_document_removed():
     with pytest.raises(ScopeError, match="STALE_CONTEXT"):
         ix.assert_context_current(old_generation, requester_id=OWNER)
     assert ledger.trusted_context(requester_id=OWNER) == ()
+
+
+def test_benchmark_rejects_duplicate_hits_instead_of_inflating_ndcg():
+    _, cases = synthetic_lexical_candidates()
+    forged = Candidate("duplicate", "lexical_baseline", "fixture-v1",
+                       lambda query, limit: ["s1", "s1"])
+    with pytest.raises(ValueError, match="INVALID_CANDIDATE_OUTPUT"):
+        evaluate((forged,), cases[:1], limit=2, repetitions=2)
+
+def test_benchmark_rejects_output_exceeding_requested_limit():
+    _, cases = synthetic_lexical_candidates()
+    bad = Candidate("over_limit", "lexical_baseline", "fixture-v1",
+                    lambda query, limit: ["s1", "s2", "s3"])
+    with pytest.raises(ValueError, match="INVALID_CANDIDATE_OUTPUT"):
+        evaluate((bad,), cases[:1], limit=2, repetitions=1)
+
+def test_benchmark_rejects_nondeterministic_ranking_comparison():
+    _, cases = synthetic_lexical_candidates()
+    order = iter((["s1", "s2"], ["s2", "s1"]))
+    unstable = Candidate("unstable", "lexical_baseline", "fixture-v1",
+                         lambda query, limit: next(order))
+    with pytest.raises(ValueError, match="UNSTABLE_RANKING"):
+        evaluate((unstable,), cases[:1], limit=2, repetitions=2)
+
+def test_fixture_benchmark_command_emits_explicit_model_skip():
+    import json
+    import os
+    from pathlib import Path
+    import subprocess
+    import sys
+    root = Path(__file__).resolve().parents[1]
+    env = {**os.environ, "PYTHONPATH": f"{root}:{root / 'omega_mvi'}"}
+    result = subprocess.run(
+        [sys.executable, "scripts/omega_knowledge_fixture_benchmark.py"],
+        cwd=root, env=env, capture_output=True, text=True, timeout=12, check=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["embedding_models"] == "SKIP_NOT_INSTALLED"
+    assert payload["reranker_models"] == "SKIP_NOT_INSTALLED"
+    assert len(payload["data"]) == 2
+    assert all(row["kind"] == "lexical_baseline" for row in payload["data"])
