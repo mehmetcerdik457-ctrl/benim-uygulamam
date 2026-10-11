@@ -58,3 +58,16 @@ Official references:
 - https://docs.github.com/en/copilot/how-tos/copilot-on-github/use-copilot-agents/kick-off-a-task
 
 **Non-negotiable:** no installation, user token, live Copilot dispatch, permission expansion, required Checks updates, ruleset creation, release, merge or deployment without explicit owner authorization and separate independent E2E evidence.
+
+
+## Signed GitHub webhook gate (no installation or Checks publishing)
+
+The source-only `omega_mvi/pr_security/webhook.py` verifier accepts **only** HMAC-SHA256 signed GitHub pull-request events (not SHA-1), with canonical `X-Hub-Signature-256`, a GUID `X-GitHub-Delivery`, permitted event action, fixed repository name/id, pinned PR number/head/base SHA and explicit expected installation ID. The raw payload is size-limited; verification uses constant-time comparison. The immutable result deliberately has `can_publish_checks=False`.
+
+18 synthetic negative/positive HMAC tests exercise tampering, missing/duplicate headers, wrong installation/repository/PR/SHA, invalid event/delivery, oversized body, and absence of write methods. They do not use or commit a real secret.
+
+**Missing production gates remain mandatory:** owner-approved GitHub App installation with separate least-privilege collector and Checks publisher identities; a *durable atomic* delivery-ID replay registry; fresh PR and Check API reads immediately before publishing; trusted required Check source enforcement via Rulesets; human review verification; and independent outage, rollback and negative end-to-end tests. HMAC validation by itself grants **zero** permission to publish or merge.
+
+GitHub reference: https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
+
+The added source has **68 synthetic contract tests** (39 PR gate, 11 Copilot blocked intent, 18 webhook verifier) whose latest exact HEAD status must be checked against GitHub CI. Zero real credentials, webhooks, Checks or delegations were created.
