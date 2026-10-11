@@ -115,7 +115,7 @@ def test_server_side_test_identity_prevents_cross_tenant_read(isolated_db):
 
 
 def test_sensitive_metadata_values_rejected(isolated_db):
-    bad=["synthetic_token=invalid_test_fixture","-----BEGIN " + "PRIVATE KEY-----","Authorization: Bearer synthetic","person@example.invalid"]
+    bad=["secret info","synthetic_token=invalid_test_fixture","-----BEGIN " + "PRIVATE KEY-----","Authorization: Bearer synthetic","person@example.invalid"]
     for value in bad:
         with pytest.raises(ValueError):
             store.create(isolated_db,"tenant-a",uuid4(),{"label":value})
