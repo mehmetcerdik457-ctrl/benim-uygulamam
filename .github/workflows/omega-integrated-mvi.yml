@@ -2,7 +2,7 @@ name: OMEGA integrated safe MVI
 
 on:
   push:
-    branches: [omega/integration-mvi-safe-20261011]
+    branches: [omega/integration-mvi-safe-20261011, omega/inspection-integration-20261011]
   pull_request:
     paths:
       - 'omega_mvi/**'
@@ -44,10 +44,13 @@ jobs:
       - name: Verify the live API health and Turkish UI INSIDE isolated container
         run: |
           docker compose -f compose.omega.yml exec -T api python -c "import urllib.request; from urllib.parse import urljoin; base='http://127.0.0.1:8000/'; health=urllib.request.urlopen(base+'api/health', timeout=5).read().decode(); ui=urllib.request.urlopen(base,timeout=5).read().decode(); assert '\"production_ready\":false' in health.replace(' ',''); assert 'PROJECT OMEGA' in ui; assert 'Türkçe' in ui; print('OMEGA_INTEGRATION_API_UI=PASS')"
+      - name: Verify four synthetic inspectors in the LIVE FastAPI container
+        run: |
+          docker compose -f compose.omega.yml exec -T api python -c "import json,urllib.request; d=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/inspection/demo',timeout=5)); assert d['fixture_only'] is True; assert d['execution_allowed'] is False; assert d['redaction']['applied'] is True; assert len(d['retrieval']['citations'])==1; assert d['pr_review']['advisory_only'] is True; print('OMEGA_INSPECTION_LIVE_API=PASS')"
       - name: Legacy backend, matrix, model, approval and dashboard regressions
         run: |
           python3 -m pip install --quiet -r omega_mvi/requirements-test.txt
-          python3 -m pytest -q tests omega_mvi/tests/test_mvi_health.py omega_mvi/tests/test_dashboard_tr.py omega_mvi/model_adapter/test_adapter.py omega_mvi/approval/test_contract.py
+          python3 -m pytest -q tests omega_mvi/tests/test_mvi_health.py omega_mvi/tests/test_dashboard_tr.py omega_mvi/model_adapter/test_adapter.py omega_mvi/approval/test_contract.py omega_mvi/tests/test_inspection_api.py
       - name: Cleanup disposable containers and volumes
         if: always()
         run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans
