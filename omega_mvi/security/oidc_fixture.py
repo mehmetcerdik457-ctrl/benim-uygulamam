@@ -27,7 +27,7 @@ AUDIENCE = "omega-synthetic-fixture-client"
 MAX_TOKEN_LIFETIME_SECONDS = 300
 ALLOWED_FIXTURE_SCOPES = frozenset({"repository:read", "inventory:read", "rag:read", "pr:read"})
 _B64URL = re.compile(r"^[A-Za-z0-9_-]+$")
-_PKCE_VERIFIER = re.compile(r"^[A-Za-z0-9._~\\-]{43,128}$")
+_PKCE_VERIFIER = re.compile(r"^[A-Za-z0-9._~\-]{43,128}$")
 _MAX_JWT_BYTES = 4096
 
 
