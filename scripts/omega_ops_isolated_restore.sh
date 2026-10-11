@@ -29,7 +29,19 @@ assert db.get("image")=="postgres:16-alpine", "review changed database image bef
 echo "OMEGA_OPS_COMPOSE_DISPOSABLE_GUARD=PASS"
 cleanup() {
   # The unique project ID prevents targeting any preexisting OMEGA services.
-  "${compose[@]}" --profile integration down --volumes --remove-orphans >/dev/null 2>&1 || true
+  original_status=$?
+  if ! "${compose[@]}" --profile integration down --volumes --remove-orphans >/dev/null 2>&1; then
+    echo "OMEGA_OPS_ISOLATED_DISPOSAL=FAIL"
+    exit 27
+  fi
+  container_left="$(docker ps -aq --filter "label=com.docker.compose.project=$project")"
+  volume_left="$(docker volume ls -q --filter "label=com.docker.compose.project=$project")"
+  if [[ -n "$container_left" || -n "$volume_left" ]]; then
+    echo "OMEGA_OPS_ISOLATED_DISPOSAL=FAIL"
+    exit 28
+  fi
+  echo "OMEGA_OPS_ISOLATED_DISPOSAL=PASS"
+  exit "$original_status"
 }
 trap cleanup EXIT
 "${compose[@]}" up -d --wait --wait-timeout 120 db >/dev/null
