@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
+from functools import wraps
+from threading import RLock
 import re
 from typing import Iterable
 
@@ -35,6 +37,7 @@ class ScanOutcome:
     added: int = 0
     updated: int = 0
     unchanged: int = 0
+    removed: int = 0
 
 
 _WORDS = re.compile(r"[a-z0-9]+")
@@ -42,6 +45,16 @@ _WORDS = re.compile(r"[a-z0-9]+")
 
 def _terms(value: str) -> set[str]:
     return set(_WORDS.findall(value.casefold()))
+
+
+def _atomic(method):
+    """Serialize fixture index and linked memory operations under one lock."""
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        lock = self._lock if hasattr(self, "_lock") else self._index._lock
+        with lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class ControlledIndex:
@@ -69,8 +82,10 @@ class ControlledIndex:
         self._deleted_ids: set[tuple[str, str]] = set()
         self._deleted_fingerprints: dict[str, set[str]] = {}
         self._generation = 0
+        self._lock = RLock()
 
     @property
+    @_atomic
     def generation(self) -> int:
         """Monotonic number for caller-side context-cache invalidation."""
         return self._generation
@@ -81,11 +96,12 @@ class ControlledIndex:
             raise ScopeError("OWNER_ACCESS_REQUIRED")
 
     def _source_allowed(self, source_ref: str) -> None:
-        if source_ref not in self._allowed:
+        if type(source_ref) is not str or source_ref not in self._allowed:
             raise ScopeError("SOURCE_NOT_ALLOWED")
         if source_ref in self._revoked_sources:
             raise ScopeError("SOURCE_REVOKED")
 
+    @_atomic
     def rescan(self, changes: Iterable[DocumentChange], *, requester_id: str,
                approved: bool = False) -> ScanOutcome:
         self._authorized(requester_id)
@@ -131,6 +147,48 @@ class ControlledIndex:
             self._generation += 1
         return ScanOutcome(added, updated, unchanged)
 
+    @_atomic
+    def replace_source_snapshot(self, source_ref: str, changes: Iterable[DocumentChange],
+                                *, requester_id: str, approved: bool = False) -> ScanOutcome:
+        """Replace a COMPLETE synthetic source snapshot atomically.
+
+        Incremental batches MUST use rescan(). Missing IDs become tombstones;
+        same-content rename in this source is denied. All fixture state is
+        volatile and vanishes after process restart.
+        """
+        self._authorized(requester_id)
+        if approved is not True:
+            raise ScopeError("SNAPSHOT_APPROVAL_REQUIRED")
+        self._source_allowed(source_ref)
+        batch = tuple(changes)
+        if len(batch) > 1000:
+            raise ValueError("SCAN_BATCH_TOO_LARGE")
+        if any(not isinstance(x, DocumentChange) or x.source_ref != source_ref for x in batch):
+            raise ValueError("INVALID_SNAPSHOT_SCOPE")
+        incoming = {x.document_id for x in batch}
+        removed = [key for key in self._records if key[0] == source_ref and key[1] not in incoming]
+        trial = ControlledIndex(owner_id=self._owner, allowlisted_sources=self._allowed)
+        trial._records = self._records.copy()
+        trial._revoked_sources = self._revoked_sources.copy()
+        trial._deleted_ids = self._deleted_ids.copy()
+        trial._deleted_fingerprints = {
+            key: values.copy() for key, values in self._deleted_fingerprints.items()
+        }
+        trial._generation = self._generation
+        for key in removed:
+            prior = trial._records.pop(key)
+            trial._deleted_ids.add(key)
+            trial._deleted_fingerprints.setdefault(source_ref, set()).add(prior[2])
+        result = trial.rescan(batch, requester_id=requester_id, approved=True)
+        if removed and trial._generation == self._generation:
+            trial._generation += 1
+        self._records = trial._records
+        self._deleted_ids = trial._deleted_ids
+        self._deleted_fingerprints = trial._deleted_fingerprints
+        self._generation = trial._generation
+        return ScanOutcome(result.added, result.updated, result.unchanged, len(removed))
+
+    @_atomic
     def delete_document(self, source_ref: str, document_id: str, *, requester_id: str,
                         approved: bool = False) -> None:
         self._authorized(requester_id)
@@ -145,6 +203,7 @@ class ControlledIndex:
             self._deleted_fingerprints.setdefault(source_ref, set()).add(prior[2])
         self._generation += 1
 
+    @_atomic
     def revoke_source(self, source_ref: str, *, requester_id: str,
                       approved: bool = False) -> None:
         self._authorized(requester_id)
@@ -159,11 +218,13 @@ class ControlledIndex:
                 self._deleted_ids.add(key)
         self._generation += 1
 
+    @_atomic
     def is_active(self, source_ref: str, document_id: str, *, requester_id: str) -> bool:
         self._authorized(requester_id)
         return source_ref in self._allowed and source_ref not in self._revoked_sources and (
             source_ref, document_id) in self._records
 
+    @_atomic
     def search(self, query: str, *, requester_id: str, limit: int = 5) -> tuple[SearchHit, ...]:
         self._authorized(requester_id)
         if type(query) is not str or not query.strip():
@@ -182,9 +243,22 @@ class ControlledIndex:
                 results.append(SearchHit(source, identity, revision, contents, score))
         return tuple(sorted(results, key=lambda r: (-r.score, r.source_ref, r.document_id))[:limit])
 
+    @_atomic
     def context(self, query: str, *, requester_id: str) -> tuple[str, ...]:
         """New, access-checked context each call; no persistent LLM cache."""
         return tuple(hit.text for hit in self.search(query, requester_id=requester_id))
+
+    @_atomic
+    def context_snapshot(self, query: str, *, requester_id: str) -> tuple[int, tuple[str, ...]]:
+        """Tag a generated response so consumers can reject stale contexts."""
+        return self._generation, self.context(query, requester_id=requester_id)
+
+    @_atomic
+    def assert_context_current(self, generation: int, *, requester_id: str) -> None:
+        """Fail closed when a retained response predates a source change."""
+        self._authorized(requester_id)
+        if type(generation) is not int or generation != self._generation:
+            raise ScopeError("STALE_CONTEXT")
 
 
 _ALLOWED_STATES = frozenset(("unverified_suggestion", "approved_fact", "tested_solution"))
@@ -208,6 +282,7 @@ class MemoryLedger:
         self._index = index
         self._entries: dict[str, MemoryEntry] = {}
 
+    @_atomic
     def record_suggestion(self, entry: MemoryEntry, *, requester_id: str) -> None:
         if entry.state != "unverified_suggestion" or entry.evidence_ref or entry.approver_id:
             raise ValueError("NEW_MEMORY_MUST_BE_UNVERIFIED")
@@ -220,6 +295,7 @@ class MemoryLedger:
             raise ScopeError("SOURCE_NOT_ACTIVE")
         self._entries[entry.entry_id] = entry
 
+    @_atomic
     def promote(self, entry_id: str, *, requester_id: str, new_state: str,
                 approver_id: str, evidence_ref: str) -> None:
         self._index._authorized(requester_id)
@@ -245,6 +321,7 @@ class MemoryLedger:
                                              record.document_id, record.statement,
                                              new_state, evidence_ref, approver_id)
 
+    @_atomic
     def trusted_context(self, *, requester_id: str) -> tuple[MemoryEntry, ...]:
         self._index._authorized(requester_id)
         return tuple(e for e in self._entries.values()
@@ -252,6 +329,7 @@ class MemoryLedger:
                      and self._index.is_active(e.source_ref, e.document_id,
                                                requester_id=requester_id))
 
+    @_atomic
     def inspect(self, *, requester_id: str) -> tuple[MemoryEntry, ...]:
         self._index._authorized(requester_id)
         # Inactive entries are quarantined from all public-facing memory views.
