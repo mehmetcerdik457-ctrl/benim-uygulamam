@@ -37,7 +37,7 @@ from fastapi.responses import FileResponse
 def turkish_dashboard():
     return FileResponse(Path(__file__).parent / "static" / "index.html",
                         media_type="text/html",
-                        headers={"Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff"})
+                        headers={"Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'","Referrer-Policy":"no-referrer","X-Frame-Options":"DENY","X-Content-Type-Options":"nosniff"})
 
 
 # Fixed synthetic-only demo routes. Not an authenticated task API or model runtime.
@@ -80,3 +80,21 @@ def demo_task_status():
                 "task_details_available":False,"production_ready":False}
     except (ValueError,psycopg.Error,OverflowError) as exc:
         raise HTTPException(status_code=503,detail="DEMO_DATABASE_UNAVAILABLE") from exc
+
+
+# Fixed read-only static assets: no directory traversal or externally hosted scripts.
+@app.get("/assets/dashboard.js", include_in_schema=False)
+def dashboard_javascript():
+    return FileResponse(Path(__file__).parent / "static" / "dashboard.js",
+                        media_type="text/javascript",
+                        headers={"Cache-Control":"no-store",
+                                 "X-Content-Type-Options":"nosniff",
+                                 "Cross-Origin-Resource-Policy":"same-origin"})
+
+@app.get("/assets/dashboard.css", include_in_schema=False)
+def dashboard_stylesheet():
+    return FileResponse(Path(__file__).parent / "static" / "dashboard.css",
+                        media_type="text/css",
+                        headers={"Cache-Control":"no-store",
+                                 "X-Content-Type-Options":"nosniff",
+                                 "Cross-Origin-Resource-Policy":"same-origin"})
