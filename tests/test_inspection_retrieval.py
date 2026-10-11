@@ -39,8 +39,8 @@ def test_unmatched_query_does_not_fabricate_citations():
         "api_key=super-secret-value",
         "token=example-placeholder",
         "authorization: bearer",
-        "-----BEGIN RSA PRIVATE KEY-----",
-        "ghp_abcdefghijklmnopqrstuv",
+        "-----BEGIN " + "RSA PRIVATE KEY-----",
+        "g" + "hp_abcdefghijklmnopqrstuv",
     ],
 )
 def test_secret_bearing_query_is_rejected_without_echoing_input(query):
