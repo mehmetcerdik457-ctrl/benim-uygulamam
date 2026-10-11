@@ -14,7 +14,7 @@ SYNTHETIC = "ghp_" + "A" * 24
 def scan_block():
     workflow = yaml.load(WORKFLOW.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
     return next(step["run"] for step in workflow["jobs"]["guard"]["steps"]
-                if step["name"] == "Scan text files for credential markers")
+                if step.get("name") == "Scan text files for credential markers")
 
 
 def run_case(content, initialized=True):
@@ -36,7 +36,7 @@ def run_case(content, initialized=True):
 @pytest.mark.parametrize("content,expected", [
     (SYNTHETIC, 1),
     ("ordinary nonsecret text", 0),
-])
+], ids=["synthetic-match", "no-match"])
 def test_actual_workflow_shell_distinguishes_match_from_no_match(content, expected):
     result = run_case(content)
     assert result.returncode == expected
