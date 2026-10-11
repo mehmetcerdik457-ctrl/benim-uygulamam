@@ -12,7 +12,28 @@ services:
     ports:
       - "127.0.0.1:18080:8000"
     depends_on:
+      tests:
+    profiles: ["integration"]
+    build:
+      context: ./omega_mvi
+      dockerfile: Dockerfile.test
+    environment:
+      OMEGA_DATABASE_URL: postgresql://omega_demo:${OMEGA_DEV_DB_PASSWORD}@db:5432/omega_demo
+    depends_on:
       db:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  db:
         condition: service_healthy
     networks:
       - isolated_demo
