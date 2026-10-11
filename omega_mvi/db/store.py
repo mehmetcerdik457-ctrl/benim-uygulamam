@@ -5,6 +5,7 @@ accepted as an authenticated owner. The test API supplies a server-side fixture
 identity; real identity verification remains MVI-03 BLOCKED.
 """
 import re
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from psycopg.types.json import Jsonb
 
@@ -27,25 +28,51 @@ def _metadata(data):
         raise ValueError("only predefined, nonidentifying synthetic fixture labels are accepted")
     return data
 
-def create(conn, owner, trace_id, metadata=None):
+READ_SCOPES=frozenset(("repository:read","inventory:read","rag:read","pr:read"))
+
+def _controls(budget_limit_minor, budget_currency, permissions, deadline_utc):
+    if type(budget_limit_minor) is not int or not 0 <= budget_limit_minor <= 1000000000:
+        raise ValueError("budget must be a finite nonnegative integer in minor units")
+    if budget_currency not in ("USD","TRY"):
+        raise ValueError("invalid budget currency")
+    if not isinstance(permissions,(list,tuple)) or any(type(p) is not str for p in permissions):
+        raise ValueError("permissions must be a read-only scope sequence")
+    if len(permissions)!=len(set(permissions)) or not set(permissions).issubset(READ_SCOPES):
+        raise ValueError("permissions are not authorized")
+    now=datetime.now(timezone.utc)
+    if deadline_utc is None:
+        deadline_utc=now+timedelta(hours=1)
+    if not isinstance(deadline_utc,datetime) or deadline_utc.tzinfo is None or deadline_utc.utcoffset()!=timedelta(0):
+        raise ValueError("deadline must be UTC timezone-aware")
+    if not (now < deadline_utc <= now+timedelta(days=365)):
+        raise ValueError("deadline must be in the future and within one year")
+    return budget_limit_minor, budget_currency, list(permissions), deadline_utc
+
+def create(conn, owner, trace_id, metadata=None, *, budget_limit_minor=0,
+           budget_currency="USD", permissions=(), deadline_utc=None):
     if not isinstance(owner,str) or _OWNER.fullmatch(owner) is None:
         raise ValueError("invalid owner")
     data=_metadata({} if metadata is None else metadata)
+    budget_limit_minor,budget_currency,permissions,deadline_utc=_controls(
+        budget_limit_minor,budget_currency,permissions,deadline_utc)
     task_id=uuid4()
     with conn.transaction():
-        conn.execute("INSERT INTO omega_tasks(task_id,owner,trace_id,metadata) VALUES (%s,%s,%s,%s)",
-                     (task_id,owner,trace_id,Jsonb(data)))
+        conn.execute("""INSERT INTO omega_tasks
+          (task_id,owner,trace_id,metadata,budget_limit_minor,budget_currency,permissions,deadline_utc)
+          VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+                     (task_id,owner,trace_id,Jsonb(data),
+                      budget_limit_minor,budget_currency,permissions,deadline_utc))
     return task_id
 
 def get(conn,task_id,owner=None):
     if owner is None:
-        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata FROM omega_tasks WHERE task_id=%s",(task_id,)).fetchone()
+        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata,budget_limit_minor,budget_currency,permissions,deadline_utc FROM omega_tasks WHERE task_id=%s",(task_id,)).fetchone()
     else:
         if not isinstance(owner,str) or _OWNER.fullmatch(owner) is None:
             raise ValueError("invalid verified owner")
-        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata FROM omega_tasks WHERE task_id=%s AND owner=%s",(task_id,owner)).fetchone()
+        row=conn.execute("SELECT task_id,owner,state,trace_id,metadata,budget_limit_minor,budget_currency,permissions,deadline_utc FROM omega_tasks WHERE task_id=%s AND owner=%s",(task_id,owner)).fetchone()
     if row is None: return None
-    return dict(zip(("task_id","owner","state","trace_id","metadata"),row))
+    return dict(zip(("task_id","owner","state","trace_id","metadata","budget_limit_minor","budget_currency","permissions","deadline_utc"),row))
 
 def advance(conn,task_id,next_state,approval=None):
     if next_state not in VALID_STATES:

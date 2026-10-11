@@ -28,3 +28,13 @@ def readiness():
 @app.post("/api/execute")
 def disabled_operations():
     raise HTTPException(status_code=403, detail="DENIED: not enabled")
+
+
+from pathlib import Path
+from fastapi.responses import FileResponse
+
+@app.get("/",include_in_schema=False)
+def turkish_dashboard():
+    return FileResponse(Path(__file__).parent / "static" / "index.html",
+                        media_type="text/html",
+                        headers={"Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; img-src 'none'; frame-ancestors 'none'","X-Content-Type-Options":"nosniff"})
