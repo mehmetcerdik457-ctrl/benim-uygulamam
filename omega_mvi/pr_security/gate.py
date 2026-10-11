@@ -195,7 +195,7 @@ def evaluate(
         blockers.append("MAIN_NOT_PROTECTED_OR_UNKNOWN")
     if base.get("ref") != "main":
         blockers.append("STACKED_PR_NOT_MAIN_ACCEPTANCE")
-    elif main.get("commit", {}).get("sha") != base.get("sha"):
+    elif not isinstance(main.get("commit"), dict) or main["commit"].get("sha") != base.get("sha"):
         blockers.append("BASE_SHA_NOT_CURRENT_MAIN")
 
     checks = _strict_list(evidence.get("checks"), limit=101)
