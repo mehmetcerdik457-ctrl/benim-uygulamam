@@ -51,9 +51,10 @@ def test_direct_update_rejected_and_integrity(connection):
     tid=store.create(connection,"fixture-owner",uuid4())
     with pytest.raises(psycopg.Error):
         connection.execute("UPDATE omega_tasks SET state='RUNNING' WHERE task_id=%s",(tid,))
+    store.advance(connection,tid,"PLANNED")
     with pytest.raises(psycopg.Error):
         connection.execute("DELETE FROM omega_task_events")
-    assert store.get(connection,tid)["state"]=="CREATED"
+    assert store.get(connection,tid)["state"]=="PLANNED"
     with pytest.raises(ValueError):
         store.create(connection,"fixture-owner",uuid4(),{"secret":"never-index"})
 
