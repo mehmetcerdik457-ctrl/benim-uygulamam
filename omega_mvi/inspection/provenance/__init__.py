@@ -27,7 +27,7 @@ _MAX_RECORDS = 1000
 
 
 def _safe_component(value: object, maximum: int) -> bool:
-    return (type(value) is str and 0 < len(value) <= maximum
+    return (type(value) is str and value not in (".", "..") and 0 < len(value) <= maximum
             and all(char in _SAFE_PART for char in value))
 
 
