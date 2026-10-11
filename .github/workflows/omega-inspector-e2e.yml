@@ -38,6 +38,25 @@ jobs:
           echo "OMEGA_DEMO_READS_ENABLED=true" >> "$GITHUB_ENV"
       - name: Start ONE Compose with PostgreSQL and localhost-bound API
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+      - name: Verify loopback from CI RUNNER host (not owner's device)
+        run: |
+          python3 - <<'PY'
+          import json
+          import urllib.error
+          import urllib.request
+          base="http://127.0.0.1:18080"
+          with urllib.request.urlopen(base+"/api/health",timeout=6) as response:
+              health=json.load(response)
+          assert health["mode"]=="mock" and health["production_ready"] is False
+          request=urllib.request.Request(base+"/api/execute",data=b"{}",method="POST",
+                                         headers={"Content-Type":"application/json"})
+          try:
+              urllib.request.urlopen(request,timeout=6)
+              raise AssertionError("execution must never return 2xx")
+          except urllib.error.HTTPError as error:
+              assert error.code==403
+          print("OMEGA_RUNNER_HOST_LOOPBACK_HTTP=PASS")
+          PY
       - name: Seed disposable DB guard token (never real data)
         run: |
           docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1),marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1,'${OMEGA_TEST_DB_SENTINEL}');"
