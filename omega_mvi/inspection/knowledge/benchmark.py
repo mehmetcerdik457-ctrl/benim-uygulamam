@@ -41,6 +41,7 @@ def evaluate(candidates: Sequence[Candidate], cases: Sequence[BenchmarkCase], *,
         peak_python_bytes = 0
         for case in cases:
             ids = ()
+            reference_ranking = None
             for _ in range(repetitions):
                 tracemalloc.start()
                 try:
@@ -50,8 +51,13 @@ def evaluate(candidates: Sequence[Candidate], cases: Sequence[BenchmarkCase], *,
                     _, peak = tracemalloc.get_traced_memory()
                 finally:
                     tracemalloc.stop()
-                if any(type(item) is not str for item in ids):
+                if (len(ids) > limit or any(type(item) is not str or not item for item in ids)
+                        or len(ids) != len(set(ids))):
                     raise ValueError("INVALID_CANDIDATE_OUTPUT")
+                if reference_ranking is None:
+                    reference_ranking = ids
+                elif ids != reference_ranking:
+                    raise ValueError("UNSTABLE_RANKING")
                 latencies.append(elapsed_ms)
                 peak_python_bytes = max(peak_python_bytes, peak)
             recalls.append(len(set(ids[:limit]) & case.relevant_ids) / len(case.relevant_ids))
