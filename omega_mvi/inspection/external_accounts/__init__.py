@@ -38,13 +38,19 @@ def _assert_safe_next(url, repository, resource, expected_page):
 
 def _next_link(headers):
     link = headers.get("link", headers.get("Link", ""))
+    if type(link) is not str:
+        raise InventoryIncomplete("Malformed pagination headers")
+    matches = []
     for segment in link.split(","):
-        if 'rel="next"' in segment:
-            value = segment.strip().split(";", 1)[0].strip()
+        parts = segment.strip().split(";")
+        if any(part.strip() == 'rel="next"' for part in parts[1:]):
+            value = parts[0].strip()
             if not (value.startswith("<") and value.endswith(">")):
                 raise InventoryDenied("Malformed next Link")
-            return value[1:-1]
-    return None
+            matches.append(value[1:-1])
+    if len(matches) > 1:
+        raise InventoryDenied("Ambiguous next Link")
+    return matches[0] if matches else None
 
 
 def github_metadata_pages(fetch_page, repository, approved_repositories,
@@ -63,6 +69,7 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
     if type(max_pages) is not int or not 1 <= max_pages <= 50:
         raise InventoryDenied("Invalid page ceiling")
     results = []
+    seen_names = set()
     for page in range(1, max_pages + 1):
         response = fetch_page(_page_url(repository, resource, page))
         if type(response) is not dict:
@@ -88,6 +95,9 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
                     raise InventoryIncomplete("Unsafe branch name")
             elif not _REPOSITORY.fullmatch(name):
                 raise InventoryIncomplete("Unsafe fork name")
+            if name in seen_names:
+                raise InventoryIncomplete("Repeated inventory name across pages")
+            seen_names.add(name)
             results.append(name)
         next_url = _next_link(headers)
         if next_url is not None:
@@ -113,6 +123,7 @@ def drive_metadata_only(pages, *, approved_folder_ids, folder_id):
             or folder_id not in approved_folder_ids):
         raise InventoryDenied("Drive folder not explicitly approved")
     index = []
+    seen_ids = set()
     for page in pages:
         if type(page) is not dict or page.get("complete") is not True:
             raise InventoryIncomplete("Drive metadata page not proven complete")
@@ -120,15 +131,68 @@ def drive_metadata_only(pages, *, approved_folder_ids, folder_id):
         if type(files) is not list:
             raise InventoryIncomplete("Invalid Drive page")
         for item in files:
-            if type(item) is not dict or folder_id not in item.get("parent_ids", []):
+            if type(item) is not dict:
+                raise InventoryIncomplete("Invalid Drive file metadata")
+            parents = item.get("parent_ids")
+            if type(parents) not in (list, tuple) or folder_id not in parents:
                 raise InventoryDenied("Drive item outside allowed folder")
             ident, mime = item.get("id"), item.get("mime_type")
             if (type(ident) is not str or not 1 <= len(ident) <= 200
                     or not re.fullmatch(r"[A-Za-z0-9_-]+", ident)
                     or type(mime) is not str or not _MIME.fullmatch(mime)):
                 raise InventoryIncomplete("Invalid Drive metadata")
+            if ident in seen_ids:
+                raise InventoryIncomplete("Repeated Drive file ID")
+            seen_ids.add(ident)
             # No title, description, owners, paths, links or file bytes.
             index.append({"id": ident, "mime_type": mime})
     return {"complete": True, "item_count": len(index),
             "mime_counts": dict(Counter(i["mime_type"] for i in index)),
             "ephemeral_index": tuple(index), "content_downloads": 0}
+
+
+def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
+                         max_pages=10):
+    """Fetch strictly approved folder metadata pages without returning item IDs.
+
+    `fetch_page(folder_id, page_token)` MUST be an adapter restricted to an
+    authorized Drive files.list metadata query for this exact folder. It must
+    return {status: 200, files: [...], next_page_token: str | None} using
+    minimal fields. This layer cannot establish the adapter's OAuth scopes;
+    it *does* fail closed on incomplete/duplicated/malformed pages.
+    """
+    if (type(folder_id) is not str or not folder_id or
+            type(approved_folder_ids) not in (list, tuple, set, frozenset)
+            or folder_id not in approved_folder_ids):
+        raise InventoryDenied("Drive folder not explicitly approved")
+    if type(max_pages) is not int or not 1 <= max_pages <= 50:
+        raise InventoryDenied("Invalid Drive page ceiling")
+    pages = []
+    seen_tokens = set()
+    page_token = None
+    for page_no in range(1, max_pages + 1):
+        response = fetch_page(folder_id, page_token)
+        if type(response) is not dict or response.get("status") != 200:
+            raise InventoryIncomplete("Drive metadata response not verified")
+        files = response.get("files")
+        if type(files) is not list or len(files) > 100:
+            raise InventoryIncomplete("Invalid Drive metadata page size")
+        if "next_page_token" not in response:
+            raise InventoryIncomplete("Drive continuation status missing")
+        next_token = response["next_page_token"]
+        if next_token is not None:
+            if (type(next_token) is not str or not
+                    re.fullmatch(r"[A-Za-z0-9._~+/=-]{1,1024}", next_token)
+                    or next_token == page_token or next_token in seen_tokens):
+                raise InventoryIncomplete("Invalid/repeated Drive page token")
+            seen_tokens.add(next_token)
+        pages.append({"complete": True, "files": files})
+        # Validate every page BEFORE requesting another one; reject scope drift.
+        intermediate = drive_metadata_only(
+            pages, approved_folder_ids=approved_folder_ids, folder_id=folder_id)
+        if next_token is None:
+            return {"complete": True, "item_count": intermediate["item_count"],
+                    "mime_counts": intermediate["mime_counts"], "pages": page_no,
+                    "content_downloads": 0}
+        page_token = next_token
+    raise InventoryIncomplete("Drive metadata page ceiling reached")
