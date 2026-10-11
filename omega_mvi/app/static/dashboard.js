@@ -18,8 +18,17 @@ async function inspection(){
     const x=await json("/api/demo/inspection");
     if(x.production_ready!==false || x.authority!=="none" || x.mode!=="synthetic_offline_only" ||
        x.redaction_applied!==true || !Array.isArray(x.sources))throw Error("untrusted_result");
-    const sources=x.sources.slice(0,5);
-    if(sources.some(s=>typeof s.ref!=="string" || !s.ref.startsWith("synthetic://")))throw Error("unsafe_reference");
+    // This route is explicitly synthetic-only. A prefix does not prove a citation.
+    // Production provenance will require a separate authenticated endpoint/schema.
+    const allowedRefs=new Set([
+      "synthetic://omega-fixtures/owner-controls.md#access",
+      "synthetic://omega-fixtures/provenance.md#citations",
+      "synthetic://omega-fixtures/privacy.md#secrets"
+    ]);
+    if(x.sources.length>5 || x.sources.some(s=>!s || typeof s!=="object" ||
+       !allowedRefs.has(s.ref) || !Number.isSafeInteger(s.score) || s.score<1) ||
+       new Set(x.sources.map(s=>s.ref)).size!==x.sources.length)throw Error("unsafe_reference");
+    const sources=x.sources;
     show("inspection","4 sentetik modül: GitHub envanteri, maskeleme, kaynaklı arama ve PR inceleme. "+
       "Kaynak sayısı: "+sources.length+". Karar yetkisi: YOK.");
     show("sources",sources.map(s=>s.ref).join(" | "));
