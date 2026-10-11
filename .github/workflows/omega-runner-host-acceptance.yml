@@ -6,6 +6,8 @@ on:
       - 'scripts/omega_probe_runner_loopback.py'
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
+      - 'scripts/omega_runner_host_direct_route.py'
+      - 'tests/test_omega_runner_host_direct_route.py'
       - 'tests/test_omega_runner_host_port_audit.py'
       - 'tests/test_omega_runner_host_diagnostic.py'
       - '.github/workflows/omega-runner-host-acceptance.yml'
@@ -29,11 +31,16 @@ jobs:
           echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
       - name: Test positive and negative Docker port audit outcomes (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v
+      - name: Test direct host-to-internal route classifications (synthetic)
+        run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
+      - name: Probe host-to-internal-container HTTP without network changes
+        run: python3 scripts/omega_runner_host_direct_route.py
       - name: Enforce requested versus EFFECTIVE Docker host port mapping
+        if: success() || failure()
         run: python3 scripts/omega_runner_host_port_audit.py
       - name: Enforce independent runner-host connectivity acceptance
         if: success() || failure()
