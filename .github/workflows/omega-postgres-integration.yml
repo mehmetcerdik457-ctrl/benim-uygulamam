@@ -24,8 +24,14 @@ jobs:
           pw="$(openssl rand -hex 18)"
           echo "::add-mask::$pw"
           echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+          marker="$(openssl rand -hex 16)"
+          echo "::add-mask::$marker"
+          echo "OMEGA_TEST_DB_SENTINEL=$marker" >> "$GITHUB_ENV"
       - name: Launch isolated PostgreSQL
         run: docker compose -f compose.omega.yml up -d --wait --wait-timeout 120 db
+      - name: Independently seed disposable DB identity marker
+        run: |
+          docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1), marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1, '${OMEGA_TEST_DB_SENTINEL}');"
       - name: Real DB read/write, migration and rollback
         run: docker compose -f compose.omega.yml --profile integration run --build --rm tests
       - name: Existing backend regressions and MVI-01 unit tests
