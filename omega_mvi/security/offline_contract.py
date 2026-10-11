@@ -139,7 +139,8 @@ def restore_synthetic_backup(envelope: bytes, key: bytes) -> bytes:
     from cryptography.exceptions import InvalidTag
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     if (not isinstance(envelope, bytes) or not envelope.startswith(FIXTURE_MAGIC)
-            or len(envelope) < len(FIXTURE_MAGIC) + 12 + 16
+            or not (len(FIXTURE_MAGIC) + 12 + 16
+                    <= len(envelope) <= len(FIXTURE_MAGIC) + 12 + 1024 * 1024 + 16)
             or not isinstance(key, bytes) or len(key) != 32):
         raise SecurityDenied("INVALID_FIXTURE_ENVELOPE")
     start = len(FIXTURE_MAGIC)
