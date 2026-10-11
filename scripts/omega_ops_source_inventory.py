@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 PIN = re.compile(r"^[A-Za-z0-9_.-]+(?:\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9_.+!-]+$")
@@ -50,7 +51,7 @@ def inventory(root=ROOT):
                     actions.append(bool(SHA_ACTION.search(action)))
     return {
         "scope": "repository-static-source-inventory-only",
-        "head_sha": os.getenv("GITHUB_SHA", "LOCAL_UNBOUND"),
+        "checked_out_sha": subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, text=True, capture_output=True, check=True).stdout.strip(),
         "direct_requirements": len(requirements),
         "direct_requirements_pinned": sum(x["pinned"] for x in requirements),
         "container_image_references": len(bases),
