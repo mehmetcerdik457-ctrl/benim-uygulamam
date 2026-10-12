@@ -71,3 +71,18 @@ The source-only `omega_mvi/pr_security/webhook.py` verifier accepts **only** HMA
 GitHub reference: https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
 
 The added source has **68 synthetic contract tests** (39 PR gate, 11 Copilot blocked intent, 18 webhook verifier) whose latest exact HEAD status must be checked against GitHub CI. Zero real credentials, webhooks, Checks or delegations were created.
+
+
+## 12 October 2026 — fail-closed premerge & replay hardening (synthetic-only)
+
+**No provider permissions were changed.** Main still reads `protected=false`, repository rulesets `[]`; a GitHub App connection cannot fetch admin-sensitive branch protection (403). This is a real blocker, not evidence of an enforced policy.
+
+Additional source-only components:
+
+1. `omega_mvi/pr_security/replay.py`: on-disk SQLite delivery-ID uniqueness with `BEGIN IMMEDIATE` and `synchronous=FULL`. Verification must happen **before** reserving, and durable reservation **before** downstream privileged actions. Duplicate delivery, missing persistent database path and storage outage must deny. A committed reservation is never undone to permit an unsafe retry. Integration helper `authenticate_and_reserve` composes HMAC verification and reservation without network access. **Single shared-disk demonstration only**; multiple hosts need a separately justified transactional backing store.
+2. `omega_mvi/pr_security/protection.py`: validates a supplied REST branch-protection object for strict required checks bound to **distinct trusted GitHub App IDs**, required human reviews, stale approval dismissal, CODEOWNERS and last-push approval, administrator enforcement, no force push/deletion and conversation resolution. Real settings cannot be inferred from successful CI or from `branch.protected` alone. For users on different GitHub plans, unsupported controls must remain UNKNOWN/BLOCKED, not declared PASS.
+3. `omega_mvi/pr_security/audit.py`: combines PR evidence with an independent `GET /branches/main/protection` read, rechecks mutable PR and main state after the protection read and **fails closed** on 403, outages, missing checks, stale SHA, unprotected main or high-risk changes without human approval. Result is immutable advisory state only: `authoritative=False`, `may_merge=False`.
+
+Added negative tests are purely synthetic and do not prove real Ruleset enforcement. No live webhook receiver, shared production replay store, GitHub App installation, Checks publication, Copilot dispatch, deployment, actual rollback, or merge has been performed. **Acceptance of original requirements 63, 64, 66, 67, 68, 69 and 70 remains PARTIAL/BLOCKED.**
+
+Release criteria before any approval: real source-scoped App identity; official protection settings inspected with sufficient rights; trusted Check-name/App-ID mapping; authorized human review; live protected-branch negative merge test; fail-closed auditor outage and isolated deployment rollback evidence; owner authorization for access changes. All special-case acceptance evidence must be commit-SHA-bound, not inherited from parent PR #58 or local 0.1.4-dev.
