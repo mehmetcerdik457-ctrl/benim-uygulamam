@@ -362,3 +362,26 @@ def test_drive_aggregate_discards_sensitive_provider_fields():
                     "pages": 1, "content_downloads": 0}
     assert "DO_NOT_PUBLISH_SYNTHETIC" not in repr(data)
     assert "safeSyntheticFile" not in repr(data)
+
+
+
+def test_github_callback_failure_never_exposes_provider_exception_text():
+    def raising_callback(_url):
+        raise RuntimeError("SYNTHETIC_PRIVATE_PROVIDER_ERROR")
+    with pytest.raises(InventoryIncomplete) as failure:
+        github_metadata_pages(raising_callback, REPO, {REPO}, "branches")
+    assert str(failure.value) == "GitHub metadata fetch failed"
+    assert "SYNTHETIC_PRIVATE_PROVIDER_ERROR" not in str(failure.value)
+    assert failure.value.__suppress_context__ is True
+
+
+def test_drive_callback_failure_never_exposes_provider_exception_text():
+    def raising_callback(_folder, _token):
+        raise RuntimeError("SYNTHETIC_PRIVATE_FOLDER_ERROR")
+    with pytest.raises(InventoryIncomplete) as failure:
+        drive_metadata_pages(raising_callback,
+                             approved_folder_ids={"approved"},
+                             folder_id="approved")
+    assert str(failure.value) == "Drive metadata fetch failed"
+    assert "SYNTHETIC_PRIVATE_FOLDER_ERROR" not in str(failure.value)
+    assert failure.value.__suppress_context__ is True
