@@ -7,6 +7,8 @@ on:
       - 'scripts/omega_ops_isolated_restore.sh'
       - 'tests/test_omega_ops_contract.py'
       - 'scripts/omega_ops_source_inventory.py'
+      - 'scripts/omega_ops_release_gate.py'
+      - 'tests/test_omega_ops_release_gate.py'
       - 'docs/OMEGA_OPERATIONS_RECOVERY_EVIDENCE.md'
       - '.github/workflows/omega-ops-recovery.yml'
 
@@ -40,7 +42,8 @@ jobs:
       - name: Offline safety contract checks and shell syntax
         run: |
           bash -n scripts/omega_ops_isolated_restore.sh
-          python3 -m unittest discover -s tests -p 'test_omega_ops_contract.py' -v
+          python3 -m unittest discover -s tests -p 'test_omega_ops_*.py' -v
+          python3 scripts/omega_ops_release_gate.py
       - name: Bounded source pins and supply chain NOTRUN inventory
         run: python3 scripts/omega_ops_source_inventory.py
       - name: Create random throwaway marker and database password
