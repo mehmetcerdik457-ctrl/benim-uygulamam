@@ -200,7 +200,7 @@ def test_full_snapshot_tombstones_missing_document_without_affecting_others():
               requester_id=OWNER, approved=True)
     first = ix.generation
     result = ix.replace_source_snapshot(S, (DocumentChange(S, "keep", "r1", "amber keep revision"),),
-                                        requester_id=OWNER, approved=True)
+                                        requester_id=OWNER, approved=True, expected_generation=ix.generation)
     assert (result.removed, result.unchanged) == (1, 1)
     assert ix.generation == first + 1
     assert ix.search("quartz", requester_id=OWNER) == ()
@@ -216,7 +216,7 @@ def test_snapshot_same_content_rename_is_rejected_atomically():
     before = ix.generation
     with pytest.raises(ScopeError, match="TOMBSTONE_DENIED"):
         ix.replace_source_snapshot(S, (DocumentChange(S, "renamed", "r2", "quartz change graph"),),
-                                   requester_id=OWNER, approved=True)
+                                   requester_id=OWNER, approved=True, expected_generation=ix.generation)
     assert ix.generation == before
     assert [hit.document_id for hit in ix.search("quartz", requester_id=OWNER)] == ["d1"]
 
@@ -224,24 +224,24 @@ def test_snapshot_cross_source_and_unapproved_actions_fail_closed():
     ix = index()
     add(ix)
     with pytest.raises(ScopeError, match="SNAPSHOT_APPROVAL_REQUIRED"):
-        ix.replace_source_snapshot(S, (), requester_id=OWNER)
+        ix.replace_source_snapshot(S, (), requester_id=OWNER, expected_generation=ix.generation)
     with pytest.raises(ValueError, match="INVALID_SNAPSHOT_SCOPE"):
         ix.replace_source_snapshot(S, (DocumentChange(T, "wrong", "r1", "clean"),),
-                                   requester_id=OWNER, approved=True)
+                                   requester_id=OWNER, approved=True, expected_generation=ix.generation)
     assert ix.search("quartz", requester_id=OWNER)
     with pytest.raises(ScopeError, match="OWNER_ACCESS_REQUIRED"):
-        ix.replace_source_snapshot(S, (), requester_id="foreign", approved=True)
+        ix.replace_source_snapshot(S, (), requester_id="foreign", approved=True, expected_generation=ix.generation)
 
 def test_empty_complete_snapshot_removes_all_and_blocks_recreation():
     ix = index()
     add(ix)
     before = ix.generation
-    result = ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True)
+    result = ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True, expected_generation=ix.generation)
     assert result.removed == 1 and ix.generation == before + 1
     assert ix.context("quartz", requester_id=OWNER) == ()
     with pytest.raises(ScopeError, match="TOMBSTONE_DENIED"):
         add(ix)
-    assert ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True).removed == 0
+    assert ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True, expected_generation=ix.generation).removed == 0
 
 def test_retained_model_context_requires_fresh_generation_validation():
     ix = index()
@@ -312,7 +312,7 @@ def test_memory_context_generation_fails_after_document_removed():
                    approver_id="fixture-reviewer", evidence_ref="synthetic://review/1")
     old_generation = ix.generation
     assert len(ledger.trusted_context(requester_id=OWNER)) == 1
-    ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True)
+    ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True, expected_generation=ix.generation)
     with pytest.raises(ScopeError, match="STALE_CONTEXT"):
         ix.assert_context_current(old_generation, requester_id=OWNER)
     assert ledger.trusted_context(requester_id=OWNER) == ()
@@ -357,3 +357,84 @@ def test_fixture_benchmark_command_emits_explicit_model_skip():
     assert payload["reranker_models"] == "SKIP_NOT_INSTALLED"
     assert len(payload["data"]) == 2
     assert all(row["kind"] == "lexical_baseline" for row in payload["data"])
+
+
+# Phase 3: no stale source snapshot may clobber newer mutations.
+def test_full_snapshot_stale_generation_rejected_without_changes():
+    ix = index()
+    add(ix)
+    old_gen = ix.generation
+    add(ix, doc="newer", text="amber added later")
+    with pytest.raises(ScopeError, match="STALE_SOURCE_SNAPSHOT"):
+        ix.replace_source_snapshot(S, (DocumentChange(S,"d1","r1","quartz change graph"),),
+                                   requester_id=OWNER, approved=True,
+                                   expected_generation=old_gen)
+    assert [h.document_id for h in ix.search("amber", requester_id=OWNER)] == ["newer"]
+
+@pytest.mark.parametrize("generation", (None, True, -1, "1"))
+def test_full_snapshot_missing_or_invalid_generation_is_denied(generation):
+    ix = index()
+    add(ix)
+    with pytest.raises(ScopeError, match="STALE_SOURCE_SNAPSHOT"):
+        ix.replace_source_snapshot(S, (), requester_id=OWNER, approved=True,
+                                   expected_generation=generation)
+    assert ix.search("quartz", requester_id=OWNER)
+
+def test_trusted_memory_invalidates_on_document_content_edit():
+    ix = index()
+    add(ix)
+    ledger = MemoryLedger(ix)
+    ledger.record_suggestion(MemoryEntry("content", S, "d1", "quartz old result",
+                                         "unverified_suggestion"), requester_id=OWNER)
+    ledger.promote("content", requester_id=OWNER, new_state="approved_fact",
+                   approver_id="reviewer", evidence_ref="synthetic://review/content")
+    first = ledger.trusted_context(requester_id=OWNER)
+    assert len(first) == 1 and first[0].source_sha256 and first[0].source_revision == "r1"
+    assert add(ix, text="quartz new result", revision="r2").updated == 1
+    assert ledger.trusted_context(requester_id=OWNER) == ()
+    assert ledger.inspect(requester_id=OWNER) == ()
+    with pytest.raises(ScopeError, match="SOURCE_REVISION_MISMATCH"):
+        ledger.promote("content", requester_id=OWNER, new_state="tested_solution",
+                       approver_id="reviewer", evidence_ref="synthetic://test/new")
+
+def test_memory_invalidates_on_revision_change_even_with_same_text():
+    ix = index()
+    add(ix)
+    ledger = MemoryLedger(ix)
+    ledger.record_suggestion(MemoryEntry("rev", S, "d1", "quartz was verified",
+                                         "unverified_suggestion"), requester_id=OWNER)
+    assert len(ledger.inspect(requester_id=OWNER)) == 1
+    assert add(ix, revision="r2").updated == 1
+    assert ledger.inspect(requester_id=OWNER) == ()
+
+def test_unchanged_pinned_memory_survives_unrelated_document_mutation():
+    ix = index()
+    add(ix)
+    ledger = MemoryLedger(ix)
+    ledger.record_suggestion(MemoryEntry("kept", S, "d1", "quartz result",
+                                         "unverified_suggestion"), requester_id=OWNER)
+    ledger.promote("kept", requester_id=OWNER, new_state="approved_fact",
+                   approver_id="reviewer", evidence_ref="synthetic://review/kept")
+    assert add(ix, doc="other", text="amber independent").added == 1
+    assert [x.entry_id for x in ledger.trusted_context(requester_id=OWNER)] == ["kept"]
+
+def test_caller_cannot_forge_provenance_to_make_memory_trusted():
+    ix = index()
+    add(ix)
+    ledger = MemoryLedger(ix)
+    with pytest.raises(ValueError, match="NEW_MEMORY_MUST_BE_UNVERIFIED"):
+        ledger.record_suggestion(MemoryEntry(
+            "spoof", S, "d1", "quartz", "unverified_suggestion",
+            source_revision="r0", source_sha256="0"*64), requester_id=OWNER)
+    assert ledger.inspect(requester_id=OWNER) == ()
+
+def test_unverified_old_suggestion_cannot_be_promoted_after_change():
+    ix = index()
+    add(ix)
+    ledger = MemoryLedger(ix)
+    ledger.record_suggestion(MemoryEntry("old", S, "d1", "prior suggestion",
+                                         "unverified_suggestion"), requester_id=OWNER)
+    add(ix, revision="r2")
+    with pytest.raises(ScopeError, match="SOURCE_REVISION_MISMATCH"):
+        ledger.promote("old", requester_id=OWNER, new_state="approved_fact",
+                       approver_id="reviewer", evidence_ref="synthetic://review/old")
