@@ -79,3 +79,35 @@ class SQLiteDeliveryReplayStore:
                 if conn.in_transaction:
                     conn.rollback()
                 conn.close()
+
+
+def authenticate_and_reserve(
+    store: SQLiteDeliveryReplayStore,
+    *,
+    body: bytes,
+    headers: dict[str, str],
+    webhook_secret: bytes,
+    expected_installation_id: int,
+    expected_repository_id: int,
+    expected_pr_number: int,
+    expected_head_sha: str,
+    expected_base_sha: str,
+) -> SignedWebhookEvidence:
+    """One supported call path: signature -> signed metadata -> durable replay ID.
+
+    This is NOT a GitHub webhook HTTP receiver, installation authentication,
+    external side-effect, fresh SHA check or Checks publishing authority.
+    """
+    from omega_mvi.pr_security.webhook import verify_pr_webhook
+
+    signed = verify_pr_webhook(
+        body=body, headers=headers, webhook_secret=webhook_secret,
+        expected_installation_id=expected_installation_id,
+        expected_repository_id=expected_repository_id,
+        expected_pr_number=expected_pr_number,
+        expected_head_sha=expected_head_sha, expected_base_sha=expected_base_sha,
+    )
+    if not isinstance(store, SQLiteDeliveryReplayStore):
+        raise ReplayDenied("Durable replay store is required")
+    store.reserve(signed)
+    return signed
