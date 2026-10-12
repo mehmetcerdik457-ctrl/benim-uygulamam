@@ -53,7 +53,7 @@ class SyntheticTelemetryContract(unittest.TestCase):
             self.assertEqual(validate_synthetic_samples(data, NOW)["fixture"], "BLOCKED")
 
     def test_negative_and_overflow_values_rejected(self):
-        for number in (-1, 10**25):
+        for number in (-1, 10**25, 10**1000):
             data = fixture()
             data[0]["value"] = number
             self.assertEqual(validate_synthetic_samples(data, NOW)["fixture"], "BLOCKED")
