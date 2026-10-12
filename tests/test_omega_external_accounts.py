@@ -316,8 +316,8 @@ def test_finding_constructor_rejects_forged_classification_provider_and_path():
 
 
 def test_non_private_synthetic_path_that_looks_like_token_is_rejected():
-    # Deliberately fake illustrative fragments; never use a real credential.
-    with pytest.raises(ValueError, match="sensitive"):
+    # Generic errors intentionally do not reveal which secret-like pattern matched.
+    with pytest.raises(ValueError, match="normalized relative source paths"):
         classify_finding(detector_id="unknown_detector",
                          source_path="synthetic/sk-example123.py",
                          line_number=1)
