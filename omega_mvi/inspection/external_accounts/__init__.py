@@ -134,7 +134,8 @@ def drive_metadata_only(pages, *, approved_folder_ids, folder_id):
             if type(item) is not dict:
                 raise InventoryIncomplete("Invalid Drive file metadata")
             parents = item.get("parent_ids")
-            if type(parents) not in (list, tuple) or folder_id not in parents:
+            if (type(parents) not in (list, tuple) or len(parents) != 1
+                    or parents[0] != folder_id):
                 raise InventoryDenied("Drive item outside allowed folder")
             ident, mime = item.get("id"), item.get("mime_type")
             if (type(ident) is not str or not 1 <= len(ident) <= 200
@@ -168,7 +169,10 @@ def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
         raise InventoryDenied("Drive folder not explicitly approved")
     if type(max_pages) is not int or not 1 <= max_pages <= 50:
         raise InventoryDenied("Invalid Drive page ceiling")
-    pages = []
+    # Never accumulate provider pages with unrequested/sensitive extra fields.
+    counts = Counter()
+    seen_ids = set()
+    total = 0
     seen_tokens = set()
     page_token = None
     for page_no in range(1, max_pages + 1):
@@ -189,13 +193,20 @@ def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
                     or next_token == page_token or next_token in seen_tokens):
                 raise InventoryIncomplete("Invalid/repeated Drive page token")
             seen_tokens.add(next_token)
-        pages.append({"complete": True, "files": files})
-        # Validate every page BEFORE requesting another one; reject scope drift.
-        intermediate = drive_metadata_only(
-            pages, approved_folder_ids=approved_folder_ids, folder_id=folder_id)
+        # Check this page before following its continuation. Keep only an
+        # ephemeral ID set and MIME counters, never full raw provider pages.
+        validated = drive_metadata_only(
+            [{"complete": True, "files": files}],
+            approved_folder_ids=approved_folder_ids, folder_id=folder_id)
+        for item in validated["ephemeral_index"]:
+            if item["id"] in seen_ids:
+                raise InventoryIncomplete("Repeated Drive file ID")
+            seen_ids.add(item["id"])
+            counts[item["mime_type"]] += 1
+            total += 1
         if next_token is None:
-            return {"complete": True, "item_count": intermediate["item_count"],
-                    "mime_counts": intermediate["mime_counts"], "pages": page_no,
+            return {"complete": True, "item_count": total,
+                    "mime_counts": dict(counts), "pages": page_no,
                     "content_downloads": 0}
         page_token = next_token
     raise InventoryIncomplete("Drive metadata page ceiling reached")
