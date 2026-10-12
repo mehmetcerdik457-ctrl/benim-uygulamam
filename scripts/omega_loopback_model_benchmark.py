@@ -21,6 +21,40 @@ CASES = (
 )
 
 
+def installed_model_metadata(model: str, port: int, timeout: int = 3):
+    """Fail closed unless the exact tag is already installed on this loopback daemon.
+
+    A tags GET does not pull weights; no other host or model catalogue is queried.
+    """
+    conn = http.client.HTTPConnection("127.0.0.1", port=port, timeout=timeout)
+    try:
+        conn.request("GET", "/api/tags", headers={"Accept": "application/json"})
+        response = conn.getresponse()
+        if response.status != 200:
+            raise RuntimeError("local_model_catalogue_unavailable")
+        data = response.read(262145)
+        if len(data) > 262144:
+            raise RuntimeError("local_model_catalogue_too_large")
+        try:
+            entries = json.loads(data).get("models")
+        except (ValueError, AttributeError):
+            raise RuntimeError("local_model_catalogue_invalid") from None
+        if not isinstance(entries, list) or len(entries) > 512:
+            raise RuntimeError("local_model_catalogue_invalid")
+        for item in entries:
+            if isinstance(item, dict) and item.get("name") == model:
+                digest = item.get("digest")
+                size = item.get("size")
+                return {
+                    "digest": digest if isinstance(digest, str)
+                              and re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) else None,
+                    "size_bytes": size if type(size) is int and size >= 0 else None,
+                }
+        raise RuntimeError("requested_model_not_installed")
+    finally:
+        conn.close()
+
+
 def probe(model: str, port: int, prompt: str, output_limit: int, timeout: int):
     conn = http.client.HTTPConnection("127.0.0.1", port=port, timeout=timeout)
     payload = json.dumps({"model": model, "prompt": prompt, "stream": True,
@@ -80,6 +114,15 @@ def main():
         parser.error("invalid model tag")
     if not 1 <= args.port <= 65535 or not 1 <= args.max_output_tokens <= 128:
         parser.error("unsafe limits")
+    try:
+        existing = installed_model_metadata(args.model, args.port)
+    except (OSError, ValueError, RuntimeError):
+        print(json.dumps({
+            "status": "NOT_MEASURED", "error": "existing_local_model_not_verified",
+            "evidence_scope": "EXECUTING_MACHINE_LOOPBACK_ONLY",
+            "production_accepted": False,
+        }, sort_keys=True))
+        return 2
     records = []
     for lang, prompt, expected in CASES:
         try:
@@ -92,7 +135,8 @@ def main():
             break
     successful = [r for r in records if r.get("result") == "ok"]
     summary = {"evidence_scope": "EXECUTING_MACHINE_LOOPBACK_ONLY_NOT_OWNER_UNLESS_OWNER_RAN_IT",
-               "model_tag": args.model, "benchmark_type": "synthetic_tr_en_code_smoke_not_full_quality",
+               "model_tag": args.model, "model_digest": existing["digest"],
+               "model_size_bytes": existing["size_bytes"], "benchmark_type": "synthetic_tr_en_code_smoke_not_full_quality",
                "num_cases": len(successful),
                "exact_match_count": sum(bool(r.get("exact_match")) for r in successful),
                "mean_ttft_ms": (round(statistics.mean(r["ttft_ms"] for r in successful if r["ttft_ms"] is not None), 2)
