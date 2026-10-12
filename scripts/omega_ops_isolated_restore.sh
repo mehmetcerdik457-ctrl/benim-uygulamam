@@ -30,8 +30,17 @@ c=json.load(sys.stdin)
 db=c["services"]["db"]
 assert not db.get("ports") and not db.get("volumes"), "database must not publish/mount persistent volumes"
 assert any(x.split(":")[0]=="/var/lib/postgresql/data" for x in db.get("tmpfs",[]))
-assert all(c["networks"][n].get("internal") is True for n in db.get("networks",{}))
 assert db.get("image")=="postgres:16-alpine", "review changed database image before running"
+for name, svc in c["services"].items():
+    # Disallow host mounts, privileged execution and unreviewed Docker escape paths
+    # for EVERY service, including the build/test container, not just the DB.
+    for forbidden in ("volumes","privileged","network_mode","pid","devices","cap_add"):
+        assert not svc.get(forbidden), "unsafe service configuration"
+    for network in svc.get("networks",{}):
+        assert c["networks"][network].get("internal") is True, "external network denied"
+    for published in svc.get("ports",[]):
+        assert name=="api" and published.get("host_ip")=="127.0.0.1", "unreviewed port denied"
+
 '
 echo "OMEGA_OPS_COMPOSE_DISPOSABLE_GUARD=PASS"
 cleanup() {
