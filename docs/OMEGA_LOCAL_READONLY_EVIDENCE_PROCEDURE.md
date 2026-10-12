@@ -40,3 +40,37 @@ Run `compare_indices(old, new)` for added, removed, content-only drift, metadata
 - OMEGA-014: owner-approved exact roots, RO mount evidence, no traversal escape, symlink/race/atime handling, bounded negative tests on a consenting owner-controlled test device; live device **NOT_TESTED**.
 - OMEGA-019: fixture metadata & content SHA drift, version chain, explicit unknown fields and tamper detection; synthetic tests can PASS, full filesystem validation **NOT_TESTED**.
 - OMEGA-020: source, opaque ownership, ACL/access, UTC verification and retention linked to immutable signed provenance records and least-privilege storage; synthetic schema can PASS, persistent DB and signed custody **NOT_IMPLEMENTED**.
+
+
+## Incremental synthetic review contract (2026-10-12)
+
+`verify_index_chain(snapshots, expected_genesis_sha256, expected_tip_sha256)`
+now checks every snapshot version, index digest and prior-link digest against
+independently supplied initial/final SHA-256 checkpoints. It rejects missing
+middle entries, replay, order changes, truncated tips and recomputed but
+unanchored alternate histories. The expected checkpoints must come from a
+**separate trusted, preferably signed and immutable record**; copying hashes
+from the same untrusted snapshots does not authenticate the chain.
+
+`review_provenance_changes(old, new)` produces an **advisory** report:
+source addition, removal, source-version, opaque owner, access class,
+retention policy, POSIX mode, UID, GID, ACL digest or xattr digest changes
+require external human review. Mtime-only changes remain integrity evidence,
+not a grant of authority. The report always returns
+`approval_granted=false`, `deletion_authorized=false`,
+`identity_verified=false`, and `storage_retention_enforced=false`.
+It contains only synthetic fixture aliases; it reads no disk and does not
+touch a database. A report flag is never an authenticated human approval.
+
+**Retention gap:** the fixture's `verified_at` is a verification instant,
+**not** a trusted original acquisition date. The presence of
+`retention_days` does not prove a lawful expiry clock, legal hold, erasure,
+or backup copy deletion. The eventual owner-approved persistence schema
+must anchor collection/acquisition time separately, retain immutable
+retention-policy decisions and prove authorized expiry actions. Do not
+recalculate retention from every subsequent verification timestamp.
+
+**Remaining independent controls:** authenticated/signed custody events,
+private anchor storage, real ACL enumeration, inode/race/atime controls,
+external source allowlist, legal hold, database tenant isolation and
+restore/migration/retention tests. None are implied by this fixture-only code.
