@@ -21,6 +21,11 @@ def review_provenance_changes(old: dict, new: dict) -> dict:
     changed = {}
     for key in sorted(prior.keys() & current.keys()):
         differences = [field for field in fields if prior[key][field] != current[key][field]]
+        # Operating-system ownership, mode, ACL and xattrs can alter effective
+        # access even if the high-level access_level label stays unchanged.
+        for field in ("mode", "uid", "gid", "acl_sha256", "xattr_sha256"):
+            if prior[key]["metadata"][field] != current[key]["metadata"][field]:
+                differences.append("metadata." + field)
         if differences:
             changed[key] = differences
     # Additions and removals also change the authorized collection set.
