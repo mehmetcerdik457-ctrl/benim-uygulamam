@@ -198,6 +198,7 @@ class ModelRouter:
             for profile, backend, semaphore, prompt_tokens in eligible:
                 for attempt in range(profile.max_retries + 1):
                     remaining = min(profile.timeout_ms / 1000, deadline - time.monotonic())
+                    attempt_deadline = time.monotonic() + remaining
                     if remaining <= 0:
                         raise InferenceFailed("local inference deadline exceeded")
 
@@ -218,6 +219,10 @@ class ModelRouter:
                         raise InferenceFailed("non-retryable local model failure") from None
                     except Exception:
                         raise InferenceFailed("unclassified local model failure") from None
+                    if time.monotonic() > attempt_deadline:
+                        # A backend swallowed cancellation and returned a late response.
+                        # Do not accept or fallback after this unsafe runtime violation.
+                        raise InferenceFailed("local backend ignored timeout")
                     if (not isinstance(result, Completion) or result.model != profile.name
                         or type(result.text) is not str
                         or type(result.prompt_tokens) is not int
