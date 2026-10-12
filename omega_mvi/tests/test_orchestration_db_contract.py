@@ -7,7 +7,7 @@ import os
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 import pytest
-psycopg = pytest.importorskip("psycopg", reason="disposable PostgreSQL test dependency unavailable")
+import psycopg  # Required in the authoritative disposable-DB job; missing driver must FAIL.
 from db import store
 from db.migrate import apply, assert_disposable_target
 
