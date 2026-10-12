@@ -1,7 +1,7 @@
 """Offline, synthetic-only knowledge safety primitives. Not a production IdP or RAG."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from functools import wraps
 from threading import RLock
@@ -273,6 +273,8 @@ class MemoryEntry:
     state: str
     evidence_ref: str | None = None
     approver_id: str | None = None
+    source_revision: str | None = None
+    source_sha256: str | None = None
 
 
 class MemoryLedger:
@@ -282,9 +284,19 @@ class MemoryLedger:
         self._index = index
         self._entries: dict[str, MemoryEntry] = {}
 
+    def _is_current(self, entry: MemoryEntry) -> bool:
+        record = self._index._records.get((entry.source_ref, entry.document_id))
+        return (entry.source_ref not in self._index._revoked_sources
+                and record is not None
+                and entry.source_revision is not None
+                and entry.source_sha256 is not None
+                and record[0] == entry.source_revision
+                and record[2] == entry.source_sha256)
+
     @_atomic
     def record_suggestion(self, entry: MemoryEntry, *, requester_id: str) -> None:
-        if entry.state != "unverified_suggestion" or entry.evidence_ref or entry.approver_id:
+        if (entry.state != "unverified_suggestion" or entry.evidence_ref
+                or entry.approver_id or entry.source_revision or entry.source_sha256):
             raise ValueError("NEW_MEMORY_MUST_BE_UNVERIFIED")
         if not entry.entry_id or not entry.statement or entry.entry_id in self._entries:
             raise ValueError("INVALID_ENTRY")
@@ -293,7 +305,11 @@ class MemoryLedger:
         if not self._index.is_active(entry.source_ref, entry.document_id,
                                      requester_id=requester_id):
             raise ScopeError("SOURCE_NOT_ACTIVE")
-        self._entries[entry.entry_id] = entry
+        revision, _, digest = self._index._records[(entry.source_ref, entry.document_id)]
+        # Pin even an unverified suggestion to the exact admitted source version.
+        self._entries[entry.entry_id] = replace(
+            entry, source_revision=revision, source_sha256=digest
+        )
 
     @_atomic
     def promote(self, entry_id: str, *, requester_id: str, new_state: str,
@@ -310,16 +326,16 @@ class MemoryLedger:
         if record is None:
             raise KeyError("MEMORY_NOT_FOUND")
         if not self._index.is_active(record.source_ref, record.document_id,
-                                     requester_id=requester_id):
-            raise ScopeError("SOURCE_NOT_ACTIVE")
+                                     requester_id=requester_id) or not self._is_current(record):
+            raise ScopeError("SOURCE_REVISION_MISMATCH")
         if record.state == "tested_solution" or (record.state == "approved_fact" and new_state != "tested_solution"):
             raise ValueError("INVALID_TRUST_TRANSITION")
         if new_state == "tested_solution" and record.state != "approved_fact":
             raise ValueError("FACT_APPROVAL_REQUIRED")
         # The approver_id is metadata, not cryptographic identity verification.
-        self._entries[entry_id] = MemoryEntry(record.entry_id, record.source_ref,
-                                             record.document_id, record.statement,
-                                             new_state, evidence_ref, approver_id)
+        self._entries[entry_id] = replace(record, state=new_state,
+                                          evidence_ref=evidence_ref,
+                                          approver_id=approver_id)
 
     @_atomic
     def trusted_context(self, *, requester_id: str) -> tuple[MemoryEntry, ...]:
@@ -327,7 +343,8 @@ class MemoryLedger:
         return tuple(e for e in self._entries.values()
                      if e.state in ("approved_fact", "tested_solution")
                      and self._index.is_active(e.source_ref, e.document_id,
-                                               requester_id=requester_id))
+                                               requester_id=requester_id)
+                     and self._is_current(e))
 
     @_atomic
     def inspect(self, *, requester_id: str) -> tuple[MemoryEntry, ...]:
@@ -335,4 +352,5 @@ class MemoryLedger:
         # Inactive entries are quarantined from all public-facing memory views.
         return tuple(e for e in self._entries.values()
                      if self._index.is_active(e.source_ref, e.document_id,
-                                               requester_id=requester_id))
+                                               requester_id=requester_id)
+                     and self._is_current(e))
