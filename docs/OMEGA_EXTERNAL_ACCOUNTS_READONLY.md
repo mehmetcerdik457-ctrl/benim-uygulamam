@@ -40,7 +40,10 @@ Central non-secret reporting location: [Issue #25](https://github.com/mehmetcerd
   same origin/resource and exact sequential cursor, rate-limit/error and
   ambiguous-full-page handling fail closed, no automatic retry or raw response
   logging. The API adapter is supplied by caller; this code **does not**
-  connect to GitHub or establish API quotas.
+  connect to GitHub or establish API quotas. Unexpected adapter failures
+  are wrapped as generic errors to avoid leaking provider exception text.
+  Results are observations at read time, not atomic repository snapshots.
+  [Official GitHub branch API](https://docs.github.com/en/rest/branches/branches).
 - `drive_metadata_only`: mandatory exact folder ID allowlist,
   previously obtained **complete** metadata pages, verified direct parent,
   in-memory ID/MIME projection and MIME counts only. No names, owners,
@@ -52,7 +55,15 @@ Central non-secret reporting location: [Issue #25](https://github.com/mehmetcerd
   Google Drive's `incompleteSearch` and `nextPageToken` fields and must
   itself prove the exact folder query and least-privilege OAuth scope;
   **live Drive pagination is not connected**. Metadata may itself be
-  sensitive: never print raw IDs in public issues/logs/RAG/LLM.
+  sensitive: never print raw IDs in public issues/logs/RAG/LLM. The
+  provider's per-page results are validated and discarded rather than
+  retained in a growing raw-page collection, and unexpected provider
+  exceptions are replaced by generic, non-sensitive errors.
+  **Caution:** provider pagination completion is not a consistency snapshot:
+  Google warns that results may change if items move during pagination.
+  Treat the returned aggregate as a bounded observation, not a guaranteed
+  atomic inventory.
+  [Official Google Drive files.list contract](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list).
 
 `omega_mvi/inspection/external_accounts/secret_findings.py`:
 - Maps detector identifiers (hints, NOT actual validity checks) to GitHub,
@@ -62,11 +73,17 @@ Central non-secret reporting location: [Issue #25](https://github.com/mehmetcerd
   line, explicit risk (including UNKNOWN), remediation state and
   SUSPECTED_UNVERIFIED classification. **No secret match, raw token, hash
   or password fields.** Records are created only from pre-classified detector
-  IDs; the module performs no scanning itself.
-- Verified remediation states (`REVOKED_VERIFIED`, `ROTATED_VERIFIED`,
+  IDs; the module performs no scanning itself. Direct construction of a
+  finding is validated at the dataclass boundary, including redaction
+  check of even a source path to reject credential-shaped filenames.
+  **Do not publish raw source locations:** they are restricted metadata
+  and this schema is not a public reporting format.
+- Approved or verified remediation states (`ROTATION_PLANNED`,
+  `REVOKED_VERIFIED`, `ROTATED_VERIFIED`,
   `FALSE_POSITIVE_VERIFIED`) are **impossible to set** through this
-  untrusted helper, even if a caller asserts `owner_approved=True` and
-  `provider_verified=True`. These are forgeable booleans, not proof.
+  untrusted helper or by directly constructing `SafeFinding`, even if a
+  caller asserts `owner_approved=True` and `provider_verified=True`.
+  These are forgeable booleans, not proof.
   An independent owner-private provider-attestation mechanism is a
   prerequisite. The module does not call any provider API. Actual verified
   status remains **UNKNOWN** for all real accounts.
@@ -130,6 +147,24 @@ Approval record for any provider: exact provider, account/workload identifier
 stored privately, purpose, blast-radius assessment, owner approval, safe
 rollout/rollback, sanitized verification, and *separate* audit evidence.
 Store in a secured owner-controlled system, **not** this public repository.
+
+## 12 Oct 2026 — additional negative security test coverage
+
+- Reject directly forged verified findings and arbitrary provider/classification
+  values, including deceptive sensitive path segments and Boolean-as-integer
+  source lines. Only `NOT_STARTED` and `OWNER_REVIEW_REQUIRED` states
+  are allowed in this untrusted module; an approved plan is an assertion of
+  authority and must be held in a separate owner-controlled workflow.
+- Reject Drive items with multiple/mismatching parents; hold only validated
+  ephemeral identifiers and aggregate MIME counts across pages, discarding
+  provider page bodies instead of caching them across pagination.
+- Both GitHub and Drive adapters suppress arbitrary provider exception
+  messages during normal Python traceback propagation. This does **not**
+  control an external HTTP client's own telemetry: provider client logging
+  must independently disable sensitive headers and raw body capture.
+- Synthetic regression tests exercise these cases. Live GitHub branch
+  enumeration, private Drive folders, Cloud IAM, key rotation or any owner
+  hardware were **not** connected by these changes.
 
 ## Evidence / unresolved acceptance gates
 
