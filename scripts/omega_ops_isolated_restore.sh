@@ -8,14 +8,21 @@ if [[ "${GITHUB_ACTIONS:-}" != "true" || "${RUNNER_ENVIRONMENT:-}" != "github-ho
   echo "OMEGA_OPS_ISOLATION=BLOCKED_NON_EPHEMERAL_RUNNER"
   exit 20
 fi
+temporary_password="${OMEGA_DEV_DB_PASSWORD:-}"
 if [[ ! "${OMEGA_TEST_DB_SENTINEL:-}" =~ ^[0-9a-f]{32}$ ||
-      ${#OMEGA_DEV_DB_PASSWORD} -lt 24 ]]; then
+      ${#temporary_password} -lt 24 ]]; then
   echo "OMEGA_OPS_ISOLATION=BLOCKED_MISSING_TEMP_CREDENTIALS"
   exit 21
 fi
 project="omega-ops-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
 compose=(docker compose -p "$project" -f compose.omega.yml)
 db_exec() { "${compose[@]}" exec -T db "$@"; }
+# Never inherit an existing project, even if the numeric run ID is accidentally reused.
+if [[ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project")" ||
+      -n "$(docker volume ls -q --filter "label=com.docker.compose.project=$project")" ]]; then
+  echo "OMEGA_OPS_ISOLATION=BLOCKED_PROJECT_ALREADY_EXISTS"
+  exit 29
+fi
 # Parse rendered Compose privately; neither configuration nor credentials are printed.
 "${compose[@]}" config --format json | python3 -c '
 import json,sys
@@ -71,6 +78,13 @@ db_exec psql -X -q -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c \
 # Custom-format dump is kept only INSIDE the temporary DB container. Never upload.
 db_exec pg_dump -U omega_demo -d omega_demo -Fc --no-owner --no-acl \
   -t public.omega_ops_fixture -f /tmp/omega_ops_fixture.dump
+# A deliberately truncated copy MUST be rejected before any restore.
+db_exec sh -c 'head -c 12 /tmp/omega_ops_fixture.dump > /tmp/omega_ops_invalid.dump'
+if db_exec pg_restore -l /tmp/omega_ops_invalid.dump >/dev/null 2>&1; then
+  echo "OMEGA_OPS_INVALID_ARCHIVE_REJECTION=FAIL"
+  exit 30
+fi
+echo "OMEGA_OPS_INVALID_ARCHIVE_REJECTION=PASS"
 db_exec createdb -U omega_demo omega_ops_restore
 db_exec pg_restore -U omega_demo -d omega_ops_restore --no-owner --no-privileges \
   /tmp/omega_ops_fixture.dump
