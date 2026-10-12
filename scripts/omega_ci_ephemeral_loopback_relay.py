@@ -58,11 +58,39 @@ class _Relay(socketserver.ThreadingTCPServer):
     daemon_threads = True
     allow_reuse_address = False
     request_queue_size = 4
+    max_concurrent_connections = 4
 
     def __init__(self, address, handler, *, target, target_port=8000):
+        # Reject unsafe listeners before binding. This experiment must never
+        # open a wildcard, LAN, IPv6 or non-loopback listener.
+        if (not isinstance(address, tuple) or len(address) != 2
+                or address[0] != "127.0.0.1"
+                or not isinstance(address[1], int)
+                or isinstance(address[1], bool)
+                or not 0 <= address[1] <= 65535):
+            raise ValueError("CI relay may bind IPv4 loopback only")
         self.target = target
         self.target_port = target_port
+        self._slots = threading.BoundedSemaphore(self.max_concurrent_connections)
         super().__init__(address, handler, bind_and_activate=True)
+
+    def process_request(self, request, client_address):
+        # ThreadingMixIn otherwise creates one unbounded thread per incoming
+        # connection. Cap concurrent clients, including slow or idle clients.
+        if not self._slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
 
 
 def experiment():
