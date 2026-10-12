@@ -2,7 +2,7 @@
 import copy
 import hashlib
 import pytest
-from omega_mvi.inspection.provenance import make_fixture_record, build_index, compare_indices, _digest
+from omega_mvi.inspection.provenance import make_fixture_record, build_index, compare_indices, verify_index_chain, _digest
 
 
 def fields(data=b"hello", **overrides):
@@ -211,3 +211,83 @@ def test_synthetic_record_count_limit_and_data_limit():
         make_fixture_record(**args)
     with pytest.raises(ValueError):
         build_index([record()] * 1001, version=1)
+
+
+def _anchored_history():
+    first = build_index([record()], version=1)
+    second = build_index([record(b"world")], version=2, previous=first)
+    third = build_index([], version=3, previous=second)
+    return first, second, third
+
+
+def test_full_history_matches_independent_genesis_and_tip():
+    a, b, c = _anchored_history()
+    result = verify_index_chain([a, b, c],
+                                expected_genesis_sha256=a["index_sha256"],
+                                expected_tip_sha256=c["index_sha256"])
+    assert result["history_validated"] is True
+    assert result["snapshot_count"] == 3
+    assert result["authorization_granted"] is False
+    assert result["signed_identity_verified"] is False
+
+
+@pytest.mark.parametrize("history_indices", [[0, 2], [1, 2], [0, 1], [0, 1, 1], [2, 1, 0], [0, 2, 1]])
+def test_history_reordered_truncated_or_replayed_fails(history_indices):
+    history = _anchored_history()
+    with pytest.raises(ValueError):
+        verify_index_chain([history[i] for i in history_indices],
+                            expected_genesis_sha256=history[0]["index_sha256"],
+                            expected_tip_sha256=history[-1]["index_sha256"])
+
+
+def test_history_rewritten_with_recomputed_hashes_fails_trusted_tip():
+    a, b, c = _anchored_history()
+    forged = copy.deepcopy(b)
+    entry = forged["entries"]["synthetic://case-01/safe/file.txt"]
+    entry["owner_ref"] = "owner:changed"
+    unsigned = dict(entry)
+    unsigned.pop("record_sha256")
+    entry["record_sha256"] = _digest(unsigned)
+    unsigned_index = dict(forged)
+    unsigned_index.pop("index_sha256")
+    forged["index_sha256"] = _digest(unsigned_index)
+    # Both hashes can be recomputed by the attacker, but no independent
+    # trusted final anchor can be produced by this module.
+    with pytest.raises(ValueError):
+        verify_index_chain([a, forged, c],
+                            expected_genesis_sha256=a["index_sha256"],
+                            expected_tip_sha256=c["index_sha256"])
+
+
+@pytest.mark.parametrize("anchors", [
+    ("missing", "0" * 64), ("a" * 64, "missing"),
+    (None, "0" * 64), ("0" * 64, None),
+])
+def test_history_rejects_missing_or_bad_anchor(anchors):
+    a, b, c = _anchored_history()
+    with pytest.raises(ValueError):
+        verify_index_chain([a, b, c],
+                            expected_genesis_sha256=anchors[0],
+                            expected_tip_sha256=anchors[1])
+
+
+def test_history_rejects_empty_non_list_or_oversized():
+    a, b, c = _anchored_history()
+    for snapshots in ([], (a, b, c), [a] * 129):
+        with pytest.raises(ValueError):
+            verify_index_chain(snapshots,
+                               expected_genesis_sha256=a["index_sha256"],
+                               expected_tip_sha256=c["index_sha256"])
+
+
+def test_history_rejects_forged_chain_version_even_with_recomputed_hash():
+    a, b, c = _anchored_history()
+    altered = copy.deepcopy(b)
+    altered["version"] = 4
+    unsigned = dict(altered)
+    unsigned.pop("index_sha256")
+    altered["index_sha256"] = _digest(unsigned)
+    with pytest.raises(ValueError):
+        verify_index_chain([a, altered, c],
+                            expected_genesis_sha256=a["index_sha256"],
+                            expected_tip_sha256=c["index_sha256"])
