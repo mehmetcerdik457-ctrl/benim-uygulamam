@@ -44,8 +44,10 @@ def validate_synthetic_samples(samples: Any, now: int) -> dict:
             reasons.append("timestamp_stale_or_future")
         value = sample["value"]
         low, high = BOUNDS[name]
-        if (type(value) not in (float, int) or not math.isfinite(value)
-                or not low <= value <= high):
+        # Check bounds before floating conversion, so huge integers cannot overflow
+        # math.isfinite() and bypass the fail-closed result.
+        if (type(value) not in (float, int) or not low <= value <= high
+                or (type(value) is float and not math.isfinite(value))):
             reasons.append("value_invalid")
     if len(names) != len(BOUNDS):
         reasons.append("missing_metric")
