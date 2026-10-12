@@ -80,3 +80,25 @@ Observed boundaries: the legacy backend has an explicit hosted OpenAI endpoint a
 Do **not** apply a database migration from this specialist branch. Proposed future private `omega_provenance` schema must bind, at minimum: `source_ref` + scoped immutable source ID, privately encrypted normalized path alias and source version, `owner_ref`, effective ACL/access level and classification, UTC collection/last-verification instant, explicit retention policy and expiry/hold state, content SHA-256, canonical metadata SHA-256 and append-only record digest/version. Reject missing provenance or unverified ACL; do not rely on free-form task metadata. Enforce tenant/owner isolation and least-privilege RLS in real PostgreSQL, plus unique source/path/version identity, deny direct mutation of custody events, append-only signed chain with independently verified trust anchors, and separate retention/deletion/revocation gates. Run synthetic migration/rollback/replay/cross-owner/clock-skew tests in a disposable DB before any private owner source is allowed.
 
 **Acceptance stays OPEN:** OMEGA-001 PARTIAL, -005 PARTIAL, -014 BLOCKED, -019 PARTIAL, -020 PARTIAL. No `scope.yaml`, Compose, shared CI, migration or app changes from this specialist. Final integration and owner authorization belong to the coordinator.
+
+
+## Third audit pass — 2026-10-12 (provenance chain and access drift)
+
+**Source boundary unchanged:** public PR #58 baseline `044c558b2b28e05929a9acd79a639a32092ab187`, separate PR #61 branch, no merge, and private local `0.1.4-dev` (`053e75d5591c836714d27d2d8b9b3f74c4464b9f`) **not inspected**.
+
+### New isolated implementation
+
+- `omega_mvi/inspection/provenance/__init__.py`: `verify_index_chain()` checks up to 128 snapshots, strict genesis/version/order/previous-hash links and independently provided genesis/tip SHA-256 checkpoints; **a checkpoint from the same untrusted chain is NOT an authentication source**.
+- `omega_mvi/inspection/provenance/test_index.py`: extra synthetic replay/truncation/recompute/anchor tests; previous first hardened CI [38224920857](https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38224920857) at code HEAD `85ef6bced20dd8c0d052b52c7539935a68cad19b` reported **165 passed, 18 skipped**. This is historical commit evidence, not evidence of all subsequently added modules.
+- **New** `omega_mvi/inspection/provenance/policy.py` and `test_policy.py`: report synthetic source additions/deletions and version/owner/access classification/retention-policy changes as requiring external review; recognize POSIX mode, UID, GID, ACL and xattr digest changes as permission-sensitive even when `access_level` text stays constant. Distinguish mtime-only changes from permission drift. The report **never grants** approval, identity verification, deletion or retention-enforcement authority.
+- `docs/OMEGA_LOCAL_READONLY_EVIDENCE_PROCEDURE.md`: explicit independent anchor and retention lifecycle restrictions. `verified_at` is NOT trusted original acquisition time, and `retention_days` cannot prove policy expiry without an separately anchored collection event.
+
+### Additional bounded full-text reads for OMEGA-001
+
+At PR #58 exact baseline SHA, 20 further previously under-reviewed public document/source/test file bodies were fetched as text and path-specific Git blob identifiers read back: ten scope, runner host, model, MVI, database/approval documentation and UI interface files; plus ten runner/secret guard, rollback migration, DB test and task-policy source files. These reads establish **availability/content inspection at a fixed public commit**, not complete semantic security coverage. The 107 tracked Git-tree blobs remain inventoried by path/mode/size/Git SHA-1 from the initial report. Environment template contents were deliberately excluded from bulk reading. The whole repository, past Git history, licensing of future artifacts and owner-private files remain **NOT FULLY AUDITED**.
+
+### Persistent acceptance and integration limits
+
+OMEGA-001 PARTIAL (tracked paths complete at two refs; security/license audit open). OMEGA-005 PARTIAL (encrypted backup ADR proposed only). OMEGA-014 BLOCKED (owner file roots/RO mount not authorized). OMEGA-019 PARTIAL (synthetic anchored history only; no signed trusted checkpoint). OMEGA-020 PARTIAL (synthetic authority-independent drift report; no PostgreSQL custody table, no signed events, no expiration/deletion evidence). Require a separate real identity and independently signed actor/resource/scope decision to authorize live operations. No code in this specialist branch accesses owner hardware, private source, backups, cloud accounts, secrets or money.
+
+**Exact-head CI note:** Actions on the final updated documentation commit must be fetched and reported separately; prior success cannot be copied forward. A queued or skipped job is NOT a PASS.
