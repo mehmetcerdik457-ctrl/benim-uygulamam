@@ -6,7 +6,7 @@ from omega_mvi.inspection.external_accounts import (
     drive_metadata_pages, github_metadata_pages,
 )
 from omega_mvi.inspection.external_accounts.secret_findings import (
-    classify_finding, record_remediation,
+    SafeFinding, classify_finding, record_remediation,
 )
 
 REPO = "mehmetcerdik457-ctrl/benim-uygulamam"
@@ -285,3 +285,80 @@ def test_provider_verification_cannot_be_forged_with_booleans(closed_status):
     with pytest.raises(PermissionError, match="attestation"):
         record_remediation(f, closed_status,
                            owner_approved=True, provider_verified=True)
+
+
+
+def test_direct_finding_constructor_cannot_forge_verified_state():
+    for closed_status in ("ROTATED_VERIFIED", "REVOKED_VERIFIED",
+                          "FALSE_POSITIVE_VERIFIED", "ROTATION_PLANNED"):
+        with pytest.raises(PermissionError, match="unverified"):
+            SafeFinding(provider_type="GITHUB", source_location="synthetic/demo.txt",
+                        source_line=1, risk_level="UNKNOWN",
+                        remediation_status=closed_status)
+
+
+def test_finding_constructor_rejects_forged_classification_provider_and_path():
+    for changes in (
+        {"classification": "PROVIDER_VERIFIED"},
+        {"provider_type": "UNKNOWN_PRODUCTION_ACCOUNT"},
+        {"source_location": "../owner_private"},
+        {"source_line": True},
+        {"risk_level": True},
+    ):
+        baseline = {
+            "provider_type": "UNKNOWN", "source_location": "synthetic/demo.txt",
+            "source_line": 1, "risk_level": "UNKNOWN",
+            "remediation_status": "NOT_STARTED",
+        }
+        baseline.update(changes)
+        with pytest.raises((ValueError, PermissionError)):
+            SafeFinding(**baseline)
+
+
+def test_non_private_synthetic_path_that_looks_like_token_is_rejected():
+    # Deliberately fake illustrative fragments; never use a real credential.
+    with pytest.raises(ValueError, match="sensitive"):
+        classify_finding(detector_id="unknown_detector",
+                         source_path="synthetic/sk-example123.py",
+                         line_number=1)
+
+
+def test_caller_boolean_cannot_fake_approved_rotation_plan():
+    record = classify_finding(detector_id="github_pat",
+                              source_path="synthetic/demo.txt", line_number=1)
+    with pytest.raises(PermissionError, match="Approval"):
+        record_remediation(record, "ROTATION_PLANNED",
+                           owner_approved=True, provider_verified=True)
+    assert record.remediation_status == "NOT_STARTED"
+
+
+def test_drive_metadata_requires_one_exact_parent():
+    with pytest.raises(InventoryDenied):
+        drive_metadata_only([{"complete": True, "files": [
+            {"id": "example_1", "mime_type": "text/plain",
+             "parent_ids": ["approved", "outside"]}]}],
+            approved_folder_ids={"approved"}, folder_id="approved")
+
+
+def test_drive_aggregate_discards_sensitive_provider_fields():
+    def synthetic_adapter(folder, _token):
+        assert folder == "approved"
+        return {
+            "status": 200, "incomplete_search": False, "next_page_token": None,
+            "files": [{
+                "id": "safeSyntheticFile", "mime_type": "application/pdf",
+                "parent_ids": ["approved"],
+                "title": "DO_NOT_PUBLISH_SYNTHETIC",
+                "description": "DO_NOT_PUBLISH_SYNTHETIC",
+                "content": "DO_NOT_PUBLISH_SYNTHETIC",
+                "permissions": [{"type": "user", "role": "owner"}],
+            }],
+        }
+    data = drive_metadata_pages(synthetic_adapter,
+                                approved_folder_ids={"approved"},
+                                folder_id="approved")
+    assert data == {"complete": True, "item_count": 1,
+                    "mime_counts": {"application/pdf": 1},
+                    "pages": 1, "content_downloads": 0}
+    assert "DO_NOT_PUBLISH_SYNTHETIC" not in repr(data)
+    assert "safeSyntheticFile" not in repr(data)
