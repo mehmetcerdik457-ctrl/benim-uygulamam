@@ -12,15 +12,16 @@ EMPTY = hashlib.sha256(b"").hexdigest()
 
 
 def record(*, name="safe.txt", owner="owner:test", level="internal", retention=7,
-           revision="v1", mtime=100, verified="2026-10-12T08:00:00Z"):
+           revision="v1", mtime=100, mode=0o600, uid=1, gid=1,
+           acl=EMPTY, xattr=EMPTY, verified="2026-10-12T08:00:00Z"):
     data = b"synthetic-only"
     return make_fixture_record(
         source_ref="synthetic://fixture", relative_path=name,
         source_version=revision, data=data, owner_ref=owner,
         access_level=level, verified_at=verified, retention_days=retention,
         metadata=dict(kind="regular_file", size_bytes=len(data), mtime_ns=mtime,
-                      mode=0o600, uid=1, gid=1,
-                      acl_sha256=EMPTY, xattr_sha256=EMPTY),
+                      mode=mode, uid=uid, gid=gid,
+                      acl_sha256=acl, xattr_sha256=xattr),
     )
 
 
@@ -98,3 +99,18 @@ def test_out_of_order_or_unlinked_index_rejected():
     b = build_index([record()], version=2, previous=a)
     with pytest.raises(ValueError):
         review_provenance_changes(b, a)
+
+
+@pytest.mark.parametrize(("modified", "field"), [
+    ({"mode": 0o644}, "metadata.mode"),
+    ({"uid": 2}, "metadata.uid"),
+    ({"gid": 2}, "metadata.gid"),
+    ({"acl": hashlib.sha256(b"changed-acl-fixture").hexdigest()}, "metadata.acl_sha256"),
+    ({"xattr": hashlib.sha256(b"changed-xattr-fixture").hexdigest()}, "metadata.xattr_sha256"),
+])
+def test_effective_permissions_changes_require_review(modified, field):
+    result = transition([record()], [record(**modified)])
+    assert result["requires_external_review"] is True
+    assert result["policy_fields_changed"] == {"synthetic://fixture/safe.txt": [field]}
+    assert result["approval_granted"] is False
+    assert result["deletion_authorized"] is False
