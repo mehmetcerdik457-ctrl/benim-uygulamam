@@ -145,13 +145,13 @@ def test_cancellation_before_and_after_tool():
         stop.set()
         return {"result_code": "ok", "artifact_ref": "synthetic://verified", "checked": True}
     result = run_offline(task(), registry({"plan": stop_inside}), cancelled=stop)
-    assert result.reason == "STOP_AFTER_TOOL" and result.steps == 0
+    assert result.status == "CANCELLED" and result.reason == "CANCEL_REQUESTED" and result.steps == 0
 
 
 def test_monotonic_wall_clock_limit():
     time = iter([0, 0, 0, 0, 10, 10, 10])
     result = run_offline(task(max_duration_seconds=3), registry(), elapsed_clock=lambda: next(time))
-    assert result.reason == "DURATION_LIMIT" or result.reason == "STOP_AFTER_TOOL"
+    assert result.reason == "DURATION_LIMIT"
 
 
 def test_no_task_identity_or_free_text_in_adapter_context():
