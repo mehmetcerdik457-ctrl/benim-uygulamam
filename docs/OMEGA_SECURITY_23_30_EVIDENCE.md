@@ -46,3 +46,32 @@ Rollback: close draft PR and delete only its isolated branch. No live permission
 - **Critical limitation:** This intentionally hand-scoped simulator is *not a reusable production JWT/OIDC verifier*. A true implementation must use vetted IdP libraries, real provider configuration, remote JWKS lifecycle and key rotation, secure session handling, durable replay and revocation, resource-level authorization and human approval. None are activated by this PR.
 
 Security acceptance remains **NOT ACCEPTED (6/6)**; the six requirement statuses in the authoritative matrix remain unchanged. Test progress does not indicate production readiness.
+
+
+## 2026-10-12 continued isolated execution — Audit, incident and SQLite recovery
+
+**Authority and authorization:** This code is fixture-only. No production identities, cloud permissions, service tokens, owner's Android device, existing encrypted 0.1.2/0.1.3/0.1.4 sets, or private local 0.1.4-dev contents were accessed or changed. `main` remains separate from PR #58 and stacked DRAFT PR #62.
+
+### OMEGA-025 — disk-backed synthetic audit / not production accepted
+- `omega_mvi/security/audit_fixture.py` persists only closed-vocabulary synthetic audit events in a SQLite file located under an explicitly sentinel-marked disposable test directory. The file is created with owner-only permissions.
+- Each entry includes sequence, integer UTC timestamp, enumerated kind/service/outcome and HMAC-SHA256 hash-chain digest. The 32-byte fixture HMAC key **never enters SQLite**; the caller must retain an external `AuditAnchor(sequence, mac_hex)` to detect tail truncation.
+- Tests demonstrate correct re-open with external anchor, wrong key, unauthorized writer, arbitrary secret field, UPDATE/DELETE triggers, privileged DB tampering and tail truncation detection.
+- **Known limitation:** A privileged writer can remove SQLite triggers. Local HMAC secrets and witness anchors are *test-only*, not a production append-only log, an attested storage system, or an IdP. No durable production audit destination exists.
+
+### OMEGA-030 — isolated incident tabletop / not production accepted
+- `omega_mvi/security/incident_fixture.py` simulates lost device and suspicious service containment using ONLY the in-memory synthetic lease registry; associates incident and revocation events with the disposable audit fixture.
+- Tests assert the lost device's reference is refused while other fixtures are unaffected; suspicious service containment revokes every synthetic device; mismatched targets are refused.
+- Simulated audit failure AFTER containment leaves access denied, and does **not** falsely report incident closure. `require_real_incident_action` unconditionally fails closed.
+- **Known limitation:** No real provider-side device/session revocation, certified human incident operator, notification, 24/7 response or evidence-retention system exists.
+
+### OMEGA-029 — encrypted in-memory SQLite recovery / not production accepted
+- `omega_mvi/security/recovery_fixture.py` creates only an **in-memory** SQLite instance with strict sentinel and exclusively prefixed synthetic records, then exports rows into the existing AES-256-GCM authenticated envelope and SHA-256 manifest.
+- A separate empty, sentinel-validated in-memory SQLite target accepts the decrypted, structurally validated records through parameterized INSERT and a savepoint; nonempty targets, disk-backed databases, wrong key, tampering, mismatched checksum, non-synthetic records and unsupported manifest versions are refused.
+- In a test, encrypted bytes are carried through an automatically disposable fixture file. This is **not** restoring a real production or user backup; keys are only ephemeral test bytes.
+- **Known limitation:** No real encrypted snapshot inventory, external key escrow, owner-side key recovery, hardware device test, measured RPO/RTO or production DR runbook is accepted.
+
+### Evidence
+- All new tests are included under `.github/workflows/omega-security-fixtures.yml` with `contents:read` and isolated CI fixture dependencies.
+- Only a completed GitHub Actions run associated with the **exact final code HEAD** is authoritative for CI pass counts. An external queued/in-progress job is not evidence.
+- The initial follow-up security milestone at SHA `6b708813f809cf2c22ae93fd840e82dda7e374cc` recorded **36 passed** dedicated synthetic tests and **146 passed / 18 skipped** CI. A later follow-up at `9a77b85c135f8260fdb6474247dc68c1ad6aca03` recorded **44 passed** dedicated security tests and **154 passed / 18 skipped** CI. Subsequent recovery SHA checks must be separately verified.
+- **All six original requirements remain NOT_ACCEPTED.** The real OIDC entry point continues to deny. No merge or deployment is authorized.
