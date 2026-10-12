@@ -116,12 +116,17 @@ def restore_memory_fixture(conn: sqlite3.Connection, snapshot: SyntheticBackup,
     try:
         if conn.execute("SELECT COUNT(*) FROM omega_fixture_records").fetchone()[0] != 0:
             raise SecurityDenied("RECOVERY_TARGET_NOT_EMPTY")
+    except sqlite3.Error:
+        raise SecurityDenied("RECOVERY_RESTORE_DENIED") from None
+    started = False
+    try:
         conn.execute("SAVEPOINT omega_synthetic_restore")
+        started = True
         for row_id, value in rows:
             conn.execute("INSERT INTO omega_fixture_records(id,value) VALUES(?,?)", (row_id, value))
         conn.execute("RELEASE SAVEPOINT omega_synthetic_restore")
     except (sqlite3.Error, SecurityDenied):
-        if conn.in_transaction:
+        if started:
             conn.execute("ROLLBACK TO SAVEPOINT omega_synthetic_restore")
             conn.execute("RELEASE SAVEPOINT omega_synthetic_restore")
         raise SecurityDenied("RECOVERY_RESTORE_DENIED") from None
