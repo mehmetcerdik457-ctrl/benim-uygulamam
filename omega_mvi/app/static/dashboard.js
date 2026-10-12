@@ -1,6 +1,91 @@
 "use strict";
 const $=id=>document.getElementById(id);
 const show=(id,value)=>{const node=$(id);if(node)node.textContent=value};
+// UI-only preferences. No cookies, localStorage, account data, or external requests.
+const messages={
+  tr:{
+    intro:"Türkçe güvenli müfettiş — doğrulanmamış üretim işlevleri kapalıdır.",
+    languageButton:"English",themeButton:"Açık tema",healthTitle:"Canlı sağlık denetimi",
+    refreshButton:"Yalnızca durumları yenile",inspectionTitle:"Sentetik denetim modülleri",
+    databaseTitle:"PostgreSQL salt-okunur görünüm",securityTitle:"Güvenlik sınırları",
+    executionDisabled:"Yürütme: KAPALI",identityMissing:"Gerçek kullanıcı kimliği ve tek kullanımlık onay yok.",
+    sourcesSynthetic:"Veri kaynakları: SİMÜLASYON",sourcesUnlinked:"GitHub, RAG ve yerel model gerçek hesaba bağlanmıyor.",
+    mviTitle:"MVI bileşenleri",mviDatabase:"PostgreSQL kayıtları yalnızca geçici sentinelli CI veritabanında sınandı.",
+    mviApproval:"İnsan onayı: varsayılan RET. Yerel model: deterministik sahte adaptör.",
+    productionNotAccepted:"Üretime hazırlık: KABUL EDİLMEDİ",
+    footerNotice:"Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.",
+    gatesTitle:"Üretim ekranları — henüz kullanılamıyor",
+    gatesIntro:"Kimlik ve kaynak yetkisi doğrulanmadığından aşağıdaki ekranlar gerçek veri göstermez.",
+    inventoryLabel:"73 · Dijital envanter: KAPALI",
+    inventoryReason:"Yetkili depo, klasör, servis ve veri kaynağı kaydı bağlanmadı.",
+    searchLabel:"74 · Kaynaklı arama: KAPALI",
+    searchReason:"Gerçek belge ACL, kaynak doğrulama ve silme denetimi yok.",
+    secretsLabel:"77 · Secret referansları: KAPALI",
+    secretsReason:"İzinli referans ve rotasyon metaverisi sunan güvenli uç yok; gizli değerler gösterilmez.",
+    prLabel:"78 · PR denetimi: KAPALI",
+    prReason:"Gerçek SHA'ya bağlı test, inceleme ve politika kararları doğrulanmadı.",
+    authLabel:"79 · Kimlik ve oturum: KAPALI",
+    authReason:"Gerçek IdP, MFA, RBAC veya doğrulanmış kullanıcı oturumu bulunmuyor.",
+    updating:"Güncelleniyor…",
+    healthFailure:"Yerel API erişilemiyor; hiçbir işlem başlatılmaz.",
+    healthSuccess:"Servis: ok | Mod: mock | Üretim: KAPALI",
+    inspectionFailure:"Sentetik denetim kullanılamıyor; erişim genişletilmez.",
+    inspectionSummary:n=>"4 sentetik modül: GitHub envanteri, maskeleme, kaynaklı arama ve PR inceleme. Kaynak sayısı: "+n+". Karar yetkisi: YOK.",
+    dbSuccess:"Yalnızca geçici test veritabanı: toplu durum sayıları. Kullanıcı ve görev ayrıntısı gösterilmez.",
+    dbFailure:"PostgreSQL görünümü KAPALI / ERİŞİLEMİYOR. Kimlik ve yetki olmadan gerçek görev okunmaz."
+  },
+  en:{
+    intro:"Turkish-first safe inspector — unverified production functionality is disabled.",
+    languageButton:"Türkçe",themeButton:"Light theme",healthTitle:"Local health check",
+    refreshButton:"Refresh status only",inspectionTitle:"Synthetic inspection modules",
+    databaseTitle:"PostgreSQL read-only view",securityTitle:"Security boundaries",
+    executionDisabled:"Execution: DISABLED",identityMissing:"No verified user identity or single-use approval.",
+    sourcesSynthetic:"Data sources: SIMULATED",sourcesUnlinked:"GitHub, retrieval, and local model are not connected to a real account.",
+    mviTitle:"MVI components",mviDatabase:"PostgreSQL records were tested only in a disposable CI database.",
+    mviApproval:"Human approval: default DENY. Local model: deterministic mock adapter.",
+    productionNotAccepted:"Production readiness: NOT ACCEPTED",
+    footerNotice:"No external CDN, third-party script, personal data, or credential is loaded.",
+    gatesTitle:"Production features — unavailable",
+    gatesIntro:"Without verified identity and source permissions, these screens do not display real data.",
+    inventoryLabel:"73 · Digital inventory: DISABLED",
+    inventoryReason:"No authorized repository, folder, service, or data source integration.",
+    searchLabel:"74 · Cited search: DISABLED",
+    searchReason:"No real-document ACL, citation verification, or deletion controls.",
+    secretsLabel:"77 · Secret references: DISABLED",
+    secretsReason:"No secure reference and rotation-metadata endpoint; secret values are never displayed.",
+    prLabel:"78 · PR audit: DISABLED",
+    prReason:"Actual SHA-bound checks, reviews, and policy decisions are unverified.",
+    authLabel:"79 · Identity and sessions: DISABLED",
+    authReason:"No real IdP, MFA, RBAC, or authenticated owner session.",
+    updating:"Updating…",
+    healthFailure:"Local API unavailable; no operation will start.",
+    healthSuccess:"Service: ok | Mode: mock | Production: DISABLED",
+    inspectionFailure:"Synthetic inspection unavailable; no access will be granted.",
+    inspectionSummary:n=>"4 synthetic modules: GitHub inventory, redaction, cited retrieval, and PR review. Source count: "+n+". Decision authority: NONE.",
+    dbSuccess:"Disposable test database only: aggregate state counts. User and task details are not available.",
+    dbFailure:"PostgreSQL view DISABLED / UNAVAILABLE. No real tasks are read without verified identity."
+  }
+};
+let language="tr", theme="dark";
+const tr=(key,...args)=>{const value=messages[language][key];return typeof value==="function"?value(...args):value;};
+function translateStatic(){
+  document.documentElement?.setAttribute?.("lang",language);
+  for(const node of document.querySelectorAll?.("[data-i18n]")??[]){
+    const key=node.getAttribute("data-i18n");
+    if(Object.prototype.hasOwnProperty.call(messages[language],key))node.textContent=tr(key);
+  }
+  const langButton=$("lang-toggle");
+  langButton?.setAttribute?.("aria-label",language==="tr"?"Switch language to English":"Türkçe diline geç");
+}
+function applyTheme(){
+  document.documentElement?.setAttribute?.("data-theme",theme);
+  const button=$("theme-toggle");
+  if(button){
+    button.textContent=language==="tr"?(theme==="dark"?"Açık tema":"Koyu tema"):(theme==="dark"?"Light theme":"Dark theme");
+    button.setAttribute?.("aria-pressed",String(theme==="light"));
+  }
+}
+
 async function json(path){
   const res=await fetch(path,{method:"GET",cache:"no-store",credentials:"omit",redirect:"error"});
   if(!res.ok)throw Error("local_demo_unavailable");
@@ -13,8 +98,8 @@ async function health(runId){
     if(runId!==activeRefresh)return;
     if(!x || x.production_ready!==false || x.mode!=="mock" ||
        x.service!=="omega-mvi-demo" || x.status!=="ok")throw Error("unexpected_mode");
-    show("health","Servis: "+String(x.status)+" | Mod: "+x.mode+" | Üretim: KAPALI");
-  } catch(_) {if(runId===activeRefresh)show("health","Yerel API erişilemiyor; hiçbir işlem başlatılmaz.");}
+    show("health",tr("healthSuccess"));
+  } catch(_) {if(runId===activeRefresh)show("health",tr("healthFailure"));}
 }
 async function inspection(runId){
   try {
@@ -33,10 +118,9 @@ async function inspection(runId){
        !allowedRefs.has(s.ref) || !Number.isSafeInteger(s.score) || s.score<1) ||
        new Set(x.sources.map(s=>s.ref)).size!==x.sources.length)throw Error("unsafe_reference");
     const sources=x.sources;
-    show("inspection","4 sentetik modül: GitHub envanteri, maskeleme, kaynaklı arama ve PR inceleme. "+
-      "Kaynak sayısı: "+sources.length+". Karar yetkisi: YOK.");
+    show("inspection",tr("inspectionSummary",sources.length));
     show("sources",sources.map(s=>s.ref).join(" | "));
-  } catch(_) {if(runId===activeRefresh){show("inspection","Sentetik denetim kullanılamıyor; erişim genişletilmez.");show("sources","");}}
+  } catch(_) {if(runId===activeRefresh){show("inspection",tr("inspectionFailure"));show("sources","");}}
 }
 async function db(runId){
   const output=$("states");
@@ -57,19 +141,24 @@ async function db(runId){
       li.textContent=entry.state+": "+entry.count;
       output.appendChild(li);
     }
-    show("db-status","Yalnızca geçici test veritabanı: toplu durum sayıları. Kullanıcı ve görev ayrıntısı gösterilmez.");
+    show("db-status",tr("dbSuccess"));
   }catch(_){
     if(runId!==activeRefresh)return;
     output.replaceChildren();
-    show("db-status","PostgreSQL görünümü KAPALI / ERİŞİLEMİYOR. Kimlik ve yetki olmadan gerçek görev okunmaz.");
+    show("db-status",tr("dbFailure"));
   }
 }
 async function refresh(){
   // Clear stale state immediately. Only the most recent refresh may write data.
   const runId=++activeRefresh;
-  for(const id of ["health","inspection","db-status"])show(id,"Güncelleniyor…");
+  for(const id of ["health","inspection","db-status"])show(id,tr("updating"));
   show("sources","");$("states").replaceChildren();
   await Promise.all([health(runId),inspection(runId),db(runId)]);
 }
 $("refresh").addEventListener("click",refresh);
-refresh();
+$("lang-toggle")?.addEventListener?.("click",()=>{
+  language=language==="tr"?"en":"tr";
+  translateStatic();applyTheme();refresh();
+});
+$("theme-toggle")?.addEventListener?.("click",()=>{theme=theme==="dark"?"light":"dark";applyTheme();});
+translateStatic();applyTheme();refresh();
