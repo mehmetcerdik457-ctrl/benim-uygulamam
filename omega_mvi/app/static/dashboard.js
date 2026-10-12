@@ -5,7 +5,7 @@ const show=(id,value)=>{const node=$(id);if(node)node.textContent=value};
 const messages={
   tr:{
     intro:"Türkçe güvenli müfettiş — doğrulanmamış üretim işlevleri kapalıdır.",
-    languageButton:"English",themeButton:"Açık tema",healthTitle:"Canlı sağlık denetimi",
+    languageButton:"English",themeButton:"Açık temayı kullan",preferencesLabel:"Görünüm tercihleri",healthTitle:"Canlı sağlık denetimi",
     refreshButton:"Yalnızca durumları yenile",inspectionTitle:"Sentetik denetim modülleri",
     databaseTitle:"PostgreSQL salt-okunur görünüm",securityTitle:"Güvenlik sınırları",
     executionDisabled:"Yürütme: KAPALI",identityMissing:"Gerçek kullanıcı kimliği ve tek kullanımlık onay yok.",
@@ -36,7 +36,7 @@ const messages={
   },
   en:{
     intro:"Turkish-first safe inspector — unverified production functionality is disabled.",
-    languageButton:"Türkçe",themeButton:"Light theme",healthTitle:"Local health check",
+    languageButton:"Türkçe",themeButton:"Use light theme",preferencesLabel:"Display preferences",healthTitle:"Local health check",
     refreshButton:"Refresh status only",inspectionTitle:"Synthetic inspection modules",
     databaseTitle:"PostgreSQL read-only view",securityTitle:"Security boundaries",
     executionDisabled:"Execution: DISABLED",identityMissing:"No verified user identity or single-use approval.",
@@ -74,6 +74,10 @@ function translateStatic(){
     const key=node.getAttribute("data-i18n");
     if(Object.prototype.hasOwnProperty.call(messages[language],key))node.textContent=tr(key);
   }
+  for(const node of document.querySelectorAll?.("[data-i18n-aria-label]")??[]){
+    const key=node.getAttribute("data-i18n-aria-label");
+    if(Object.prototype.hasOwnProperty.call(messages[language],key))node.setAttribute?.("aria-label",tr(key));
+  }
   const langButton=$("lang-toggle");
   langButton?.setAttribute?.("aria-label",language==="tr"?"Switch language to English":"Türkçe diline geç");
 }
@@ -81,7 +85,7 @@ function applyTheme(){
   document.documentElement?.setAttribute?.("data-theme",theme);
   const button=$("theme-toggle");
   if(button){
-    button.textContent=language==="tr"?(theme==="dark"?"Açık tema":"Koyu tema"):(theme==="dark"?"Light theme":"Dark theme");
+    button.textContent=tr("themeButton");
     button.setAttribute?.("aria-pressed",String(theme==="light"));
   }
 }
