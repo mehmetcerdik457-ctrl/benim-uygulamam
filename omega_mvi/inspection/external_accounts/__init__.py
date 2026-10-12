@@ -71,7 +71,12 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
     results = []
     seen_names = set()
     for page in range(1, max_pages + 1):
-        response = fetch_page(_page_url(repository, resource, page))
+        try:
+            response = fetch_page(_page_url(repository, resource, page))
+        except Exception:
+            # Some HTTP clients embed request headers, credentials or raw
+            # payloads in exception messages. Never forward those to logs.
+            raise InventoryIncomplete("GitHub metadata fetch failed") from None
         if type(response) is not dict:
             raise InventoryIncomplete("Missing GitHub response")
         status = response.get("status")
@@ -176,7 +181,12 @@ def drive_metadata_pages(fetch_page, *, approved_folder_ids, folder_id,
     seen_tokens = set()
     page_token = None
     for page_no in range(1, max_pages + 1):
-        response = fetch_page(folder_id, page_token)
+        try:
+            response = fetch_page(folder_id, page_token)
+        except Exception:
+            # Suppress provider-specific exception messages containing
+            # private folder IDs or authentication material.
+            raise InventoryIncomplete("Drive metadata fetch failed") from None
         if type(response) is not dict or response.get("status") != 200:
             raise InventoryIncomplete("Drive metadata response not verified")
         files = response.get("files")
