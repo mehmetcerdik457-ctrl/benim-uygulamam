@@ -46,3 +46,27 @@ If no localhost runtime is accessible, smoke script emits `NOT_MEASURED` and exi
 For acceptance, record real owner-environment CPU/RAM/GPU, available VRAM, context length, model identifier/revision/checksum/license, tokenizer hash, run command and dependency versions, warmup/cold run isolation, n and distribution (p50/p95 TTFT/total latency), eval tokens/s, peak VRAM/RAM, bilingual task success by rubric, power/cost where measured, fallback and crash traces, timeouts and rollback. Never publish private machine identifiers, secret-bearing prompts or full local file manifests.
 
 **Rollback:** revert this separate draft PR only. Keep existing PR #58 and main unchanged. Final merge/enablement requires independent review, successful exact-SHA CI and explicit owner decision.
+
+## Second audit hardening (2026-10-12; same DRAFT PR #68)
+
+This supplement is **additional code/testing**, not owner-local inference acceptance:
+
+- `ModelRouter(..., max_inflight_requests=8)` now limits **admitted + queued** requests per router instance, refusing overload before executing a backend; the default running concurrency stays 1. Cancellation releases admission. This implementation is **single-asyncio-event-loop only** and is NOT a machine-wide or multi-worker capacity coordinator.
+- Strict enum/int/quality checks reject malformed privacy metadata, bool-as-int values, invalid task quality and model cost values. Registered quality metadata is copied so a mutable caller dictionary cannot silently downgrade routing after registration.
+- A backend that suppresses cooperative cancellation and returns **after an attempt timeout** cannot have its late result accepted or fallback continued. This is an output safety gate, **not** proof that the backend was killed on deadline: an uncooperative subprocess/runtime could continue consuming RAM/GPU. Production needs an isolated, killable worker and real timeout/OOM E2E tests.
+- Local smoke script now performs `GET http://127.0.0.1:<selected-port>/api/tags` and requires an **exact already-installed** Ollama model name before any POST inference. No auto-pull, install or remote lookup. Invalid/missing catalogue returns `NOT_MEASURED` and exit 2. A successful opt-in generation still **uses computation** and can load already-installed weights into memory; do **not** describe it as a read-only resource-neutral operation.
+- New offline negative suites `tests/test_omega_router_hardening.py` (34 cases) and `tests/test_omega_ollama_preflight.py` (6 cases) use mocks; no owner model was run. The 34 router-hardening cases were observed PASS in an isolated assistant Python test container; GitHub Actions results must be checked against the final PR HEAD separately.
+- Original text says test path `tests/test_omega_model_router.py` as an initial suite. The complete focused command now includes both newly added test files, too:
+
+```sh
+PYTHONPATH=. python -m pytest -q \
+  tests/test_omega_model_router.py \
+  tests/test_omega_router_global_limit.py \
+  tests/test_omega_router_hardening.py \
+  tests/test_omega_ollama_preflight.py \
+  tests/test_omega_local_hardware_probe.py \
+  tests/test_omega_loopback_model_benchmark.py
+```
+
+### Still NOT accepted
+No real Qwen3 measured latency/TTFT/tokens/s, model weights digest on owner machine, robust TR/EN/code quality, VRAM/RAM, multi-model failover or crash/OOM/cancellation worker cleanup evidence. The synchronous injected tokenizer itself must be verified as bounded (router event-loop deadline cannot interrupt a blocking synchronous tokenizer call). Existing `/api/chat` is disabled. Do **not** advance item 41/44/47/48/49/50 to DONE.
