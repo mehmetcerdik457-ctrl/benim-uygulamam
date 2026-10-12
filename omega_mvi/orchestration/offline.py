@@ -168,11 +168,14 @@ def run_offline(task: OfflineTask, registry: OfflineMcpFixtureRegistry, *,
                     result = tool.handler({"phase": phase, "attempt": retries})
                 except Exception:
                     raise Denied("TOOL_FAILURE") from None
-                guard_after = (cancelled.is_set() or
-                               elapsed_clock() - started >= task.max_duration_seconds or
-                               utc_now() >= task.deadline_utc)
-                if guard_after:
-                    raise Denied("STOP_AFTER_TOOL")
+                # Distinguish cancellation from timeout; never count a
+                # callback result as completed if a stop arrived mid-call.
+                if cancelled.is_set():
+                    raise Denied("CANCEL_REQUESTED")
+                if elapsed_clock() - started >= task.max_duration_seconds:
+                    raise Denied("DURATION_LIMIT")
+                if utc_now() >= task.deadline_utc:
+                    raise Denied("DEADLINE_EXPIRED")
                 outcome = _validate_untrusted_output(result)
                 steps += 1
                 cost += tool.simulated_cost_minor
