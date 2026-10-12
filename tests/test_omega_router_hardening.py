@@ -157,3 +157,20 @@ def test_queue_settings_rejected_if_unbounded():
         ModelRouter([], max_inflight_requests=0)
     with pytest.raises(ValueError):
         ModelRouter([], max_inflight_requests=1025)
+
+
+def test_backend_ignoring_cancel_cannot_return_late_success_or_fallback():
+    class IgnoresCancellation(Backend):
+        async def generate(self, req, *, max_output_tokens):
+            self.calls += 1
+            try:
+                await asyncio.sleep(.10)
+            except asyncio.CancelledError:
+                await asyncio.sleep(.02)
+            return Completion(self.name, "unsafe-late", 2, 1)
+
+    first, safe = IgnoresCancellation(), Backend(name="safe")
+    router = ModelRouter([(profile(timeout_ms=5), first), (profile("safe"), safe)])
+    with pytest.raises(InferenceFailed, match="ignored timeout"):
+        run(router.generate(request()))
+    assert safe.calls == 0
