@@ -9,6 +9,7 @@ on:
       - 'tests/test_omega_security_offline.py'
       - 'tests/test_omega_oidc_fixture.py'
       - 'tests/test_omega_audit_fixture.py'
+      - 'tests/test_omega_incident_fixture.py'
       - '.github/workflows/omega-security-fixtures.yml'
   workflow_dispatch:
 permissions:
@@ -30,4 +31,4 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --quiet pytest==8.4.1 cryptography==46.0.4
-          python -m pytest -q -ra tests/test_omega_security_offline.py tests/test_omega_oidc_fixture.py tests/test_omega_audit_fixture.py
+          python -m pytest -q -ra tests/test_omega_security_offline.py tests/test_omega_oidc_fixture.py tests/test_omega_audit_fixture.py tests/test_omega_incident_fixture.py
