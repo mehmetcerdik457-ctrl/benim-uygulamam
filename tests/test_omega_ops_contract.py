@@ -51,12 +51,31 @@ class OperationsIsolationTest(unittest.TestCase):
                    "OMEGA_DEV_DB_PASSWORD": "short"})
         self.assertEqual(p.returncode, 21)
 
+    def test_refuse_unset_password_without_shell_error(self):
+        p = probe({"GITHUB_ACTIONS": "true",
+                   "RUNNER_ENVIRONMENT": "github-hosted",
+                   "GITHUB_REPOSITORY": "mehmetcerdik457-ctrl/benim-uygulamam",
+                   "OMEGA_TEST_DB_SENTINEL": "b" * 32})
+        self.assertEqual(p.returncode, 21)
+        self.assertIn("BLOCKED_MISSING_TEMP_CREDENTIALS", p.stdout)
+        self.assertNotIn("unbound variable", p.stderr)
+
+    def test_refuse_empty_sentinel(self):
+        p = probe({"GITHUB_ACTIONS": "true",
+                   "RUNNER_ENVIRONMENT": "github-hosted",
+                   "GITHUB_REPOSITORY": "mehmetcerdik457-ctrl/benim-uygulamam",
+                   "OMEGA_TEST_DB_SENTINEL": "",
+                   "OMEGA_DEV_DB_PASSWORD": "x" * 26})
+        self.assertEqual(p.returncode, 21)
+
     def test_restoration_remains_fixture_only(self):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("public.omega_ops_fixture", source)
         self.assertIn("omega_ops_restore", source)
         self.assertIn("OMEGA_TEST_DB_SENTINEL", source)
         self.assertIn("--no-owner", source)
+        self.assertIn("OMEGA_OPS_INVALID_ARCHIVE_REJECTION=PASS", source)
+        self.assertIn("BLOCKED_PROJECT_ALREADY_EXISTS", source)
         self.assertNotIn("docker volume rm", source)
         self.assertNotIn("pg_restore --clean", source)
         self.assertNotIn("docker system prune", source)
