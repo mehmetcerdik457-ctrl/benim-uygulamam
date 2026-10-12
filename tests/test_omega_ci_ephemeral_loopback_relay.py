@@ -62,6 +62,29 @@ class RelayTests(unittest.TestCase):
                 mock.shutdown()
                 mock_thread.join(timeout=3)
 
+    def test_wildcard_and_nonloopback_listeners_rejected_before_binding(self):
+        for host in ("0.0.0.0", "192.168.1.20", "::", "localhost", ""):
+            with self.subTest(host=host), self.assertRaises(ValueError):
+                m._Relay((host, 0), m._RelayHandler, target="127.0.0.1")
+        with self.assertRaises(ValueError):
+            m._Relay(("127.0.0.1", True), m._RelayHandler, target="127.0.0.1")
+
+    def test_connection_capacity_is_bounded_and_rejects_fifth_request(self):
+        from unittest.mock import Mock
+        with m._Relay(("127.0.0.1", 0), m._RelayHandler,
+                      target="127.0.0.1") as relay:
+            for _ in range(relay.max_concurrent_connections):
+                self.assertTrue(relay._slots.acquire(blocking=False))
+            self.assertFalse(relay._slots.acquire(blocking=False))
+            refused_socket = Mock()
+            with patch.object(relay, "shutdown_request") as shutdown:
+                relay.process_request(refused_socket, ("127.0.0.1", 12345))
+                shutdown.assert_called_once_with(refused_socket)
+            for _ in range(relay.max_concurrent_connections):
+                relay._slots.release()
+            self.assertTrue(relay._slots.acquire(blocking=False))
+            relay._slots.release()
+
     def test_blocked_preconditions_cannot_start_relay(self):
         with patch.object(m, "audit", return_value={
             "requested": "LOOPBACK_ONLY",
