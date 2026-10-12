@@ -40,3 +40,31 @@ Do not change \`internal: true\`, publish to \`0.0.0.0\`, enable Docker host net
 To make local UI access a release requirement, the Chief Inspector must approve a separately threat-modeled loopback-only ingress design **and** independent egress-denial tests before modifying the topology. Until then the host acceptance gate should remain red. No production deployment or main merge is permitted.
 
 Owner-machine checks require a separately approved session and independent code/version binding. Private local 0.1.4-dev, disks, encrypted Drive backups, DBs and recovery keys were not inspected or changed.
+
+## 12 Oct 2026 — Fail-closed relay capacity and address hardening (second audit)
+
+**Exact evidence HEAD before this documentation-only change:** `99ee21a92704a66a95a1d7fe62edd8ff0cca7250`.
+
+- CI: https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38224748839 — **133 passed / 18 skipped**, 1 unrelated deprecation warning; SUCCESS.
+- Privacy Guard: https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38224748833 — SUCCESS.
+- Real runner-host acceptance: https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/actions/runs/38224748923 — **FAILURE** (two required checks exit code 2), correctly BLOCKED.
+
+A read-only real GitHub-hosted Docker 28.0.4 test once again reported:
+
+```text
+OMEGA_DOCKER_PORT_REQUESTED=LOOPBACK_ONLY
+OMEGA_DOCKER_PORT_EFFECTIVE=MISSING
+OMEGA_DOCKER_PORT_COMPOSE_PORT=MISSING
+OMEGA_DOCKER_PORT_NETWORK=INTERNAL
+OMEGA_RUNNER_HOST_CONTAINER=PASS
+OMEGA_RUNNER_HOST_TCP=REFUSED
+OMEGA_RUNNER_HOST_HTTP=BLOCKED
+OMEGA_DIRECT_HOST_HTTP=PASS_HOST_TO_INTERNAL_ONLY
+OMEGA_CI_RELAY=PASS_EPHEMERAL_CI_ONLY_NOT_DOCKER_OR_OWNER_ACCEPTANCE
+```
+
+Thus real host-to-container internal HTTP with a denied unsafe POST works, but Docker's **native** host localhost port forwarding does not. This gate must not be marked green because the CI relay experiment succeeded.
+
+**Additional improvements:** The disposable CI relay *constructor* now rejects all listening addresses other than the IPv4 literal `127.0.0.1`. At most four concurrent client handler threads are permitted; excess clients are closed instead of spawning unlimited threads. Two negative tests explicitly assert wildcard/LAN binding refusal and connection-cap enforcement. Together, the three specialist suites now have **23 cases** (8 port, 9 direct route, 6 relay) all passing in the real runner. The relay remains disabled unless the experimental CLI flag and GitHub Actions environment indicator are present; those checks are operational safeguards, **not** authentication, authorization, or a claim that environment variables cannot be spoofed. The internal API has no real identity infrastructure and the temporary proxy must not be deployed as an owner service without an independently approved design.
+
+**Residual risks / explicit nonclaims:** This is a bounded TCP relay experiment, not a hardened application proxy. It performs no per-user authentication or authorization, does not establish trusted TLS, and does not support persistent owner services. The `127.0.0.1` bind is local to a *GitHub-hosted CI runner*, not the owner's phone. No owner-local `0.1.4-dev` source, services, disks or private backups were accessed. Existing PR #58 and this stacked PR #59 remain DRAFT and unmerged. Chief Inspector review, design acceptance, independent owner-device test and production-readiness checks remain BLOCKED.
