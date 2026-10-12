@@ -149,7 +149,8 @@ class ControlledIndex:
 
     @_atomic
     def replace_source_snapshot(self, source_ref: str, changes: Iterable[DocumentChange],
-                                *, requester_id: str, approved: bool = False) -> ScanOutcome:
+                                *, requester_id: str, approved: bool = False,
+                                expected_generation: int | None = None) -> ScanOutcome:
         """Replace a COMPLETE synthetic source snapshot atomically.
 
         Incremental batches MUST use rescan(). Missing IDs become tombstones;
@@ -159,6 +160,8 @@ class ControlledIndex:
         self._authorized(requester_id)
         if approved is not True:
             raise ScopeError("SNAPSHOT_APPROVAL_REQUIRED")
+        if type(expected_generation) is not int or expected_generation != self._generation:
+            raise ScopeError("STALE_SOURCE_SNAPSHOT")
         self._source_allowed(source_ref)
         batch = tuple(changes)
         if len(batch) > 1000:
