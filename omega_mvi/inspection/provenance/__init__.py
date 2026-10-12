@@ -217,3 +217,40 @@ def compare_indices(old: dict[str, Any], new: dict[str, Any]) -> dict[str, list[
         "provenance_changed": [k for k in both if any(a[k][v] != b[k][v] for v in
                               ("source_version", "owner_ref", "access_level", "verified_at", "retention_days"))],
     }
+
+
+def verify_index_chain(snapshots: list[dict[str, Any]], *,
+                       expected_genesis_sha256: str,
+                       expected_tip_sha256: str) -> dict[str, Any]:
+    """Verify a bounded complete, externally anchored synthetic index history.
+
+    The caller MUST acquire both expected hashes through an independently
+    trusted channel. A self-supplied hash (from the same untrusted input)
+    is not an authentication mechanism. No filesystem or network reads occur.
+    """
+    if (type(snapshots) is not list or not 1 <= len(snapshots) <= 128
+            or not _is_sha256(expected_genesis_sha256)
+            or not _is_sha256(expected_tip_sha256)):
+        raise ValueError("a bounded history and two trusted SHA-256 anchors are required")
+    previous = None
+    for number, snapshot in enumerate(snapshots, 1):
+        _validate_index(snapshot)
+        if snapshot["version"] != number:
+            raise ValueError("index history has a missing, replayed or reordered version")
+        if number == 1:
+            if snapshot["index_sha256"] != expected_genesis_sha256:
+                raise ValueError("genesis differs from trusted anchor")
+        elif snapshot["previous_index_sha256"] != previous["index_sha256"]:
+            raise ValueError("index history contains a broken link")
+        previous = snapshot
+    if previous["index_sha256"] != expected_tip_sha256:
+        raise ValueError("tip differs from trusted anchor or history is truncated")
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "history_validated": True,
+        "snapshot_count": len(snapshots),
+        "genesis_sha256": expected_genesis_sha256,
+        "tip_sha256": expected_tip_sha256,
+        "authorization_granted": False,
+        "signed_identity_verified": False,
+    }
