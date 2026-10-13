@@ -104,6 +104,18 @@ jobs:
           else:
               code = 'INGRESS_CAUSE_UNCLASSIFIED'
           print('OMEGA_CI_INGRESS_FATAL=' + code)
+          if fatal:
+              operation = next((name for name in (
+                  'setgid(', 'setuid(', 'setgroups(', 'mkdir(', 'open(',
+                  'bind(', 'chown(', 'socket(', 'getpwnam(', 'chmod(')
+                  if name in fatal), 'OTHER')
+              location = next((code for path, code in (
+                  ('/dev/stderr', 'STDERR'), ('/var/cache', 'CACHE'),
+                  ('/var/run', 'RUN'), ('/tmp/', 'TEMP'),
+                  ('/etc/nginx', 'CONFIG'), ('/var/lib', 'LIBRARY'))
+                  if path in fatal), 'OTHER')
+              print('OMEGA_CI_INGRESS_OPERATION=' + operation.upper().replace('(', ''))
+              print('OMEGA_CI_INGRESS_LOCATION=' + location)
           print('OMEGA_CI_INGRESS_LOG_BYTES=' + str(len(data)))
           PY
       - name: Observe Docker binding, network, runner TCP and HTTP independently
