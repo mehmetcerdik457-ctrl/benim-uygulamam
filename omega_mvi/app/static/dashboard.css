@@ -35,3 +35,9 @@ button:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
 :root[data-theme="light"] button:focus-visible{outline-color:#1e40af}
 :root[data-theme="light"] .state-list li,:root[data-theme="light"] .feature-list li{border-color:#cbd5e1}
 @media(max-width:480px){.toolbar button{flex:1 1 auto}}
+
+/* Synthetic inventory filter is keyboard-first and has no submit/network side effect. */
+#inventory-filter{display:block;margin:8px 0 12px;padding:10px 12px;min-height:44px;max-width:100%;background:#334155;color:#fff;border:1px solid #94a3b8;border-radius:7px}
+#inventory-filter:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
+:root[data-theme="light"] #inventory-filter{background:#fff;color:#0f172a;border-color:#334155}
+:root[data-theme="light"] #inventory-filter:focus-visible{outline-color:#1e40af}
