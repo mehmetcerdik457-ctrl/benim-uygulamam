@@ -39,9 +39,13 @@ jobs:
           # not route the host-published loopback port; check service health INSIDE
           # the isolated network rather than silently disabling network isolation.
           docker compose -f compose.omega.yml exec -T api python -c 'import json,urllib.request; x=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health",timeout=3)); assert x["status"]=="ok" and x["mode"]=="mock" and x["production_ready"] is False'
-          echo "OMEGA_HOST_LOOPBACK_CONNECTIVITY=NOT_VERIFIED"
+          echo "OMEGA_HOST_LOOPBACK_CONNECTIVITY=NOT_TESTED_IN_THIS_JOB"
           echo "OMEGA_MVI_COMPOSE_HEALTH=PASS"
-      - name: Confirm no production mode
+      - name: Confirm demo remains non-production with reviewed Compose topology
+        env:
+          OMEGA_DEV_DB_PASSWORD: "CI_PLACEHOLDER_NOT_REAL"
+        shell: bash
         run: |
-          grep -F 'production_ready' omega_mvi/app/main.py
-          grep -F '127.0.0.1:18080:8000' compose.omega.yml
+          set -euo pipefail
+          grep -F 'production_ready' omega_mvi/app/main.py >/dev/null
+          docker compose --profile integration -f compose.omega.yml config --format json | python3 scripts/omega_network_topology_gate.py --stdin
