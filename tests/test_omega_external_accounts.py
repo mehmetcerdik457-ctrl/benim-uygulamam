@@ -38,6 +38,7 @@ def test_github_explicit_fork_metadata_only():
     def forks(_):
         return {"status": 200, "headers": {},
                 "items": [{"full_name": "someone/public-fork",
+                           "private": False, "visibility": "public",
                            "authorization": "never-copy"}]}
     result = github_metadata_pages(forks, REPO, {REPO}, "forks")
     assert result["names"] == ("someone/public-fork",)
@@ -385,3 +386,62 @@ def test_drive_callback_failure_never_exposes_provider_exception_text():
     assert str(failure.value) == "Drive metadata fetch failed"
     assert "SYNTHETIC_PRIVATE_FOLDER_ERROR" not in str(failure.value)
     assert failure.value.__suppress_context__ is True
+
+
+@pytest.mark.parametrize("bad_repo", (
+    "owner/..", "owner/.", "owner/repo/extra", "owner//repo",
+    "-invalid/repo", "owner/abc?query=bad", "owner/repo#fragment",
+    "owner/" + "A" * 110,
+))
+def test_repository_url_path_and_slug_guards_reject_before_callback(bad_repo):
+    def forbidden(_url):
+        pytest.fail("Unapproved or path-like repository reached provider")
+    with pytest.raises(InventoryDenied):
+        github_metadata_pages(forbidden, bad_repo, {bad_repo}, "branches")
+
+
+@pytest.mark.parametrize("entry", (
+    {"full_name": "someone/private-fork", "private": True,
+     "visibility": "private"},
+    {"full_name": "someone/unknown-fork"},
+    {"full_name": "someone/unverified-fork", "private": False},
+    {"full_name": "someone/internal-fork", "private": False,
+     "visibility": "internal"},
+    {"full_name": "someone/..", "private": False,
+     "visibility": "public"},
+))
+def test_fork_public_visibility_must_be_explicit_and_safe(entry):
+    def unsafe(_url):
+        return {"status": 200, "headers": {}, "items": [entry]}
+    with pytest.raises(InventoryIncomplete):
+        github_metadata_pages(unsafe, REPO, {REPO}, "forks")
+
+
+def test_github_branch_name_with_credential_pattern_fails_closed():
+    def leak(_url):
+        # Fake test pattern only; no live credential used.
+        return {"status": 200, "headers": {},
+                "items": [{"name": "demo/ghp_example1234"}]}
+    with pytest.raises(InventoryIncomplete, match="sensitive"):
+        github_metadata_pages(leak, REPO, {REPO}, "branches")
+
+
+def test_safe_public_fork_returns_only_public_name():
+    def callback(_url):
+        return {"status": 200, "headers": {}, "items": [{
+            "full_name": "test-owner/test-repo", "private": False,
+            "visibility": "public", "permissions": {"admin": True},
+            "clone_url": "SYNTHETIC_SHOULD_NOT_LEAK"}]}
+    result = github_metadata_pages(callback, REPO, {REPO}, "forks")
+    assert result["names"] == ("test-owner/test-repo",)
+    assert "SYNTHETIC_SHOULD_NOT_LEAK" not in repr(result)
+    assert result["complete"] is True
+
+
+def test_oversize_mime_metadata_is_not_accepted():
+    fake = {"id": "syntheticid", "mime_type": "text/" + "a" * 256,
+            "parent_ids": ["approved"]}
+    with pytest.raises(InventoryIncomplete):
+        drive_metadata_only([{"complete": True, "files": [fake]}],
+                            approved_folder_ids={"approved"},
+                            folder_id="approved")
