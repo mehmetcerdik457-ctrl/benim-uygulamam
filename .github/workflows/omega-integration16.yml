@@ -39,6 +39,10 @@ jobs:
         run: |
           set -euo pipefail
           OMEGA_DEV_DB_PASSWORD=CI_PLACEHOLDER_NOT_REAL docker compose --profile integration -f compose.omega.yml config --format json | python scripts/omega_network_topology_gate.py --stdin
+      - name: Verify reproducible direct-only CycloneDX manifest without network
+        run: |
+          python scripts/omega_direct_sbom.py
+          PYTHONPATH=. python -m pytest -q tests/test_omega_direct_sbom.py
       - name: Combined complete offline regressions
         env:
           PYTHONPATH: .:omega_mvi
