@@ -31,15 +31,34 @@ db=c["services"]["db"]
 assert not db.get("ports") and not db.get("volumes"), "database must not publish/mount persistent volumes"
 assert any(x.split(":")[0]=="/var/lib/postgresql/data" for x in db.get("tmpfs",[]))
 assert db.get("image")=="postgres:16-alpine", "review changed database image before running"
-for name, svc in c["services"].items():
-    # Disallow host mounts, privileged execution and unreviewed Docker escape paths
-    # for EVERY service, including the build/test container, not just the DB.
-    for forbidden in ("volumes","privileged","network_mode","pid","devices","cap_add"):
+services=c["services"]
+assert set(services).issubset({"api","db","tests","ingress"}), "unreviewed service"
+assert {"db","api","ingress"}.issubset(services), "required service missing"
+networks=c["networks"]
+assert networks["isolated_demo"].get("internal") is True, "database network must remain internal"
+assert networks["loopback_ingress"].get("driver")=="bridge" and networks["loopback_ingress"].get("internal") is not True, "ingress bridge required"
+for name, svc in services.items():
+    for forbidden in ("privileged","network_mode","pid","devices","cap_add","extra_hosts"):
         assert not svc.get(forbidden), "unsafe service configuration"
-    for network in svc.get("networks",{}):
-        assert c["networks"][network].get("internal") is True, "external network denied"
-    for published in svc.get("ports",[]):
-        assert name=="api" and published.get("host_ip")=="127.0.0.1", "unreviewed port denied"
+    allowed_networks = {"isolated_demo","loopback_ingress"} if name=="ingress" else {"isolated_demo"}
+    assert set(svc.get("networks",{})) == allowed_networks, "unreviewed network attachment"
+    mounts=svc.get("volumes",[])
+    ports=svc.get("ports",[])
+    if name=="ingress":
+        assert svc.get("read_only") is True and svc.get("cap_drop")==["ALL"], "ingress hardening required"
+        assert "no-new-privileges:true" in svc.get("security_opt",[]), "ingress privileges denied"
+        assert len(mounts)==1 and type(mounts[0]) is dict, "ingress may only mount its own configuration"
+        m=mounts[0]
+        assert m.get("type")=="bind" and m.get("read_only") is True, "ingress mount must be read-only"
+        assert m.get("target")=="/etc/nginx/nginx.conf" and str(m.get("source","")).endswith("/omega_mvi/ingress/nginx.conf"), "unexpected ingress mount"
+        assert len(ports)==1 and type(ports[0]) is dict, "one loopback port only"
+        p=ports[0]
+        assert p.get("host_ip")=="127.0.0.1" and str(p.get("published"))=="18080" and p.get("target")==8080 and p.get("protocol","tcp")=="tcp", "unsafe ingress publication"
+    else:
+        assert not mounts and not ports, "non-ingress service cannot publish or mount host files"
+        if name in ("api","tests"):
+            assert svc.get("read_only") is True and svc.get("cap_drop")==["ALL"], "app and tests must remain hardened"
+            assert "no-new-privileges:true" in svc.get("security_opt",[]), "app privileges denied"
 
 '
 echo "OMEGA_OPS_COMPOSE_DISPOSABLE_GUARD=PASS"
