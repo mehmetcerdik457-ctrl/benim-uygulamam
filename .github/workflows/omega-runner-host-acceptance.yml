@@ -69,6 +69,36 @@ jobs:
           print("OMEGA_INGRESS_STARTUP_DIAG=" + category)
           '
           fi
+      - name: Classify disposable ingress crash without exposing container logs
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ['docker','compose','-f','compose.omega.yml','logs','--no-color','--tail','45','ingress'],
+                  capture_output=True, text=True, check=False, timeout=10)
+              data = (p.stdout + p.stderr)[-16000:].lower()
+          except (OSError, subprocess.TimeoutExpired):
+              data = ''
+          # Only fixed codes leave the ephemeral runner: never echo logs, names or errors.
+          if 'host not found in upstream' in data or 'no resolver defined' in data:
+              code = 'NGINX_DNS_CONFIGURATION'
+          elif 'read-only file system' in data:
+              code = 'NGINX_READ_ONLY_FILESYSTEM'
+          elif 'permission denied' in data or 'operation not permitted' in data:
+              code = 'NGINX_PERMISSION'
+          elif 'unknown directive' in data or 'invalid number of arguments' in data:
+              code = 'NGINX_CONFIG_SYNTAX'
+          elif '[emerg]' in data:
+              code = 'NGINX_FATAL_OTHER'
+          elif not data:
+              code = 'INGRESS_LOG_UNAVAILABLE'
+          else:
+              code = 'INGRESS_CAUSE_UNCLASSIFIED'
+          print('OMEGA_CI_INGRESS_STARTUP=' + code)
+          PY
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
