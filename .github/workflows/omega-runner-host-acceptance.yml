@@ -42,6 +42,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
       - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
+      - name: Prove temporary CI-only localhost relay and stop before acceptance
+        run: python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api ingress
       - name: Classify isolated ingress startup failure without leaking logs
@@ -122,8 +124,6 @@ jobs:
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
         run: python3 scripts/omega_runner_host_direct_route.py
-      - name: Prove temporary CI-only localhost relay and stop before acceptance
-        run: python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
       - name: Enforce requested versus EFFECTIVE Docker host port mapping
         if: success() || failure()
         run: python3 scripts/omega_runner_host_port_audit.py
