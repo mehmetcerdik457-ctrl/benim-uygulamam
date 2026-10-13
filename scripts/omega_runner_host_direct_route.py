@@ -40,12 +40,23 @@ def target_ip(runner=subprocess.run):
         ip = ipaddress.IPv4Address(endpoint.get("IPAddress"))
         if not any(ip in network for network in RFC1918):
             return None, "NETWORK_SCOPE_UNSAFE"
-        if (not isinstance(subnet_configs, list) or
-                not any(isinstance(item, dict) and
-                        ip in ipaddress.ip_network(item.get("Subnet"), strict=False)
-                        for item in subnet_configs if item.get("Subnet"))):
+        # Fail closed on malformed IPAM entries and overly broad ranges.
+        # An RFC1918 endpoint alone does NOT prove the underlying Docker
+        # subnet is private (e.g., a reported 0.0.0.0/0 would also match it).
+        if not isinstance(subnet_configs, list) or not subnet_configs:
             return None, "IPAM_UNVERIFIED"
-    except (ValueError, TypeError, ipaddress.AddressValueError):
+        private_match = False
+        for item in subnet_configs:
+            if not isinstance(item, dict) or not isinstance(item.get("Subnet"), str):
+                return None, "IPAM_UNVERIFIED"
+            subnet = ipaddress.ip_network(item["Subnet"], strict=False)
+            if isinstance(subnet, ipaddress.IPv4Network) and ip in subnet:
+                if not any(subnet.subnet_of(private) for private in RFC1918):
+                    return None, "NETWORK_SCOPE_UNSAFE"
+                private_match = True
+        if not private_match:
+            return None, "IPAM_UNVERIFIED"
+    except (ValueError, TypeError, AttributeError, ipaddress.AddressValueError):
         return None, "IPAM_UNVERIFIED"
     return str(ip), "SINGLE_INTERNAL_BRIDGE_RFC1918"
 
