@@ -229,7 +229,7 @@ class ModelRouter:
                     except asyncio.CancelledError:
                         raise  # No retry or fallback on cancellation.
                     except BackendUnresponsive:
-                        raise InferenceFailed("local model cancellation integrity failed") from None
+                        raise InferenceFailed("local backend ignored timeout or cancellation") from None
                     except (asyncio.TimeoutError, TransientModelError):
                         if attempt == profile.max_retries:
                             break
