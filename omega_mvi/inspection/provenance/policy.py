@@ -28,7 +28,8 @@ def review_provenance_changes(old: dict, new: dict) -> dict:
                 differences.append("metadata." + field)
         if differences:
             changed[key] = differences
-    # Additions, removals and CONTENT changes require independent review.\n    # A correct checksum is integrity evidence, never a source approval.
+    # Additions, removals and CONTENT changes require independent review.
+    # A correct checksum is integrity evidence, never a source approval.
     approval_items = sorted(set(drift["added"] + drift["removed"] + drift["content_changed"] + list(changed)))
     return {
         "schema": "omega.synthetic-provenance-transition.v1",

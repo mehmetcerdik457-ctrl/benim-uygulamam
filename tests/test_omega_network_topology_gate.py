@@ -1,14 +1,10 @@
 """Offline Compose topology negative cases; no Docker or host mutations."""
 from copy import deepcopy
 from io import StringIO
-from pathlib import Path
 import json
-import sys
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
-from omega_network_topology_gate import evaluate, main
+from scripts.omega_network_topology_gate import evaluate, main
 
 
 def topology():

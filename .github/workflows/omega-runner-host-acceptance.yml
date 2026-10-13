@@ -33,6 +33,7 @@ jobs:
           echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
       - name: Confirm rendered Compose isolation separately from live connectivity
         run: |
+          set -euo pipefail
           docker compose -f compose.omega.yml config --format json | python3 scripts/omega_network_topology_gate.py --stdin
       - name: Test positive and negative Docker port audit outcomes (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v

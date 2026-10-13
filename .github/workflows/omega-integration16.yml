@@ -37,6 +37,7 @@ jobs:
           mypy --follow-imports=skip --ignore-missing-imports --check-untyped-defs scripts/omega_network_topology_gate.py
       - name: Verify policy topology without pretending host access
         run: |
+          set -euo pipefail
           OMEGA_DEV_DB_PASSWORD=CI_PLACEHOLDER_NOT_REAL docker compose -f compose.omega.yml config --format json | python scripts/omega_network_topology_gate.py --stdin
       - name: Combined complete offline regressions
         env:

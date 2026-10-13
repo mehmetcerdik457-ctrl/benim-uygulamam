@@ -44,13 +44,13 @@ def evaluate(config: object) -> dict[str, str | bool]:
         "cause": "UNVERIFIED_NETWORK_POLICY",
     }
     if not isinstance(config, dict):
-        return base
+        return {**base, "cause": "COMPOSE_JSON_UNAVAILABLE_OR_INVALID"}
     services = config.get("services")
     networks = config.get("networks")
     if not isinstance(services, dict) or not isinstance(networks, dict):
-        return base
+        return {**base, "cause": "RENDERED_SERVICE_OR_NETWORK_SECTION_MISSING"}
     if not {"api", "db", "tests"}.issubset(services):
-        return base
+        return {**base, "cause": "REQUIRED_SERVICE_MISSING"}
     isolated = networks.get("isolated_demo")
     if not isinstance(isolated, dict) or isolated.get("internal") is not True:
         return {**base, "cause": "INTERNAL_NETWORK_REQUIRED"}
