@@ -12,7 +12,7 @@ EMPTY = hashlib.sha256(b"").hexdigest()
 
 
 def record(*, name="safe.txt", owner="owner:test", level="internal", retention=7,
-           revision="v1", mtime=100, mode=0o600, uid=1, gid=1,
+           revision="v1", mtime=100, mode=0o600, uid=1, gid=1, data=b"synthetic-only",
            acl=EMPTY, xattr=EMPTY, verified="2026-10-12T08:00:00Z"):
     data = b"synthetic-only"
     return make_fixture_record(
@@ -114,3 +114,24 @@ def test_effective_permissions_changes_require_review(modified, field):
     assert result["policy_fields_changed"] == {"synthetic://fixture/safe.txt": [field]}
     assert result["approval_granted"] is False
     assert result["deletion_authorized"] is False
+
+
+def test_content_sha_change_with_same_identity_forces_independent_review():
+    # No owner/access/version labels change. A new document body must still
+    # be reviewed before it can be accepted into a trusted source snapshot.
+    old = build_index([record()], version=1)
+    new = build_index([record(data=b"changed-synthetic-content")], version=2, previous=old)
+    report = review_provenance_changes(old, new)
+    assert report["content_changed"] == ["synthetic://fixture/safe.txt"]
+    assert report["requires_external_review"] is True
+    assert report["review_items"] == ["synthetic://fixture/safe.txt"]
+    assert report["approval_granted"] is False
+    assert report["identity_verified"] is False
+
+
+def test_unchanged_content_does_not_invent_review_trigger():
+    old = build_index([record()], version=1)
+    new = build_index([record()], version=2, previous=old)
+    report = review_provenance_changes(old, new)
+    assert report["content_changed"] == []
+    assert report["requires_external_review"] is False

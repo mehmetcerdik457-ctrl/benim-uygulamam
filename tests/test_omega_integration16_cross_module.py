@@ -7,7 +7,7 @@ import pytest
 
 from omega_mvi.inspection.provenance import make_fixture_record, build_index
 from omega_mvi.inspection.provenance.policy import review_provenance_changes
-from omega_mvi.inspection.knowledge import ControlledIndex, DocumentChange, ScopeError
+from omega_mvi.inspection.knowledge import ControlledIndex, DocumentChange, ScopeError, MemoryEntry, MemoryLedger
 from omega_mvi.security.offline_contract import SecurityDenied, require_live_identity, require_live_oidc
 from omega_mvi.orchestration.offline import OfflineTask, OfflineMcpFixtureRegistry, run_offline
 from omega_mvi.model_adapter.router import ModelRouter, RouteRequest, RouteDenied
@@ -72,3 +72,44 @@ def test_model_router_cannot_infer_without_authorized_local_backend():
                            max_total_tokens=72)
     with pytest.raises(RouteDenied):
         asyncio.run(router.generate(request))
+
+
+def test_content_digest_review_and_memory_invalidation_across_specialists():
+    content = b"synthetic source alpha"
+    empty_digest = sha256(b"").hexdigest()
+    def record(body):
+        return make_fixture_record(
+            source_ref="synthetic://research", relative_path="doc.txt",
+            source_version="v1", data=body, owner_ref="owner:fixture",
+            metadata=dict(kind="regular_file", size_bytes=len(body), mtime_ns=1,
+                          mode=0o400, uid=1, gid=1, acl_sha256=empty_digest,
+                          xattr_sha256=empty_digest),
+            access_level="internal", verified_at="2026-10-13T00:00:00Z",
+            retention_days=30)
+    previous = build_index([record(content)], version=1)
+    current = build_index([record(b"synthetic source beta")],
+                          version=2, previous=previous)
+    delta = review_provenance_changes(previous, current)
+    assert delta["content_changed"] == ["synthetic://research/doc.txt"]
+    assert delta["requires_external_review"] and not delta["approval_granted"]
+
+    index = ControlledIndex(owner_id="fixture-owner",
+                            allowlisted_sources={"synthetic://research"})
+    index.rescan([DocumentChange("synthetic://research", "doc.txt", "v1",
+                                 content.decode())],
+                 requester_id="fixture-owner", approved=True)
+    ledger = MemoryLedger(index)
+    ledger.record_suggestion(MemoryEntry(
+        "fixture-memory", "synthetic://research", "doc.txt",
+        "synthetic source alpha", "unverified_suggestion"),
+        requester_id="fixture-owner")
+    ledger.promote("fixture-memory", requester_id="fixture-owner",
+                   new_state="approved_fact", approver_id="fixture-reviewer",
+                   evidence_ref="synthetic://review/1")
+    assert len(ledger.trusted_context(requester_id="fixture-owner")) == 1
+    # Unauthorized source contents are NOT ingested; the current index is
+    # later revoked by test-only explicit approval. No live owner exists.
+    index.revoke_source("synthetic://research", requester_id="fixture-owner",
+                        approved=True)
+    assert ledger.trusted_context(requester_id="fixture-owner") == ()
+    assert index.search("alpha", requester_id="fixture-owner") == ()

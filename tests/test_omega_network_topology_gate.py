@@ -1,0 +1,84 @@
+"""Offline Compose topology negative cases; no Docker or host mutations."""
+from copy import deepcopy
+from io import StringIO
+from pathlib import Path
+import json
+import sys
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from omega_network_topology_gate import evaluate, main
+
+
+def topology():
+    return {"networks": {"isolated_demo": {"internal": True}},
+            "services": {
+                "api": {"networks": ["isolated_demo"], "read_only": True,
+                        "cap_drop": ["ALL"],
+                        "security_opt": ["no-new-privileges:true"],
+                        "ports": [{"host_ip": "127.0.0.1", "target": 8000,
+                                   "published": "18080", "protocol": "tcp"}]},
+                "db": {"networks": ["isolated_demo"]},
+                "tests": {"networks": ["isolated_demo"]}}}
+
+
+def test_static_only_never_claims_runner_host_success():
+    result = evaluate(topology())
+    assert result["topology"] == "PASS_INTERNAL_AND_LOOPBACK_REQUEST_ONLY"
+    assert result["host_acceptance"] == "BLOCKED_NOT_ACCEPTED"
+    assert result["production_ready"] is False
+
+
+def test_compact_port_equivalent_still_not_runtime_acceptance():
+    config = topology()
+    config["services"]["api"]["ports"] = ["127.0.0.1:18080:8000"]
+    assert evaluate(config)["host_acceptance"] == "BLOCKED_NOT_ACCEPTED"
+
+
+def test_raw_extra_external_network_does_not_bypass_policy():
+    config = topology()
+    config["networks"]["external"] = {"internal": False}
+    config["services"]["api"]["networks"].append("external")
+    assert evaluate(config)["topology"] == "DENIED"
+
+
+def test_wildcard_or_extra_port_denied():
+    config = topology()
+    config["services"]["api"]["ports"][0]["host_ip"] = "0.0.0.0"
+    assert evaluate(config)["topology"] == "DENIED"
+    config = topology()
+    config["services"]["api"]["ports"].append("0.0.0.0:8888:8000")
+    assert evaluate(config)["topology"] == "DENIED"
+
+
+def test_db_port_and_network_mode_denied():
+    config = topology()
+    config["services"]["db"]["ports"] = ["127.0.0.1:15432:5432"]
+    assert evaluate(config)["topology"] == "DENIED"
+    config = topology()
+    config["services"]["api"]["network_mode"] = "host"
+    assert evaluate(config)["topology"] == "DENIED"
+
+
+def test_missing_hardening_or_external_network_never_passes():
+    for part, value in [("read_only", False), ("cap_drop", []),
+                        ("security_opt", [])]:
+        config = topology()
+        config["services"]["api"][part] = value
+        assert evaluate(config)["topology"] == "DENIED"
+    config = topology()
+    config["networks"]["isolated_demo"]["internal"] = False
+    assert evaluate(config)["topology"] == "DENIED"
+
+
+def test_cli_outputs_only_fixed_codes_without_raw_input(capsys):
+    config = topology()
+    config["sensitive_unexpected_key"] = "UNSAFE_VALUE_DO_NOT_ECHO"
+    with patch("sys.stdin", StringIO(json.dumps(config))):
+        assert main(["--stdin"]) == 0
+    output = capsys.readouterr().out
+    assert "UNSAFE_VALUE_DO_NOT_ECHO" not in output
+    assert "OMEGA_NETWORK_HOST_ACCEPTANCE=BLOCKED_NOT_ACCEPTED" in output
+    with patch("sys.stdin", StringIO("{invalid }")):
+        assert main(["--stdin"]) == 2
