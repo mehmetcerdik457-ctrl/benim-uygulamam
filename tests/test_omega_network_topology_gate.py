@@ -15,6 +15,7 @@ def topology():
                         "security_opt": ["no-new-privileges:true"],
                         },
                 "ingress": {"networks": ["isolated_demo", "loopback_ingress"],
+                            "user": "101:101",
                             "read_only": True, "cap_drop": ["ALL"],
                             "security_opt": ["no-new-privileges:true"],
                             "volumes": ["./omega_mvi/ingress/nginx.conf:/etc/nginx/nginx.conf:ro"],
@@ -70,6 +71,15 @@ def test_missing_hardening_or_external_network_never_passes():
         assert evaluate(config)["topology"] == "DENIED"
     config = topology()
     config["networks"]["isolated_demo"]["internal"] = False
+    assert evaluate(config)["topology"] == "DENIED"
+
+
+def test_ingress_cannot_regress_to_privileged_user():
+    config = topology()
+    config["services"]["ingress"]["user"] = "0:0"
+    assert evaluate(config)["topology"] == "DENIED"
+    config = topology()
+    del config["services"]["ingress"]["user"]
     assert evaluate(config)["topology"] == "DENIED"
 
 
