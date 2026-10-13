@@ -2,3 +2,4 @@
 pytest==8.4.1
 httpx==0.28.1
 PyYAML==6.0.2
+cryptography==46.0.4  # AES-GCM synthetic backup test dependency only

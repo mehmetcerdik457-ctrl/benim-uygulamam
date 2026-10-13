@@ -1,0 +1,54 @@
+name: OMEGA Chat 8 isolated PostgreSQL contract
+
+on:
+  pull_request:
+    paths:
+      - 'omega_mvi/orchestration/**'
+      - 'omega_mvi/tests/test_orchestration_*.py'
+      - '.github/workflows/omega-orchestration-db.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  orchestration-db:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact commit without retained credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Create disposable credentials and marker (never disclose values)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pw="$(openssl rand -hex 18)"
+          marker="$(openssl rand -hex 16)"
+          runtime_pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "::add-mask::$marker"
+          echo "::add-mask::$runtime_pw"
+          {
+            echo "OMEGA_DEV_DB_PASSWORD=$pw"
+            echo "OMEGA_TEST_DB_SENTINEL=$marker"
+            echo "OMEGA_TEST_RUNTIME_PASSWORD=$runtime_pw"
+          } >> "$GITHUB_ENV"
+      - name: Validate isolated Docker Compose contract
+        run: docker compose -f compose.omega.yml config -q
+      - name: Start only disposable PostgreSQL
+        run: docker compose -f compose.omega.yml up -d --wait --wait-timeout 120 db
+      - name: Create independent database sentinel
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1), marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1,'${OMEGA_TEST_DB_SENTINEL}');"
+      - name: Run new DB contract test explicitly; skipping is forbidden
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -f compose.omega.yml --profile integration run --build --rm tests python -m pytest -q -rs tests/test_orchestration_db_contract.py
+      - name: Destroy temporary database, network and containers
+        if: always()
+        run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans

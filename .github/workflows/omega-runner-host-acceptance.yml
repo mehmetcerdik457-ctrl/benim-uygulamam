@@ -3,8 +3,15 @@ on:
   pull_request:
     paths:
       - 'compose.omega.yml'
+      - 'omega_mvi/ingress/**'
       - 'scripts/omega_probe_runner_loopback.py'
       - 'scripts/omega_runner_host_diagnostic.py'
+      - 'scripts/omega_runner_host_port_audit.py'
+      - 'scripts/omega_runner_host_direct_route.py'
+      - 'scripts/omega_ci_ephemeral_loopback_relay.py'
+      - 'tests/test_omega_ci_ephemeral_loopback_relay.py'
+      - 'tests/test_omega_runner_host_direct_route.py'
+      - 'tests/test_omega_runner_host_port_audit.py'
       - 'tests/test_omega_runner_host_diagnostic.py'
       - '.github/workflows/omega-runner-host-acceptance.yml'
 permissions:
@@ -19,17 +26,119 @@ jobs:
           persist-credentials: false
       - name: Confirm network and publish config without printing credentials
         run: |
-          python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8000' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
+          python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8080' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
+      - name: Reject unreviewed Nginx ingress configuration changes
+        run: python3 scripts/omega_ingress_config_gate.py
       - name: Generate disposable database password only for this isolated job
         run: |
           pw="$(openssl rand -hex 18)"
           echo "::add-mask::$pw"
           echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+      - name: Confirm rendered Compose isolation separately from live connectivity
+        run: |
+          set -euo pipefail
+          docker compose --profile integration -f compose.omega.yml config --format json | python3 scripts/omega_network_topology_gate.py --stdin
+      - name: Test positive and negative Docker port audit outcomes (synthetic)
+        run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v
+      - name: Test direct host-to-internal route classifications (synthetic)
+        run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
+      - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
+        run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
-        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api ingress
+      - name: Classify isolated ingress startup failure without leaking logs
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cid="$(docker compose -f compose.omega.yml ps -aq ingress 2>/dev/null || true)"
+          if [ -z "$cid" ]; then
+            echo "OMEGA_INGRESS_STARTUP_DIAG=NO_DISPOSABLE_CONTAINER"
+          else
+            docker logs "$cid" 2>&1 | python3 -c '
+          import sys
+          raw = sys.stdin.read(16384).lower()
+          checks = (
+              ("HOSTNAME_RESOLUTION", "host not found in upstream"),
+              ("NGINX_CONFIGURATION", "nginx: configuration file"),
+              ("FILE_PERMISSION", "permission denied"),
+              ("MISSING_FILESYSTEM", "no such file or directory"),
+              ("BIND_LISTENER", "bind() to"),
+              ("UNSUPPORTED_DIRECTIVE", "unknown directive"),
+              ("UPSTREAM_FAILURE", "connect() failed"),
+          )
+          category = next((label for label, match in checks if match in raw), "UNCLASSIFIED")
+          print("OMEGA_INGRESS_STARTUP_DIAG=" + category)
+          '
+          fi
+      - name: Classify disposable ingress crash without exposing container logs
+        if: failure()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          try:
+              p = subprocess.run(
+                  ['docker','compose','-f','compose.omega.yml','logs','--no-color','--tail','45','ingress'],
+                  capture_output=True, text=True, check=False, timeout=10)
+              data = (p.stdout + p.stderr)[-16000:].lower()
+          except (OSError, subprocess.TimeoutExpired):
+              data = ''
+          # Only fixed codes leave the ephemeral runner: never echo logs, names or errors.
+          fatal = next((line for line in data.splitlines()
+                        if '[emerg]' in line or '[alert]' in line), '')
+          if 'host not found in upstream' in fatal or 'no resolver defined' in fatal:
+              code = 'NGINX_FATAL_DNS'
+          elif 'read-only file system' in fatal and 'mkdir(' in fatal:
+              code = 'NGINX_FATAL_TEMP_DIRECTORY_READ_ONLY'
+          elif 'read-only file system' in fatal and 'open(' in fatal:
+              code = 'NGINX_FATAL_FILE_READ_ONLY'
+          elif 'permission denied' in fatal or 'operation not permitted' in fatal:
+              code = 'NGINX_FATAL_PERMISSION'
+          elif 'unknown directive' in fatal or 'invalid number of arguments' in fatal:
+              code = 'NGINX_FATAL_SYNTAX'
+          elif fatal:
+              code = 'NGINX_FATAL_UNCLASSIFIED'
+          elif 'read-only file system' in data:
+              code = 'ENTRYPOINT_READ_ONLY_WARNING_NO_NGINX_FATAL'
+          elif not data:
+              code = 'INGRESS_LOG_UNAVAILABLE'
+          else:
+              code = 'INGRESS_CAUSE_UNCLASSIFIED'
+          print('OMEGA_CI_INGRESS_FATAL=' + code)
+          if fatal:
+              operation = next((name for name in (
+                  'setgid(', 'setuid(', 'setgroups(', 'mkdir(', 'open(',
+                  'bind(', 'chown(', 'socket(', 'getpwnam(', 'chmod(')
+                  if name in fatal), 'OTHER')
+              location = next((code for path, code in (
+                  ('/dev/stderr', 'STDERR'), ('/var/cache', 'CACHE'),
+                  ('/var/run', 'RUN'), ('/tmp/', 'TEMP'),
+                  ('/etc/nginx', 'CONFIG'), ('/var/lib', 'LIBRARY'))
+                  if path in fatal), 'OTHER')
+              print('OMEGA_CI_INGRESS_OPERATION=' + operation.upper().replace('(', ''))
+              print('OMEGA_CI_INGRESS_LOCATION=' + location)
+          print('OMEGA_CI_INGRESS_LOG_BYTES=' + str(len(data)))
+          PY
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
+      - name: Probe host-to-internal-container HTTP without network changes
+        run: python3 scripts/omega_runner_host_direct_route.py
+      - name: CI-only relay fallback only when native runner-host is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 scripts/omega_runner_host_port_audit.py >/dev/null 2>&1 &&
+             python3 scripts/omega_runner_host_diagnostic.py --require-runner-host >/dev/null 2>&1; then
+            echo "OMEGA_CI_RELAY=NOT_REQUIRED_NATIVE_RUNNER_HOST_ACCEPTED"
+          else
+            python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
+          fi
+      - name: Enforce requested versus EFFECTIVE Docker host port mapping
+        if: success() || failure()
+        run: python3 scripts/omega_runner_host_port_audit.py
       - name: Enforce independent runner-host connectivity acceptance
+        if: success() || failure()
         run: python3 scripts/omega_runner_host_diagnostic.py --require-runner-host
       - name: Clean up ONLY containers and temporary volumes made in this CI runner
         if: always()
