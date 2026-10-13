@@ -25,7 +25,39 @@ def fixture(v4=False, v6=False, rc=0):
     return runner
 
 
+def embedded_ipv6_parser():
+    # Exercise the exact pure helper used inside docker compose exec,
+    # without looking at CI host routes.
+    definitions = g._CONTAINER_PROBE.split("print(json.dumps", 1)[0]
+    namespace = {}
+    exec(definitions, namespace)
+    return namespace["classify_ipv6_default"]
+
+
+def ipv6_row(*, dest=None, prefix="00", flags="00000003", interface="eth0"):
+    return " ".join((dest if dest is not None else "0"*32, prefix,
+                     "0"*32, "00", "0"*32,
+                     "00000000", "00000000", "00000000",
+                     flags, interface))
+
+
 class EgressRouteTests(unittest.TestCase):
+    def test_rejecting_ipv6_loopback_default_is_not_usable_egress(self):
+        parse = embedded_ipv6_parser()
+        self.assertIs(parse([ipv6_row(flags="00200200", interface="lo")]), False)
+
+    def test_real_interface_ipv6_default_is_unsafe(self):
+        parse = embedded_ipv6_parser()
+        self.assertIs(parse([ipv6_row(flags="00000003", interface="eth0")]), True)
+
+    def test_unknown_loopback_ipv6_default_stays_unverified(self):
+        parse = embedded_ipv6_parser()
+        self.assertIsNone(parse([ipv6_row(flags="00000003", interface="lo")]))
+
+    def test_malformed_ipv6_route_stays_unverified(self):
+        parse = embedded_ipv6_parser()
+        self.assertIsNone(parse(["bad route row"]))
+
     def test_no_routes_is_only_narrow_pass(self):
         self.assertEqual(g.audit(fixture()), {
             "ipv4": "ABSENT", "ipv6": "ABSENT",
