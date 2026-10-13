@@ -49,12 +49,14 @@ def evaluate(config: object) -> dict[str, str | bool]:
     networks = config.get("networks")
     if not isinstance(services, dict) or not isinstance(networks, dict):
         return {**base, "cause": "RENDERED_SERVICE_OR_NETWORK_SECTION_MISSING"}
-    if not {"api", "db", "tests"}.issubset(services):
+    if not {"api", "db"}.issubset(services) or not set(services).issubset({"api", "db", "tests"}):
         return {**base, "cause": "REQUIRED_SERVICE_MISSING"}
     isolated = networks.get("isolated_demo")
     if not isinstance(isolated, dict) or isolated.get("internal") is not True:
         return {**base, "cause": "INTERNAL_NETWORK_REQUIRED"}
     for name in ("api", "db", "tests"):
+        if name not in services:
+            continue  # Compose excludes inactive integration profiles.
         service = services[name]
         if _networks(service) != {"isolated_demo"}:
             return {**base, "cause": "UNEXPECTED_NETWORK_ATTACHMENT"}

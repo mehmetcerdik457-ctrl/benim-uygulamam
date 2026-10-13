@@ -78,3 +78,11 @@ def test_cli_outputs_only_fixed_codes_without_raw_input(capsys):
     assert "OMEGA_NETWORK_HOST_ACCEPTANCE=BLOCKED_NOT_ACCEPTED" in output
     with patch("sys.stdin", StringIO("{invalid }")):
         assert main(["--stdin"]) == 2
+
+
+def test_inactive_integration_profile_is_optional_but_extra_service_denied():
+    config = topology()
+    del config["services"]["tests"]
+    assert evaluate(config)["topology"] == "PASS_INTERNAL_AND_LOOPBACK_REQUEST_ONLY"
+    config["services"]["unsafe-extra"] = {"networks": ["isolated_demo"]}
+    assert evaluate(config)["topology"] == "DENIED"
