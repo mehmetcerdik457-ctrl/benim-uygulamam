@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'compose.omega.yml'
+      - 'omega_mvi/ingress/**'
       - 'scripts/omega_probe_runner_loopback.py'
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
@@ -25,7 +26,7 @@ jobs:
           persist-credentials: false
       - name: Confirm network and publish config without printing credentials
         run: |
-          python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8000' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
+          python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8080' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
       - name: Generate disposable database password only for this isolated job
         run: |
           pw="$(openssl rand -hex 18)"
@@ -42,7 +43,7 @@ jobs:
       - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
-        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api ingress
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
