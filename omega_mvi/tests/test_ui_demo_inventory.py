@@ -40,3 +40,36 @@ def test_actual_browser_script_validates_fixture_in_node_vm():
     cp=subprocess.run([node,"--test",str(script)],capture_output=True,text=True,
                       check=False,timeout=30)
     assert cp.returncode==0,cp.stdout+cp.stderr
+
+
+def test_fastapi_inventory_fixture_is_fixed_and_never_owner_authorized():
+    """Read actual FastAPI demo response, not just a mocked browser payload."""
+    import sys
+    from fastapi.testclient import TestClient
+    sys.path.insert(0, str(ROOT))
+    from app.main import app
+
+    client=TestClient(app)
+    clean=client.get("/api/demo/inspection")
+    assert clean.status_code==200
+    body=clean.json()
+    assert body["mode"]=="synthetic_offline_only"
+    assert body["authority"]=="none"
+    assert body["production_ready"] is False
+    assert body["repository"]=={
+        "repository":"mehmetcerdik457-ctrl/benim-uygulamam",
+        "name":"benim-uygulamam",
+        "visibility":"public",
+        "description":"Synthetic offline repository fixture",
+        "counts":{"stars":0,"forks":0,"watchers":0,"open_issues":0},
+    }
+    for forbidden in ("owner_id","token","credential","secret","password","private"):
+        assert forbidden not in body["repository"]
+    assert clean.headers.get("access-control-allow-origin") is None
+    forged=client.get("/api/demo/inspection",headers={
+        "X-Owner":"synthetic-superuser",
+        "X-Role":"admin",
+        "Authorization":"Bearer synthetic-test-not-real",
+    })
+    assert forged.status_code==200
+    assert forged.json()==body  # The fixture cannot become real data via headers.
