@@ -210,6 +210,9 @@ class ModelRouter:
             ))
             for profile, backend, semaphore, prompt_tokens in eligible:
                 for attempt in range(profile.max_retries + 1):
+                    if self._quarantined:
+                        raise InferenceFailed("local model router quarantined")
+
                     remaining = min(profile.timeout_ms / 1000, deadline - time.monotonic())
                     attempt_deadline = time.monotonic() + remaining
                     if remaining <= 0:
@@ -218,6 +221,10 @@ class ModelRouter:
                     async def once() -> Completion:
                         async with self._global_semaphore:
                             async with semaphore:
+                                # Another already-admitted call may have quarantined
+                                # the router while this request was waiting.
+                                if self._quarantined:
+                                    raise InferenceFailed("local model router quarantined")
                                 return await backend.generate(request, max_output_tokens=request.max_output_tokens)
 
                     try:
