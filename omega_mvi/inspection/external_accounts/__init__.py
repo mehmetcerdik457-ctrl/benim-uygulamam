@@ -7,6 +7,8 @@ from collections import Counter
 import re
 from urllib.parse import parse_qs, urlparse
 
+from omega_mvi.inspection.redaction import redact_text
+
 
 class InventoryDenied(ValueError):
     """Unapproved resource or unsafe provider response."""
@@ -16,7 +18,25 @@ class InventoryIncomplete(RuntimeError):
     """Do not report a partial result as a complete inventory."""
 
 
-_REPOSITORY = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\Z")
+_OWNER = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\Z")
+_REPO_SLUG = re.compile(r"[A-Za-z0-9_.-]{1,100}\Z")
+
+
+def _safe_repository(name):
+    """Canonical GitHub owner/repo only; never interpolate untrusted paths."""
+    if type(name) is not str or len(name) > 140:
+        return False
+    parts = name.split("/")
+    return (len(parts) == 2 and bool(_OWNER.fullmatch(parts[0]))
+            and bool(_REPO_SLUG.fullmatch(parts[1]))
+            and parts[1] not in (".", "..")
+            and redact_text(name) == name)
+
+
+def _safe_branch(name):
+    return (type(name) is str and len(name) <= 200
+            and bool(_BRANCH.fullmatch(name))
+            and ".." not in name and redact_text(name) == name)
 _RESOURCE = {"branches", "forks"}
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9_./-]{0,199}\Z")
 _MIME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*/[A-Za-z0-9][A-Za-z0-9.+-]*\Z")
@@ -61,10 +81,10 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
     On 403/429, missing pagination certainty, or a page limit: fail closed.
     A connector that hides headers cannot prove API quota; no quota claim made.
     """
-    if (not isinstance(repository, str) or
-            not _REPOSITORY.fullmatch(repository) or
+    if (not _safe_repository(repository) or
             type(approved_repositories) not in (list, tuple, set, frozenset) or
-            repository not in approved_repositories or resource not in _RESOURCE):
+            repository not in approved_repositories or
+            type(resource) is not str or resource not in _RESOURCE):
         raise InventoryDenied("GitHub resource not explicitly approved")
     if type(max_pages) is not int or not 1 <= max_pages <= 50:
         raise InventoryDenied("Invalid page ceiling")
@@ -96,10 +116,15 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
             if type(name) is not str:
                 raise InventoryIncomplete("Missing item name")
             if resource == "branches":
-                if not _BRANCH.fullmatch(name) or ".." in name:
-                    raise InventoryIncomplete("Unsafe branch name")
-            elif not _REPOSITORY.fullmatch(name):
-                raise InventoryIncomplete("Unsafe fork name")
+                if not _safe_branch(name):
+                    raise InventoryIncomplete("Unsafe or sensitive branch name")
+            else:
+                # A public source repository does NOT authorize private fork
+                # disclosure. Require explicit provider public visibility.
+                if not _safe_repository(name):
+                    raise InventoryIncomplete("Unsafe or sensitive fork name")
+                if item.get("private") is not False or item.get("visibility") != "public":
+                    raise InventoryIncomplete("Fork public visibility not proven")
             if name in seen_names:
                 raise InventoryIncomplete("Repeated inventory name across pages")
             seen_names.add(name)
@@ -145,7 +170,8 @@ def drive_metadata_only(pages, *, approved_folder_ids, folder_id):
             ident, mime = item.get("id"), item.get("mime_type")
             if (type(ident) is not str or not 1 <= len(ident) <= 200
                     or not re.fullmatch(r"[A-Za-z0-9_-]+", ident)
-                    or type(mime) is not str or not _MIME.fullmatch(mime)):
+                    or type(mime) is not str or len(mime) > 255
+                    or not _MIME.fullmatch(mime)):
                 raise InventoryIncomplete("Invalid Drive metadata")
             if ident in seen_ids:
                 raise InventoryIncomplete("Repeated Drive file ID")
