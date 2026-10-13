@@ -32,6 +32,10 @@ services:
 
   ingress:
     image: nginx:1.27-alpine
+    # Custom configuration is mounted read-only. Skip image entrypoint scripts
+    # that try to rewrite /etc on a deliberately read-only container rootfs.
+    entrypoint: ["nginx"]
+    command: ["-g", "daemon off;"]
     volumes:
       - ./omega_mvi/ingress/nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
