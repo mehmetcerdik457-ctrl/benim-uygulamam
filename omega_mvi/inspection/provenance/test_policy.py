@@ -14,7 +14,6 @@ EMPTY = hashlib.sha256(b"").hexdigest()
 def record(*, name="safe.txt", owner="owner:test", level="internal", retention=7,
            revision="v1", mtime=100, mode=0o600, uid=1, gid=1, data=b"synthetic-only",
            acl=EMPTY, xattr=EMPTY, verified="2026-10-12T08:00:00Z"):
-    data = b"synthetic-only"
     return make_fixture_record(
         source_ref="synthetic://fixture", relative_path=name,
         source_version=revision, data=data, owner_ref=owner,
