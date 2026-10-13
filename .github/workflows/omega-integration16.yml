@@ -42,7 +42,8 @@ jobs:
       - name: Verify reproducible direct-only CycloneDX manifest without network
         run: |
           python scripts/omega_direct_sbom.py
-          PYTHONPATH=. python -m pytest -q tests/test_omega_direct_sbom.py
+          # Negative manifest tests run in the full pytest stage below after
+          # installing the pinned test requirements.
       - name: Combined complete offline regressions
         env:
           PYTHONPATH: .:omega_mvi
