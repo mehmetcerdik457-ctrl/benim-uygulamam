@@ -106,7 +106,7 @@ class DirectRouteTests(unittest.TestCase):
 
     def test_public_subnet_containing_private_ip_is_rejected(self):
         self.assertEqual(
-            d.diagnose(runner=fake_docker(subnet="0.0.0.0/1"))["scope"],
+            d.diagnose(runner=fake_docker(subnet="128.0.0.0/1"))["scope"],
             "NETWORK_SCOPE_UNSAFE")
 
     def test_non_object_health_json_is_denied(self):
