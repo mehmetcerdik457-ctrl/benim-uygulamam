@@ -81,7 +81,11 @@ class OfflineLeaseRegistry:
 
     def check(self, lease: LeaseMetadata, action: str, now: datetime) -> bool:
         _utc(now)
-        stored = self._leases.get(getattr(lease, "reference", None))
+        # Do not let a duck-typed object override equality to impersonate
+        # an issued fixture lease. This is not real token authentication.
+        if type(lease) is not LeaseMetadata:
+            raise SecurityDenied("UNKNOWN_LEASE")
+        stored = self._leases.get(lease.reference)
         if stored is None or stored != lease:
             raise SecurityDenied("UNKNOWN_LEASE")
         if (lease.expires_at <= now or lease.device in self._revoked_devices
