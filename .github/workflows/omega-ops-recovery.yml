@@ -11,6 +11,8 @@ on:
       - 'tests/test_omega_ops_release_gate.py'
       - 'scripts/omega_ops_metrics_contract.py'
       - 'tests/test_omega_ops_metrics_contract.py'
+      - 'scripts/omega_ops_sbom.py'
+      - 'tests/test_omega_ops_sbom.py'
       - 'docs/OMEGA_OPERATIONS_RECOVERY_EVIDENCE.md'
       - '.github/workflows/omega-ops-recovery.yml'
 
@@ -49,6 +51,31 @@ jobs:
           python3 scripts/omega_ops_metrics_contract.py
       - name: Bounded source pins and supply chain NOTRUN inventory
         run: python3 scripts/omega_ops_source_inventory.py
+      - name: Generate bounded Python venv SBOM if disk is adequate
+        id: python_sbom
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          free_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR==2 {print $4}')"
+          if [[ ! "$free_kib" =~ ^[0-9]+$ || "$free_kib" -lt 2097152 ]]; then
+            echo "OMEGA_PYTHON_VENV_SBOM=NOTRUN_INSUFFICIENT_DISK"
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 -m venv "$RUNNER_TEMP/omega-sbom-venv"
+          "$RUNNER_TEMP/omega-sbom-venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir --quiet -r omega_mvi/requirements-test.txt
+          OMEGA_SBOM_CI_SCOPE=disposable-venv "$RUNNER_TEMP/omega-sbom-venv/bin/python" scripts/omega_ops_sbom.py --sha "$EXPECTED_SHA" --output "$RUNNER_TEMP/omega-python-ci.cdx.json"
+          echo "generated=true" >> "$GITHUB_OUTPUT"
+      - name: Retain the sanitized Python venv SBOM for exact-SHA review
+        if: steps.python_sbom.outputs.generated == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: omega-python-ci-sbom-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/omega-python-ci.cdx.json
+          if-no-files-found: error
+          retention-days: 7
       - name: Create random throwaway marker and database password
         run: |
           pw="$(openssl rand -hex 18)"
