@@ -48,7 +48,7 @@ def test_030_device_loss_contains_one_device_and_retains_verifiable_audit(tablet
     assert result.anchor.sequence == 2
     assert ledger.verify(expected_anchor=result.anchor) == result.anchor
     ledger.close()
-    reopened = FixtureAuditLedger(directory, key)
+    reopened = FixtureAuditLedger(directory, key, expected_anchor=result.anchor)
     assert reopened.verify(expected_anchor=result.anchor) == result.anchor
     reopened.close()
     # Test finalizer only attempts to close already-closed connection.
