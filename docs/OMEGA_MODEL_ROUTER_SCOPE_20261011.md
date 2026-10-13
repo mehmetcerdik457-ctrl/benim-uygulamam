@@ -70,3 +70,18 @@ PYTHONPATH=. python -m pytest -q \
 
 ### Still NOT accepted
 No real Qwen3 measured latency/TTFT/tokens/s, model weights digest on owner machine, robust TR/EN/code quality, VRAM/RAM, multi-model failover or crash/OOM/cancellation worker cleanup evidence. The synchronous injected tokenizer itself must be verified as bounded (router event-loop deadline cannot interrupt a blocking synchronous tokenizer call). Existing `/api/chat` is disabled. Do **not** advance item 41/44/47/48/49/50 to DONE.
+
+## Third specialist audit — 2026-10-13: bounded cancellation / quarantine
+
+**Threat modeled:** Python `asyncio.wait_for` may remain blocked after its nominal deadline when an injected model coroutine catches/suppresses cancellation. The previous late-response validator detected a response arriving after timeout but did not guarantee that the caller would regain control within a bounded time.
+
+**New code** (no network/model/runtime modification):
+- `omega_mvi/model_adapter/runtime_guard.py` adds `bounded_inference`: explicit attempt deadline + bounded cancellation acknowledgement grace. A cooperative cancellation yields a retryable `TimeoutError`; an uncooperative task yields sanitized `BackendUnresponsive` after the grace period and signals quarantine. Parent cancellation is propagated with bounded cleanup.
+- `omega_mvi/model_adapter/router.py` calls this guard with configurable `cancel_grace_ms` (1–5000 ms, default 250 ms). The router becomes **permanently quarantined** on cancellation-integrity failure; future calls are refused. A rogue model's late response is not returned and automatic fallback is not attempted after quarantine.
+- `tests/test_omega_router_cancellation_guard.py` uses hostile **synthetic coroutines** that suppress cancellation, plus cooperative timeouts and parent cancellation tests. The underlying guard was first tested in an isolated Python environment: **6/6 unit tests passed**; the authoritative GitHub CI result must be checked on the final commit.
+
+**Unresolved and intentionally not overclaimed:**
+- A quarantined router does **not terminate** an uncooperative model process or reclaim GPU/VRAM. Production requires separate killable worker/service boundaries, process-level cancellation, bounded queue isolation and real crash/OOM/resume tests.
+- Synchronous `count_prompt_tokens` is injected by the backend and remains **unbounded if that backend blocks**. A real engine-specific exact tokenizer must be verified/isolated before production. Word-count fixtures are never real tokenization evidence.
+- The guard is per-router/per-event-loop, not cross-process distributed concurrency governance.
+- Owner's actual Qwen3 device, exact weight/license/hash and robust bilingual/code performance remain **NOT_TESTED**. PR stays DRAFT; no main merge, owner-local change, permission expansion or paid GPU/API.
