@@ -4,17 +4,38 @@
 <link rel="stylesheet" href="/assets/dashboard.css">
 <script src="/assets/dashboard.js" defer></script></head><body>
 <header><small>LOCAL-FIRST • READ ONLY • DENY BY DEFAULT</small><h1>PROJECT OMEGA</h1>
-<p>Türkçe güvenli müfettiş — doğrulanmamış üretim işlevleri kapalıdır.</p></header>
-<section><h2>Canlı sağlık denetimi</h2><p id="health" aria-live="polite">Yerel servisten durum okunuyor…</p>
-<button type="button" id="refresh">Yalnızca durumları yenile</button></section>
-<section><h2>Sentetik denetim modülleri</h2><p id="inspection" aria-live="polite">Denetim sonucu bekleniyor.</p><p id="sources" class="muted"></p></section>
-<section><h2>PostgreSQL salt-okunur görünüm</h2><p id="db-status" aria-live="polite">Durum denetleniyor.</p>
+<p data-i18n="intro">Türkçe güvenli müfettiş — doğrulanmamış üretim işlevleri kapalıdır.</p>
+<div class="toolbar" role="group" aria-label="Görünüm tercihleri" data-i18n-aria-label="preferencesLabel">
+<button type="button" id="lang-toggle" data-i18n="languageButton" aria-label="Switch language to English">English</button>
+<button type="button" id="theme-toggle" data-i18n="themeButton" aria-pressed="false">Açık temayı kullan</button>
+</div></header>
+<main id="main-content">
+<section><h2 data-i18n="healthTitle">Canlı sağlık denetimi</h2><p id="health" aria-live="polite">Yerel servisten durum okunuyor…</p>
+<button type="button" id="refresh" data-i18n="refreshButton">Yalnızca durumları yenile</button></section>
+<section><h2 data-i18n="inspectionTitle">Sentetik denetim modülleri</h2><p id="inspection" aria-live="polite">Denetim sonucu bekleniyor.</p><p id="sources" class="muted"></p></section>
+<section><h2 data-i18n="databaseTitle">PostgreSQL salt-okunur görünüm</h2><p id="db-status" aria-live="polite">Durum denetleniyor.</p>
 <ul id="states" class="state-list"></ul></section>
-<section><h2>Güvenlik sınırları</h2><div class="row"><div>
-<strong class="warn">Yürütme: KAPALI</strong><p>Gerçek kullanıcı kimliği ve tek kullanımlık onay yok.</p></div>
-<div><strong>Veri kaynakları: SİMÜLASYON</strong><p>GitHub, RAG ve yerel model gerçek hesaba bağlanmıyor.</p></div></div></section>
-<section><h2>MVI bileşenleri</h2><p>PostgreSQL kayıtları yalnızca geçici sentinelli CI veritabanında sınandı.</p>
-<p>İnsan onayı: varsayılan RET. Yerel model: deterministik sahte adaptör.</p>
-<p>Üretime hazırlık: <strong class="warn">KABUL EDİLMEDİ</strong></p></section>
-<small>Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.</small>
+<section><h2 data-i18n="securityTitle">Güvenlik sınırları</h2><div class="row"><div>
+<strong class="warn" data-i18n="executionDisabled">Yürütme: KAPALI</strong><p data-i18n="identityMissing">Gerçek kullanıcı kimliği ve tek kullanımlık onay yok.</p></div>
+<div><strong data-i18n="sourcesSynthetic">Veri kaynakları: SİMÜLASYON</strong><p data-i18n="sourcesUnlinked">GitHub, RAG ve yerel model gerçek hesaba bağlanmıyor.</p></div></div></section>
+<section><h2 data-i18n="mviTitle">MVI bileşenleri</h2><p data-i18n="mviDatabase">PostgreSQL kayıtları yalnızca geçici sentinelli CI veritabanında sınandı.</p>
+<p data-i18n="mviApproval">İnsan onayı: varsayılan RET. Yerel model: deterministik sahte adaptör.</p>
+<p data-i18n="productionNotAccepted">Üretime hazırlık: KABUL EDİLMEDİ</p></section>
+<section aria-labelledby="restricted-features-title">
+<h2 id="restricted-features-title" data-i18n="gatesTitle">Üretim ekranları — henüz kullanılamıyor</h2>
+<p data-i18n="gatesIntro">Kimlik ve kaynak yetkisi doğrulanmadığından aşağıdaki ekranlar gerçek veri göstermez.</p>
+<ul class="feature-list">
+<li><strong data-i18n="inventoryLabel">73 · Dijital envanter: KAPALI</strong>
+<p data-i18n="inventoryReason">Yetkili depo, klasör, servis ve veri kaynağı kaydı bağlanmadı.</p></li>
+<li><strong data-i18n="searchLabel">74 · Kaynaklı arama: KAPALI</strong>
+<p data-i18n="searchReason">Gerçek belge ACL, kaynak doğrulama ve silme denetimi yok.</p></li>
+<li><strong data-i18n="secretsLabel">77 · Secret referansları: KAPALI</strong>
+<p data-i18n="secretsReason">İzinli referans ve rotasyon metaverisi sunan güvenli uç yok; gizli değerler gösterilmez.</p></li>
+<li><strong data-i18n="prLabel">78 · PR denetimi: KAPALI</strong>
+<p data-i18n="prReason">Gerçek SHA'ya bağlı test, inceleme ve politika kararları doğrulanmadı.</p></li>
+<li><strong data-i18n="authLabel">79 · Kimlik ve oturum: KAPALI</strong>
+<p data-i18n="authReason">Gerçek IdP, MFA, RBAC veya doğrulanmış kullanıcı oturumu bulunmuyor.</p></li>
+</ul></section>
+</main>
+<footer><small data-i18n="footerNotice">Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.</small></footer>
 </body></html>
