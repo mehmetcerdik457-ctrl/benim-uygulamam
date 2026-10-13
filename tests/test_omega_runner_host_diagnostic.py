@@ -35,15 +35,15 @@ class Result:
 def runner_factory(*, address="127.0.0.1", internal=True, inside="OK"):
     def fake(args, **kwargs):
         cmd = " ".join(args[:3])
-        if args[-3:] == ["ps", "-q", "api"]:
+        if args[-3:] == ["ps", "-q", "ingress"]:
             return Result("synthetic-container-id")
         if args[:3] == ["docker", "inspect", "--format"]:
             if "Ports" in args[3]:
-                return Result(json.dumps({"8000/tcp": [
+                return Result(json.dumps({"8080/tcp": [
                     {"HostIp": address, "HostPort": "18080"}]}))
-            return Result(json.dumps({"omega-mvi-demo_isolated_demo": {}}))
+            return Result(json.dumps({"omega-mvi-demo_isolated_demo": {}, "omega-mvi-demo_loopback_ingress": {}}))
         if args[:3] == ["docker", "network", "inspect"]:
-            return Result("true" if internal else "false")
+            return Result("true" if (internal and args[-1].endswith("_isolated_demo")) else "false")
         if args[:5] == ["docker", "compose", "-f", "compose.omega.yml", "exec"]:
             return Result(inside)
         return Result("", rc=1)
@@ -63,7 +63,7 @@ def refused(*args, **kwargs):
 def test_internal_network_and_declared_loopback_can_still_be_refused():
     report = h.diagnose(runner=runner_factory(), connector=refused)
     assert report == {
-        "binding": "LOOPBACK_ONLY", "network": "INTERNAL",
+        "binding": "LOOPBACK_ONLY", "network": "SEGMENTED_INGRESS",
         "container": "PASS", "tcp": "REFUSED",
         "http": "BLOCKED", "verdict": "BLOCKED_NOT_ACCEPTED",
         "cause": "TCP_CONNECTION_REFUSED_ROOT_CAUSE_UNKNOWN",
@@ -76,7 +76,7 @@ def test_runner_only_success_requires_all_evidence_and_denied_execute():
                         opener=denied_opener)
     assert report["verdict"] == "PASS_RUNNER_ONLY_NOT_OWNER"
     assert report["http"] == "PASS"
-    assert report["network"] == "INTERNAL"
+    assert report["network"] == "SEGMENTED_INGRESS"
 
 
 def test_no_unrestricted_host_binding_is_accepted():
@@ -117,10 +117,10 @@ def test_effective_docker_port_mapping_missing_is_specific_blocker():
     normal = runner_factory()
     def no_binding(args, **kwargs):
         if args[:3] == ["docker", "inspect", "--format"] and "Ports" in args[3]:
-            return Result(json.dumps({"8000/tcp": None}))
+            return Result(json.dumps({"8080/tcp": None}))
         return normal(args, **kwargs)
     report = h.diagnose(runner=no_binding, connector=refused)
-    assert report["network"] == "INTERNAL"
+    assert report["network"] == "SEGMENTED_INGRESS"
     assert report["binding"] == "MISSING"
     assert report["tcp"] == "REFUSED"
     assert report["cause"] == "HOST_PORT_MAPPING_MISSING_UPSTREAM_CAUSE_UNKNOWN"
