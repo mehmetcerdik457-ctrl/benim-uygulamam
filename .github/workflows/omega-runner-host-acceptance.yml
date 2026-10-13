@@ -122,8 +122,16 @@ jobs:
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
         run: python3 scripts/omega_runner_host_direct_route.py
-      - name: Prove temporary CI-only localhost relay and stop before acceptance
-        run: python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
+      - name: CI-only relay fallback only when native runner-host is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if python3 scripts/omega_runner_host_port_audit.py >/dev/null 2>&1 &&
+             python3 scripts/omega_runner_host_diagnostic.py --require-runner-host >/dev/null 2>&1; then
+            echo "OMEGA_CI_RELAY=NOT_REQUIRED_NATIVE_RUNNER_HOST_ACCEPTED"
+          else
+            python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
+          fi
       - name: Enforce requested versus EFFECTIVE Docker host port mapping
         if: success() || failure()
         run: python3 scripts/omega_runner_host_port_audit.py
