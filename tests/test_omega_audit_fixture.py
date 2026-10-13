@@ -34,7 +34,9 @@ def test_025_synthetic_audit_persists_and_anchor_verifies_after_reopen(marked_fo
 
     db = marked_folder / DB_NAME
     assert db.exists() and db.stat().st_mode & 0o077 == 0
-    reopened = FixtureAuditLedger(marked_folder, key)
+    with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
+        FixtureAuditLedger(marked_folder, key)  # witness is mandatory on reopen
+    reopened = FixtureAuditLedger(marked_folder, key, expected_anchor=a2)
     assert reopened.verify(expected_anchor=a2) == a2
     assert reopened.verify(expected_anchor=a1) == a2
     rows = reopened._db.execute("SELECT * FROM audit_events").fetchall()
@@ -84,7 +86,7 @@ def test_025_mac_detects_privileged_db_tampering(marked_folder):
     db.commit()
     db.close()
     with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
-        FixtureAuditLedger(marked_folder, key)
+        FixtureAuditLedger(marked_folder, key, expected_anchor=anchor)
     # An attacker with privileged DB access can remove triggers; the external
     # HMAC key and witness anchor must remain outside that DB.
 
@@ -102,11 +104,10 @@ def test_025_external_anchor_detects_complete_tail_truncation(marked_folder):
                   BEGIN SELECT RAISE(ABORT,'IMMUTABLE_AUDIT'); END;""")
     db.commit()
     db.close()
-    ledger = FixtureAuditLedger(marked_folder, key)
-    assert ledger.verify().sequence == 1  # chain alone CANNOT detect truncation!
-    with pytest.raises(SecurityDenied, match="AUDIT_EXTERNAL_ANCHOR_MISMATCH"):
-        ledger.verify(expected_anchor=anchor)
-    ledger.close()
+    with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
+        FixtureAuditLedger(marked_folder, key, expected_anchor=anchor)
+    with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
+        FixtureAuditLedger(marked_folder, key)  # refusing missing witness avoids silent truncation
 
 
 def test_025_wrong_key_or_wrong_anchor_fails_closed(marked_folder):
