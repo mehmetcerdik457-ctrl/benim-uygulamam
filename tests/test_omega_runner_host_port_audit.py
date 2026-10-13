@@ -79,6 +79,19 @@ class PortAuditTests(unittest.TestCase):
     def test_noninternal_network_is_unsafe_even_if_mapping_works(self):
         self.assertEqual(audit.audit(runner(internal=False))["verdict"], "UNSAFE")
 
+    def test_multiple_internal_network_attachments_are_not_accepted(self):
+        original = audit._json
+
+        def two_networks(args, fake_runner):
+            if "NetworkSettings.Networks" in str(args):
+                return {"isolated-network": {}, "unexpected-internal": {}}
+            return original(args, fake_runner)
+
+        with patch.object(audit, "_json", side_effect=two_networks):
+            result = audit.audit(runner())
+        self.assertEqual(result["network"], "UNVERIFIED")
+        self.assertEqual(result["verdict"], "BLOCKED_NOT_ACCEPTED")
+
     def test_unexpected_additional_publication_is_unsafe(self):
         self.assertEqual(audit.audit(runner(extra_port=True))["verdict"], "UNSAFE")
 
