@@ -445,3 +445,61 @@ def test_oversize_mime_metadata_is_not_accepted():
         drive_metadata_only([{"complete": True, "files": [fake]}],
                             approved_folder_ids={"approved"},
                             folder_id="approved")
+
+
+def test_github_mixed_case_link_header_is_not_lost():
+    second = f"https://api.github.com/repos/{REPO}/branches?per_page=100&page=2"
+    urls = []
+    def fetch(url):
+        urls.append(url)
+        if len(urls) == 1:
+            return {"status": 200, "headers": {
+                "LiNk": f'<{second}>; rel="next"'},
+                "items": [{"name": "main"}]}
+        return {"status": 200, "headers": {}, "items": [{"name": "test"}]}
+    result = github_metadata_pages(fetch, REPO, {REPO}, "branches")
+    assert result["pages"] == 2
+    assert urls[-1] == second
+    assert result["names"] == ("main", "test")
+
+
+def test_github_mixed_case_zero_quota_is_not_ignored():
+    def fetch(_):
+        return {"status": 200, "headers": {"X-RaTeLiMiT-ReMaInInG": "00"},
+                "items": [{"name": "main"}]}
+    with pytest.raises(InventoryIncomplete, match="rate limit exhausted"):
+        github_metadata_pages(fetch, REPO, {REPO}, "branches")
+
+
+@pytest.mark.parametrize("header", (
+    {"LINK": "garbage; rel='next'"},
+    {"link": "garbage; rel=next"},
+    {"link": ["untrusted-nontext-header"]},
+    {"link": 'https://api.github.com/anything; rel="next"'},
+    {"LiNk": "x", "link": "y"},
+))
+def test_ambiguous_or_noncanonical_link_is_not_silent_success(header):
+    def fetch(_):
+        return {"status": 200, "headers": header,
+                "items": [{"name": "main"}]}
+    with pytest.raises((InventoryDenied, InventoryIncomplete)):
+        github_metadata_pages(fetch, REPO, {REPO}, "branches")
+
+
+@pytest.mark.parametrize("bad_quota", ("NaN", "-1", "", " " * 2, 0, True))
+def test_invalid_quota_header_fails_closed(bad_quota):
+    def fetch(_):
+        return {"status": 200, "headers": {"x-ratelimit-remaining": bad_quota},
+                "items": [{"name": "main"}]}
+    with pytest.raises(InventoryIncomplete, match="rate limit"):
+        github_metadata_pages(fetch, REPO, {REPO}, "branches")
+
+
+def test_ambiguous_quota_case_variations_fails_closed():
+    def fetch(_):
+        return {"status": 200, "headers": {
+            "X-RateLimit-Remaining": "1",
+            "x-ratelimit-remaining": "0"},
+            "items": [{"name": "main"}]}
+    with pytest.raises(InventoryIncomplete, match="Ambiguous"):
+        github_metadata_pages(fetch, REPO, {REPO}, "branches")
