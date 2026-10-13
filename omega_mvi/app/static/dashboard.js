@@ -16,6 +16,15 @@ const messages={
     footerNotice:"Dış CDN, üçüncü taraf betik, kullanıcı verisi veya bağlantı anahtarı yüklenmez.",
     gatesTitle:"Üretim ekranları — henüz kullanılamıyor",
     gatesIntro:"Kimlik ve kaynak yetkisi doğrulanmadığından aşağıdaki ekranlar gerçek veri göstermez.",
+    inventoryDemoTitle:"73 · Sentetik envanter örneği",
+    inventoryDemoNotice:"Yalnızca sabit, çevrimdışı test deposu; gerçek hesap veya klasörler taranmaz.",
+    inventoryFilterLabel:"Kaynak türüne göre filtrele",
+    inventoryTypeRepo:"Depolar",inventoryTypeFolder:"Klasörler",
+    inventoryTypeService:"Servisler",inventoryTypeData:"Veri kaynakları",
+    inventoryWaiting:"Sentetik depo verisi bekleniyor.",
+    inventoryNoData:"Bu tür için yetkili gerçek veri yok; sentetik öğe de bulunmuyor.",
+    inventoryUnavailable:"Sentetik envanter doğrulanamadı; hiçbir kaynak gösterilmez.",
+    inventoryDemoResult:(name,stars,forks)=>"SADECE SENTETİK: "+name+" | Yıldız: "+stars+" | Fork: "+forks,
     inventoryLabel:"73 · Dijital envanter: KAPALI",
     inventoryReason:"Yetkili depo, klasör, servis ve veri kaynağı kaydı bağlanmadı.",
     searchLabel:"74 · Kaynaklı arama: KAPALI",
@@ -47,6 +56,15 @@ const messages={
     footerNotice:"No external CDN, third-party script, personal data, or credential is loaded.",
     gatesTitle:"Production features — unavailable",
     gatesIntro:"Without verified identity and source permissions, these screens do not display real data.",
+    inventoryDemoTitle:"73 · Synthetic inventory sample",
+    inventoryDemoNotice:"Fixed offline test repository only; no real accounts or folders are scanned.",
+    inventoryFilterLabel:"Filter by source type",
+    inventoryTypeRepo:"Repositories",inventoryTypeFolder:"Folders",
+    inventoryTypeService:"Services",inventoryTypeData:"Data sources",
+    inventoryWaiting:"Waiting for synthetic repository data.",
+    inventoryNoData:"No authorized live data or synthetic entry for this source type.",
+    inventoryUnavailable:"Synthetic inventory could not be validated; no source is displayed.",
+    inventoryDemoResult:(name,stars,forks)=>"SYNTHETIC ONLY: "+name+" | Stars: "+stars+" | Forks: "+forks,
     inventoryLabel:"73 · Digital inventory: DISABLED",
     inventoryReason:"No authorized repository, folder, service, or data source integration.",
     searchLabel:"74 · Cited search: DISABLED",
@@ -95,6 +113,41 @@ async function json(path){
   if(!res.ok)throw Error("local_demo_unavailable");
   return await res.json();
 }
+// Fixture-only inventory renderer. Real inventory requires server-verified owner ACL/RBAC.
+let demoInventory=null;
+function validateFixtureInventory(value){
+  if(!value || typeof value!=="object" || Array.isArray(value))return null;
+  const expected=["counts","description","name","repository","visibility"].sort().join(",");
+  if(Object.keys(value).sort().join(",")!==expected ||
+     value.repository!=="mehmetcerdik457-ctrl/benim-uygulamam" ||
+     value.name!=="benim-uygulamam" || value.visibility!=="public" ||
+     value.description!=="Synthetic offline repository fixture")return null;
+  const counts=value.counts;
+  if(!counts || typeof counts!=="object" || Array.isArray(counts) ||
+     Object.keys(counts).sort().join(",")!=="forks,open_issues,stars,watchers" ||
+     Object.values(counts).some(n=>!Number.isSafeInteger(n)||n<0))return null;
+  return {repository:value.repository,stars:counts.stars,forks:counts.forks};
+}
+function renderInventory(){
+  const output=$("inventory-items");
+  if(!output)return;
+  output.replaceChildren();
+  const type=$("inventory-filter")?.value;
+  if(!["repository","folder","service","data_source"].includes(type)){
+    show("inventory-status",tr("inventoryUnavailable"));return;
+  }
+  if(!demoInventory){
+    show("inventory-status",tr("inventoryUnavailable"));return;
+  }
+  if(type!=="repository"){
+    show("inventory-status",tr("inventoryNoData"));return;
+  }
+  const li=document.createElement("li");
+  li.textContent=tr("inventoryDemoResult",demoInventory.repository,demoInventory.stars,demoInventory.forks);
+  output.appendChild(li);
+  show("inventory-status",tr("inventoryDemoNotice"));
+}
+
 let activeRefresh=0;
 async function health(runId){
   try {
@@ -124,7 +177,9 @@ async function inspection(runId){
     const sources=x.sources;
     show("inspection",tr("inspectionSummary",sources.length));
     show("sources",sources.map(s=>s.ref).join(" | "));
-  } catch(_) {if(runId===activeRefresh){show("inspection",tr("inspectionFailure"));show("sources","");}}
+    demoInventory=validateFixtureInventory(x.repository);
+    renderInventory();
+  } catch(_) {if(runId===activeRefresh){show("inspection",tr("inspectionFailure"));show("sources","");demoInventory=null;renderInventory();}}
 }
 async function db(runId){
   const output=$("states");
@@ -157,9 +212,12 @@ async function refresh(){
   const runId=++activeRefresh;
   for(const id of ["health","inspection","db-status"])show(id,tr("updating"));
   show("sources","");$("states").replaceChildren();
+  demoInventory=null;show("inventory-status",tr("inventoryWaiting"));
+  $("inventory-items")?.replaceChildren?.();
   await Promise.all([health(runId),inspection(runId),db(runId)]);
 }
 $("refresh").addEventListener("click",refresh);
+$("inventory-filter")?.addEventListener?.("change",renderInventory);
 $("lang-toggle")?.addEventListener?.("click",()=>{
   language=language==="tr"?"en":"tr";
   translateStatic();applyTheme();refresh();
