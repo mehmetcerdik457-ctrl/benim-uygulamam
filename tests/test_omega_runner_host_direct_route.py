@@ -17,7 +17,7 @@ class Completed:
 
 
 def fake_docker(*, ip="172.28.0.4", subnet="172.28.0.0/16",
-                internal=True, driver="bridge", second=False):
+                internal=True, driver="bridge", second=False, ipam_entries=None):
     def run(args, **kwargs):
         args = list(args)
         if args == [*d.COMPOSE, "ps", "-q", "api"]:
@@ -33,7 +33,7 @@ def fake_docker(*, ip="172.28.0.4", subnet="172.28.0.0/16",
             if ".Driver" in args[4]:
                 return Completed(driver)
             if ".IPAM.Config" in args[4]:
-                return Completed(json.dumps([{"Subnet": subnet}]))
+                return Completed(json.dumps([{"Subnet": subnet}] if ipam_entries is None else ipam_entries))
         return Completed("do not log raw stdout", 1)
     return run
 
@@ -88,6 +88,37 @@ class DirectRouteTests(unittest.TestCase):
     def test_public_ip_is_rejected(self):
         self.assertEqual(d.diagnose(runner=fake_docker(ip="8.8.8.8"))["scope"],
                          "NETWORK_SCOPE_UNSAFE")
+
+    def test_overly_broad_network_subnet_is_unsafe(self):
+        # A 172.x container IP alone must not accept a Docker 0.0.0.0/0.
+        self.assertEqual(
+            d.diagnose(runner=fake_docker(subnet="0.0.0.0/0"))["scope"],
+            "NETWORK_SCOPE_UNSAFE")
+
+    def test_malformed_ipam_fails_closed_without_exception(self):
+        for entries in (["not-a-dictionary"], [{"Subnet": None}],
+                        [{"Subnet": 123}], [{"Subnet": "invalid"}],
+                        []):
+            with self.subTest(entries=entries):
+                self.assertEqual(
+                    d.diagnose(runner=fake_docker(ipam_entries=entries))["verdict"],
+                    "BLOCKED_NOT_ACCEPTED")
+
+    def test_public_subnet_containing_private_ip_is_rejected(self):
+        self.assertEqual(
+            d.diagnose(runner=fake_docker(subnet="0.0.0.0/1"))["scope"],
+            "NETWORK_SCOPE_UNSAFE")
+
+    def test_non_object_health_json_is_denied(self):
+        self.assertEqual(d._probe_http("172.28.0.4",
+                         opener=lambda *a, **k: Response(b'[1,2,3]')),
+                         "HTTP_HEALTH_INVALID")
+
+    def test_large_health_response_never_parsed_as_safe(self):
+        huge = b'{"mode":"mock","production_ready":false,"external_api_enabled":false,"padding":"' + b'x'*4096 + b'"}'
+        self.assertEqual(d._probe_http("172.28.0.4",
+                         opener=lambda *a, **k: Response(huge)),
+                         "HTTP_HEALTH_INVALID")
 
     def test_execute_allowed_fails(self):
         def open_success(*args, **kwargs):
