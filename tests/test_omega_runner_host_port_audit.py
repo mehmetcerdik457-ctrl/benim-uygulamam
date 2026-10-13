@@ -89,7 +89,7 @@ class PortAuditTests(unittest.TestCase):
 
         with patch.object(audit, "_json", side_effect=two_networks):
             result = audit.audit(runner())
-        self.assertEqual(result["network"], "UNVERIFIED")
+        self.assertEqual(result["network"], "UNSAFE")
         self.assertEqual(result["verdict"], "BLOCKED_NOT_ACCEPTED")
 
     def test_unexpected_additional_publication_is_unsafe(self):
