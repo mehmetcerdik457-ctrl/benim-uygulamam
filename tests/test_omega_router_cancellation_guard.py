@@ -123,3 +123,38 @@ def test_cancel_grace_invalid_parameters_rejected(value):
 def test_router_defaults_to_unquarantined():
     router = ModelRouter([])
     assert not router._quarantined
+
+
+def test_queued_request_cannot_pass_quarantine_after_rogue_releases():
+    from dataclasses import replace
+
+    async def action():
+        release, reached = asyncio.Event(), asyncio.Event()
+        rogue, backup = Rogue("rogue", release, reached), Mock("backup")
+        router = ModelRouter([
+            (prof("rogue"), rogue),
+            (replace(prof("backup"), timeout_ms=400), backup),
+        ], cancel_grace_ms=15)
+        first = asyncio.create_task(router.generate(req()))
+        await reached.wait()
+        second = asyncio.create_task(router.generate(replace(
+            req(), allowed_models=frozenset({"backup"}), deadline_ms=500,
+        )))
+        try:
+            with pytest.raises(InferenceFailed, match="ignored timeout"):
+                await first
+            assert router._quarantined
+            release.set()
+            with pytest.raises(InferenceFailed):
+                await second
+            assert backup.calls == 0
+            assert router._inflight == 0
+        finally:
+            release.set()
+            for task in (first, second):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(first, second, return_exceptions=True)
+            await asyncio.sleep(.01)
+
+    run(action())
