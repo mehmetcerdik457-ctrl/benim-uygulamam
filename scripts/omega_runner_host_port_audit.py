@@ -51,7 +51,8 @@ def _binding(table):
 
 
 def _networks(table, runner):
-    if not isinstance(table, dict) or not table or len(table) > 8:
+    # A second attachment is an unreviewed route, even if both are internal.
+    if not isinstance(table, dict) or len(table) != 1:
         return "UNVERIFIED"
     states = []
     for name in table:
