@@ -89,7 +89,7 @@ def test_parent_cancellation_is_bounded_and_quarantines_rogue():
         rogue = Rogue("rogue", release, reached)
         router = ModelRouter([(prof("rogue"), rogue)], cancel_grace_ms=15)
         task = asyncio.create_task(router.generate(req()))
-        await reached.wait()
+        await asyncio.wait_for(reached.wait(), timeout=1.0)
         task.cancel()
         try:
             with pytest.raises(asyncio.CancelledError):
@@ -136,7 +136,7 @@ def test_queued_request_cannot_pass_quarantine_after_rogue_releases():
             (replace(prof("backup"), timeout_ms=400), backup),
         ], cancel_grace_ms=15)
         first = asyncio.create_task(router.generate(req()))
-        await reached.wait()
+        await asyncio.wait_for(reached.wait(), timeout=1.0)
         second = asyncio.create_task(router.generate(replace(
             req(), allowed_models=frozenset({"backup"}), deadline_ms=500,
         )))
