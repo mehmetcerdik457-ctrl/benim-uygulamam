@@ -76,7 +76,8 @@ def evaluate(config: object) -> dict[str, str | bool]:
             or "no-new-privileges:true" not in api.get("security_opt", [])):
         return {**base, "cause": "API_HARDENING_MISSING"}
     ingress = services["ingress"]
-    if (not isinstance(ingress, dict) or ingress.get("read_only") is not True
+    if (not isinstance(ingress, dict) or ingress.get("user") != "101:101"
+            or ingress.get("read_only") is not True
             or ingress.get("cap_drop") != ["ALL"]
             or "no-new-privileges:true" not in ingress.get("security_opt", [])
             or not isinstance(ingress.get("volumes"), list)
