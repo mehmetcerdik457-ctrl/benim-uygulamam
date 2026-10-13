@@ -32,6 +32,7 @@ services:
 
   ingress:
     image: nginx:1.27-alpine
+    user: "101:101"
     # Custom configuration is mounted read-only. Skip image entrypoint scripts
     # that try to rewrite /etc on a deliberately read-only container rootfs.
     entrypoint: ["nginx"]
