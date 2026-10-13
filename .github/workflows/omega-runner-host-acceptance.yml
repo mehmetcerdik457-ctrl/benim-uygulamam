@@ -83,21 +83,28 @@ jobs:
           except (OSError, subprocess.TimeoutExpired):
               data = ''
           # Only fixed codes leave the ephemeral runner: never echo logs, names or errors.
-          if 'host not found in upstream' in data or 'no resolver defined' in data:
-              code = 'NGINX_DNS_CONFIGURATION'
+          fatal = next((line for line in data.splitlines()
+                        if '[emerg]' in line or '[alert]' in line), '')
+          if 'host not found in upstream' in fatal or 'no resolver defined' in fatal:
+              code = 'NGINX_FATAL_DNS'
+          elif 'read-only file system' in fatal and 'mkdir(' in fatal:
+              code = 'NGINX_FATAL_TEMP_DIRECTORY_READ_ONLY'
+          elif 'read-only file system' in fatal and 'open(' in fatal:
+              code = 'NGINX_FATAL_FILE_READ_ONLY'
+          elif 'permission denied' in fatal or 'operation not permitted' in fatal:
+              code = 'NGINX_FATAL_PERMISSION'
+          elif 'unknown directive' in fatal or 'invalid number of arguments' in fatal:
+              code = 'NGINX_FATAL_SYNTAX'
+          elif fatal:
+              code = 'NGINX_FATAL_UNCLASSIFIED'
           elif 'read-only file system' in data:
-              code = 'NGINX_READ_ONLY_FILESYSTEM'
-          elif 'permission denied' in data or 'operation not permitted' in data:
-              code = 'NGINX_PERMISSION'
-          elif 'unknown directive' in data or 'invalid number of arguments' in data:
-              code = 'NGINX_CONFIG_SYNTAX'
-          elif '[emerg]' in data:
-              code = 'NGINX_FATAL_OTHER'
+              code = 'ENTRYPOINT_READ_ONLY_WARNING_NO_NGINX_FATAL'
           elif not data:
               code = 'INGRESS_LOG_UNAVAILABLE'
           else:
               code = 'INGRESS_CAUSE_UNCLASSIFIED'
-          print('OMEGA_CI_INGRESS_STARTUP=' + code)
+          print('OMEGA_CI_INGRESS_FATAL=' + code)
+          print('OMEGA_CI_INGRESS_LOG_BYTES=' + str(len(data)))
           PY
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
