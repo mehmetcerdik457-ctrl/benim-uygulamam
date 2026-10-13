@@ -30,31 +30,54 @@ class SyntheticBackup:
     sha256_hex: str
 
 
-def _memory_guard(conn: sqlite3.Connection):
+def _one_memory_database(conn: sqlite3.Connection):
     if type(conn) is not sqlite3.Connection:
         raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
     try:
         databases = conn.execute("PRAGMA database_list").fetchall()
-        if not databases or any(row[2] for row in databases):
+        # An attached :memory: schema (empty filename) must NOT bypass isolation.
+        if (len(databases) != 1 or databases[0][1] != "main"
+                or databases[0][2] != ""):
             raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
+    except sqlite3.Error:
+        raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY") from None
+
+
+def _memory_guard(conn: sqlite3.Connection):
+    _one_memory_database(conn)
+    try:
+        objects = conn.execute(
+            "SELECT type,name FROM main.sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+        ).fetchall()
+        if set(objects) != {
+            ("table", "omega_fixture_sentinel"),
+            ("table", "omega_fixture_records"),
+        } or len(objects) != 2:
+            raise SecurityDenied("RECOVERY_UNEXPECTED_SCHEMA")
+        # Reject altered columns/constraints even when expected table names exist.
+        required = {
+            "omega_fixture_sentinel": [("id", "INTEGER", 0, 1), ("marker", "TEXT", 1, 0)],
+            "omega_fixture_records": [("id", "TEXT", 0, 1), ("value", "TEXT", 1, 0)],
+        }
+        for table, expected in required.items():
+            columns = conn.execute(f"PRAGMA main.table_info({table})").fetchall()
+            if [(r[1], r[2], r[3], r[5]) for r in columns] != expected:
+                raise SecurityDenied("RECOVERY_UNEXPECTED_SCHEMA")
         marker = conn.execute(
-            "SELECT marker FROM omega_fixture_sentinel WHERE id = 1"
+            "SELECT marker FROM main.omega_fixture_sentinel WHERE id = 1"
         ).fetchall()
         if marker != [(DB_SENTINEL,)]:
             raise SecurityDenied("RECOVERY_SENTINEL_MISSING")
     except sqlite3.Error:
-        raise SecurityDenied("RECOVERY_SENTINEL_MISSING") from None
+        raise SecurityDenied("RECOVERY_UNEXPECTED_SCHEMA") from None
 
 
 def create_memory_fixture(conn: sqlite3.Connection):
     """Called only by test setup; refuses disk-backed and populated databases."""
-    if type(conn) is not sqlite3.Connection:
-        raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
-    databases = conn.execute("PRAGMA database_list").fetchall()
-    if not databases or any(row[2] for row in databases):
-        raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
+    _one_memory_database(conn)
+    # Do not initialize a database already containing a view, trigger or table.
     existing = [x[0] for x in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
     )]
     if existing:
         raise SecurityDenied("RECOVERY_NONEMPTY_DATABASE")
