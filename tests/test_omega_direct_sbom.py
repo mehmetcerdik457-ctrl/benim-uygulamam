@@ -83,7 +83,7 @@ def test_symlink_to_private_file_is_denied(tmp_path):
 def test_invalid_encoding_or_oversized_denied(tmp_path):
     root = fixture_tree(tmp_path)
     file = root / "omega_mvi/requirements.txt"
-    file.write_bytes(b"\\xff")
+    file.write_bytes(b"\xff")
     with pytest.raises(ManifestDenied, match="UNREADABLE_REQUIREMENTS_FILE"):
         direct_pins(root)
     file.write_bytes(b"z" * 16385)
