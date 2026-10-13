@@ -128,7 +128,7 @@ def test_029_nonempty_restore_target_never_overwritten():
 def test_029_missing_sentinel_and_unexpected_existing_schema_fail_closed():
     conn = sqlite3.connect(":memory:")
     try:
-        with pytest.raises(SecurityDenied, match="RECOVERY_SENTINEL_MISSING"):
+        with pytest.raises(SecurityDenied, match="RECOVERY_UNEXPECTED_SCHEMA"):
             export_memory_fixture(conn, token_bytes(32))
         conn.execute("CREATE TABLE other_tenant(id TEXT)")
         with pytest.raises(SecurityDenied, match="RECOVERY_NONEMPTY_DATABASE"):
