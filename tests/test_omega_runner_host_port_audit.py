@@ -19,7 +19,7 @@ class Proc:
 
 def runner(*, requested="127.0.0.1", effective=None, internal=True,
            compose_port=None, extra_port=False):
-    desired = {"8000/tcp": [{"HostIp": requested, "HostPort": "18080"}]}
+    desired = {"8080/tcp": [{"HostIp": requested, "HostPort": "18080"}]}
     if extra_port:
         desired["9999/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": "9999"}]
     mapped = effective if effective is not None else desired
@@ -29,7 +29,7 @@ def runner(*, requested="127.0.0.1", effective=None, internal=True,
         args = list(args)
         if args == ["docker", "version", "--format", "{{.Server.Version}}"]:
             return Proc("29.6.2")
-        if args == [*audit.COMPOSE, "ps", "-q", "api"]:
+        if args == [*audit.COMPOSE, "ps", "-q", "ingress"]:
             return Proc("disposable-container-id")
         if args[:3] == ["docker", "inspect", "--format"]:
             if "HostConfig.PortBindings" in args[3]:
@@ -37,10 +37,10 @@ def runner(*, requested="127.0.0.1", effective=None, internal=True,
             if "NetworkSettings.Ports" in args[3]:
                 return Proc(json.dumps(mapped))
             if "NetworkSettings.Networks" in args[3]:
-                return Proc(json.dumps({"isolated-network": {}}))
+                return Proc(json.dumps({"omega-mvi-demo_isolated_demo": {}, "omega-mvi-demo_loopback_ingress": {}}))
         if args[:3] == ["docker", "network", "inspect"]:
-            return Proc(json.dumps(internal))
-        if args == [*audit.COMPOSE, "port", "api", "8000"]:
+            return Proc(json.dumps(internal if args[-1].endswith("_isolated_demo") else False))
+        if args == [*audit.COMPOSE, "port", "ingress", "8080"]:
             return Proc(observed)
         return Proc("private information must not leak", 1)
     return fake
@@ -48,11 +48,11 @@ def runner(*, requested="127.0.0.1", effective=None, internal=True,
 
 class PortAuditTests(unittest.TestCase):
     def test_requested_but_missing_effective_port_is_blocked(self):
-        fake = runner(effective={"8000/tcp": None}, compose_port="")
+        fake = runner(effective={"8080/tcp": None}, compose_port="")
         result = audit.audit(fake)
         self.assertEqual(result["requested"], "LOOPBACK_ONLY")
         self.assertEqual(result["effective"], "MISSING")
-        self.assertEqual(result["network"], "INTERNAL")
+        self.assertEqual(result["network"], "SEGMENTED_INGRESS")
         self.assertEqual(result["cause"], "DOCKER_REQUEST_ACCEPTED_BUT_PUBLICATION_NOT_EFFECTIVE")
         self.assertEqual(result["verdict"], "BLOCKED_NOT_ACCEPTED")
         with patch.object(audit, "audit", return_value=result):
@@ -84,13 +84,13 @@ class PortAuditTests(unittest.TestCase):
 
         def two_networks(args, fake_runner):
             if "NetworkSettings.Networks" in str(args):
-                return {"isolated-network": {}, "unexpected-internal": {}}
+                return {"omega-mvi-demo_isolated_demo": {}, "unexpected-internal": {}}
             return original(args, fake_runner)
 
         with patch.object(audit, "_json", side_effect=two_networks):
             result = audit.audit(runner())
-        self.assertEqual(result["network"], "UNVERIFIED")
-        self.assertEqual(result["verdict"], "BLOCKED_NOT_ACCEPTED")
+        self.assertEqual(result["network"], "UNSAFE")
+        self.assertEqual(result["verdict"], "UNSAFE")
 
     def test_unexpected_additional_publication_is_unsafe(self):
         self.assertEqual(audit.audit(runner(extra_port=True))["verdict"], "UNSAFE")
