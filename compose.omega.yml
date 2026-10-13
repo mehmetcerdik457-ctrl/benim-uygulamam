@@ -49,8 +49,8 @@ services:
       - loopback_ingress
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=16m
-      - /var/cache/nginx:rw,noexec,nosuid,size=16m
+      - /tmp:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=0700
+      - /var/cache/nginx:rw,noexec,nosuid,size=16m,uid=101,gid=101,mode=0700
     cap_drop:
       - ALL
     security_opt:
