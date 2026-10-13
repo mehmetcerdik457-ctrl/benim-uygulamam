@@ -36,6 +36,8 @@ def test_025_synthetic_audit_persists_and_anchor_verifies_after_reopen(marked_fo
     assert db.exists() and db.stat().st_mode & 0o077 == 0
     with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
         FixtureAuditLedger(marked_folder, key)  # witness is mandatory on reopen
+    with pytest.raises(SecurityDenied, match="AUDIT_UNAVAILABLE_OR_TAMPERED"):
+        FixtureAuditLedger(marked_folder, key, expected_anchor=a1)  # stale tip cannot reopen
     reopened = FixtureAuditLedger(marked_folder, key, expected_anchor=a2)
     assert reopened.verify(expected_anchor=a2) == a2
     assert reopened.verify(expected_anchor=a1) == a2
