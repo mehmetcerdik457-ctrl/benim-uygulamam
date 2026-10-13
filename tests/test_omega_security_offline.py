@@ -117,3 +117,22 @@ def test_030_device_loss_revocation_and_suspicious_activity():
         registry.check(other, "repository:read", NOW)
     with pytest.raises(SecurityDenied, match="IDENTITY_REVOKED"):
         registry.issue(SERVICE, "synthetic-device-2", "repository:read", NOW)
+
+
+def test_024_duck_typed_lease_with_forged_equality_cannot_reuse_reference():
+    registry = OfflineLeaseRegistry()
+    valid = registry.issue(SERVICE, DEVICE, "repository:read", NOW)
+
+    class SpoofedLease:
+        reference = valid.reference
+        service = valid.service
+        device = valid.device
+        expires_at = valid.expires_at
+        generation = valid.generation
+
+        def __eq__(self, other):
+            return True  # malicious equality implementation must not be trusted
+
+    with pytest.raises(SecurityDenied, match="UNKNOWN_LEASE"):
+        registry.check(SpoofedLease(), "repository:read", NOW)
+    assert registry.check(valid, "repository:read", NOW)
