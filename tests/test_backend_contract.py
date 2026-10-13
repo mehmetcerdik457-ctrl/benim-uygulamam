@@ -62,3 +62,46 @@ def test_configured_false_without_key(monkeypatch):
 def test_configured_true_with_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     assert server.configured() is True
+
+
+class _FakeResponse:
+    def __init__(self, body):
+        self._body = body
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def test_call_openai_sends_bearer_header_offline(monkeypatch):
+    import json as _json
+
+    captured = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["headers"] = {k.lower(): v for k, v in req.header_items()}
+        captured["timeout"] = timeout
+        return _FakeResponse(_json.dumps({"output_text": "tamam"}).encode())
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
+    monkeypatch.setattr(server.urllib.request, "urlopen", fake_urlopen)
+    text, model = server.call_openai("selam", [])
+    assert text == "tamam"
+    assert model in server.ALLOWED_MODELS
+    assert captured["headers"]["authorization"] == "Bearer " + "test-only-not-a-real-key"
+    assert captured["timeout"] == server.UPSTREAM_TIMEOUT_SECONDS
+
+
+def test_call_openai_fails_closed_without_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    try:
+        server.call_openai("selam", [])
+    except RuntimeError as exc:
+        assert str(exc) == "PROVIDER_NOT_CONFIGURED"
+    else:
+        raise AssertionError("expected fail-closed")
