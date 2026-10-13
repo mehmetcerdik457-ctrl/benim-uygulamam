@@ -69,8 +69,13 @@ def _probe_http(ip, opener=None):
         with open_url(base + "/api/health", timeout=4) as response:
             if getattr(response, "status", 200) != 200:
                 return "HTTP_HEALTH_INVALID"
-            doc = json.load(response)
-        if (doc.get("mode") != "mock" or
+            # Never read an unbounded HTTP body from a compromised service.
+            payload = response.read(2049)
+            if len(payload) > 2048:
+                return "HTTP_HEALTH_INVALID"
+            doc = json.loads(payload)
+        if (not isinstance(doc, dict) or
+                doc.get("mode") != "mock" or
                 doc.get("production_ready") is not False or
                 doc.get("external_api_enabled") is not False):
             return "HTTP_HEALTH_INVALID"
