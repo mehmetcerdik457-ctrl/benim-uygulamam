@@ -9,7 +9,7 @@ import json
 import re
 import subprocess
 
-EXPECTED_PORT = "8000/tcp"
+EXPECTED_PORT = "8080/tcp"
 EXPECTED_BINDING = {"HostIp": "127.0.0.1", "HostPort": "18080"}
 COMPOSE = ("docker", "compose", "-f", "compose.omega.yml")
 
@@ -52,9 +52,9 @@ def _binding(table):
 
 def _networks(table, runner):
     # A second attachment is an unreviewed route, even if both are internal.
-    if not isinstance(table, dict) or len(table) != 1:
+    if not isinstance(table, dict) or len(table) != 2:
         return "UNVERIFIED"
-    states = []
+    states = {}
     for name in table:
         if not isinstance(name, str) or not name:
             return "UNVERIFIED"
@@ -62,12 +62,17 @@ def _networks(table, runner):
                           "{{json .Internal}}", name], runner)
         if type(internal) is not bool:
             return "UNVERIFIED"
-        states.append(internal)
-    return "INTERNAL" if all(states) else "UNSAFE"
+        if name.endswith("_isolated_demo"):
+            states["isolated_demo"] = internal
+        elif name.endswith("_loopback_ingress"):
+            states["loopback_ingress"] = internal
+        else:
+            return "UNSAFE"
+    return "SEGMENTED_INGRESS" if states == {"isolated_demo": True, "loopback_ingress": False} else "UNSAFE"
 
 
 def audit(runner=subprocess.run):
-    cid = _read((*COMPOSE, "ps", "-q", "api"), runner)
+    cid = _read((*COMPOSE, "ps", "-q", "ingress"), runner)
     result = dict(requested="UNVERIFIED", effective="UNVERIFIED",
                   compose_port="UNVERIFIED", network="UNVERIFIED",
                   engine_version="UNVERIFIED", cause="INCOMPLETE_EVIDENCE",
@@ -87,7 +92,7 @@ def audit(runner=subprocess.run):
     result["requested"] = _binding(requested)
     result["effective"] = _binding(effective)
     result["network"] = _networks(attached, runner)
-    compose_port = _read((*COMPOSE, "port", "api", "8000"), runner)
+    compose_port = _read((*COMPOSE, "port", "ingress", "8080"), runner)
     if not compose_port:
         result["compose_port"] = "MISSING"
     elif compose_port == "127.0.0.1:18080":
@@ -102,13 +107,13 @@ def audit(runner=subprocess.run):
     elif (result["requested"] == "LOOPBACK_ONLY"
           and result["effective"] == "MISSING"
           and result["compose_port"] == "MISSING"
-          and result["network"] == "INTERNAL"):
+          and result["network"] == "SEGMENTED_INGRESS"):
         # Observed mismatch; underlying Docker decision path is not proven.
         result["cause"] = "DOCKER_REQUEST_ACCEPTED_BUT_PUBLICATION_NOT_EFFECTIVE"
     elif (result["requested"] == "LOOPBACK_ONLY"
           and result["effective"] == "LOOPBACK_ONLY"
           and result["compose_port"] == "LOOPBACK_ONLY"
-          and result["network"] == "INTERNAL"):
+          and result["network"] == "SEGMENTED_INGRESS"):
         result["cause"] = "DOCKER_MAPPING_PRESENT_HTTP_NOT_YET_CHECKED"
         result["verdict"] = "PORT_CONTRACT_PASS_NOT_HTTP_OR_OWNER"
     return result
