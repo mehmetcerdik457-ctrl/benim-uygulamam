@@ -7,8 +7,6 @@ from collections import Counter
 import re
 from urllib.parse import parse_qs, urlparse
 
-from omega_mvi.inspection.redaction import redact_text
-
 
 class InventoryDenied(ValueError):
     """Unapproved resource or unsafe provider response."""
@@ -20,6 +18,11 @@ class InventoryIncomplete(RuntimeError):
 
 _OWNER = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?\Z")
 _REPO_SLUG = re.compile(r"[A-Za-z0-9_.-]{1,100}\Z")
+_CREDENTIAL_LABEL = re.compile(
+    r"(?:github_pat_|(?:ghp|gho|ghu|ghs|gsk|glpat|hf)[_-]|"
+    r"(?:sk|rk)[_-](?:live[-_])?|xox[baprs]-|AIza|AKIA)"
+    r"[A-Za-z0-9_-]{4,}", re.IGNORECASE
+)
 
 
 def _safe_repository(name):
@@ -30,13 +33,13 @@ def _safe_repository(name):
     return (len(parts) == 2 and bool(_OWNER.fullmatch(parts[0]))
             and bool(_REPO_SLUG.fullmatch(parts[1]))
             and parts[1] not in (".", "..")
-            and redact_text(name) == name)
+            and not _CREDENTIAL_LABEL.search(name))
 
 
 def _safe_branch(name):
     return (type(name) is str and len(name) <= 200
             and bool(_BRANCH.fullmatch(name))
-            and ".." not in name and redact_text(name) == name)
+            and ".." not in name and not _CREDENTIAL_LABEL.search(name))
 _RESOURCE = {"branches", "forks"}
 _BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9_./-]{0,199}\Z")
 _MIME = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*/[A-Za-z0-9][A-Za-z0-9.+-]*\Z")
