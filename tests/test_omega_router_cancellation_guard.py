@@ -13,7 +13,7 @@ from omega_mvi.model_adapter.router import (
 def prof(name):
     return ModelProfile(
         name=name, tasks=frozenset({"chat"}), max_privacy=Privacy.RESTRICTED,
-        context_tokens=64, output_tokens=8, quality_by_task={"chat": 80},
+        context_tokens=64, output_tokens=8, quality_by_task={"chat": 99 if name in ("rogue", "slow") else 80},
         timeout_ms=10, max_retries=0,
     )
 
