@@ -27,6 +27,8 @@ jobs:
       - name: Confirm network and publish config without printing credentials
         run: |
           python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8080' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
+      - name: Reject unreviewed Nginx ingress configuration changes
+        run: python3 scripts/omega_ingress_config_gate.py
       - name: Generate disposable database password only for this isolated job
         run: |
           pw="$(openssl rand -hex 18)"
