@@ -44,6 +44,31 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api ingress
+      - name: Classify isolated ingress startup failure without leaking logs
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cid="$(docker compose -f compose.omega.yml ps -aq ingress 2>/dev/null || true)"
+          if [ -z "$cid" ]; then
+            echo "OMEGA_INGRESS_STARTUP_DIAG=NO_DISPOSABLE_CONTAINER"
+          else
+            docker logs "$cid" 2>&1 | python3 -c '
+          import sys
+          raw = sys.stdin.read(16384).lower()
+          checks = (
+              ("HOSTNAME_RESOLUTION", "host not found in upstream"),
+              ("NGINX_CONFIGURATION", "nginx: configuration file"),
+              ("FILE_PERMISSION", "permission denied"),
+              ("MISSING_FILESYSTEM", "no such file or directory"),
+              ("BIND_LISTENER", "bind() to"),
+              ("UNSUPPORTED_DIRECTIVE", "unknown directive"),
+              ("UPSTREAM_FAILURE", "connect() failed"),
+          )
+          category = next((label for label, match in checks if match in raw), "UNCLASSIFIED")
+          print("OMEGA_INGRESS_STARTUP_DIAG=" + category)
+          '
+          fi
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
