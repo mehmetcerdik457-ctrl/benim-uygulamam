@@ -81,7 +81,10 @@ def _next_link(headers):
             matches.append(value[1:-1])
     if len(matches) > 1:
         raise InventoryDenied("Ambiguous next Link")
-    if not matches and re.search(r"\\brel\\s*=\\s*['\\\"]?next\\b", link, re.IGNORECASE):
+    if not matches and any(
+            "rel" in part.lower() and "next" in part.lower()
+            for segment in link.split(",")
+            for part in segment.split(";")[1:]):
         raise InventoryIncomplete("Unrecognized GitHub next Link format")
     return matches[0] if matches else None
 
