@@ -56,9 +56,20 @@ def _assert_safe_next(url, repository, resource, expected_page):
         raise InventoryDenied("Unsafe GitHub pagination destination")
 
 
+def _header_value(headers, canonical_name):
+    """Read an HTTP header case-insensitively; reject duplicate ambiguities."""
+    values = [value for key, value in headers.items()
+              if type(key) is str and key.lower() == canonical_name]
+    if len(values) > 1:
+        raise InventoryIncomplete("Ambiguous GitHub response headers")
+    return values[0] if values else None
+
+
 def _next_link(headers):
-    link = headers.get("link", headers.get("Link", ""))
-    if type(link) is not str:
+    link = _header_value(headers, "link")
+    if link is None:
+        return None
+    if type(link) is not str or len(link) > 8192:
         raise InventoryIncomplete("Malformed pagination headers")
     matches = []
     for segment in link.split(","):
@@ -70,6 +81,8 @@ def _next_link(headers):
             matches.append(value[1:-1])
     if len(matches) > 1:
         raise InventoryDenied("Ambiguous next Link")
+    if not matches and re.search(r"\\brel\\s*=\\s*['\\\"]?next\\b", link, re.IGNORECASE):
+        raise InventoryIncomplete("Unrecognized GitHub next Link format")
     return matches[0] if matches else None
 
 
@@ -107,8 +120,12 @@ def github_metadata_pages(fetch_page, repository, approved_repositories,
         headers, items = response.get("headers"), response.get("items")
         if type(headers) is not dict or type(items) is not list or len(items) > 100:
             raise InventoryIncomplete("Missing headers or malformed page")
-        if headers.get("x-ratelimit-remaining", headers.get("X-RateLimit-Remaining")) == "0":
-            raise InventoryIncomplete("GitHub rate limit exhausted")
+        quota = _header_value(headers, "x-ratelimit-remaining")
+        if quota is not None:
+            if type(quota) is not str or not 1 <= len(quota) <= 20 or not quota.isascii() or not quota.isdecimal():
+                raise InventoryIncomplete("Malformed GitHub rate limit header")
+            if int(quota) == 0:
+                raise InventoryIncomplete("GitHub rate limit exhausted")
         for item in items:
             if type(item) is not dict:
                 raise InventoryIncomplete("Malformed inventory item")
