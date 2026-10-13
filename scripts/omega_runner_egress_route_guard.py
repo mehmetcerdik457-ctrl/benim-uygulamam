@@ -22,21 +22,41 @@ def ipv4():
             if len(cols) < 8:
                 return None
             if cols[1] == '00000000' and cols[7] == '00000000':
+                # A kernel reject default is not a usable route.
+                flags = int(cols[3], 16)
+                if flags & 0x200:
+                    continue
+                if cols[0] == 'lo':
+                    return None
                 return True
         return False
     except (OSError, ValueError):
         return None
 
+def classify_ipv6_default(lines):
+    # /proc/net/ipv6_route fields:
+    # destination/prefix, source/prefix, gateway, metric, ref, use,
+    # flags (hex), interface. Linux RTF_REJECT = 0x200.
+    for line in lines:
+        cols = line.split()
+        if len(cols) < 10:
+            return None
+        if cols[0] == '0' * 32 and cols[1] == '00':
+            try:
+                flags = int(cols[8], 16)
+            except ValueError:
+                return None
+            if flags & 0x200:
+                continue  # Kernel intentionally rejects this default.
+            if cols[9] == 'lo':
+                return None  # Unusual non-reject localhost default.
+            return True
+    return False
+
 def ipv6():
     try:
         lines = Path('/proc/net/ipv6_route').read_text().splitlines()
-        for line in lines:
-            cols = line.split()
-            if len(cols) < 2:
-                return None
-            if cols[0] == '0' * 32 and cols[1] == '00':
-                return True
-        return False
+        return classify_ipv6_default(lines)
     except (OSError, ValueError):
         return None
 
