@@ -13,6 +13,19 @@
 <section><h2 data-i18n="healthTitle">Canlı sağlık denetimi</h2><p id="health" aria-live="polite">Yerel servisten durum okunuyor…</p>
 <button type="button" id="refresh" data-i18n="refreshButton">Yalnızca durumları yenile</button></section>
 <section><h2 data-i18n="inspectionTitle">Sentetik denetim modülleri</h2><p id="inspection" aria-live="polite">Denetim sonucu bekleniyor.</p><p id="sources" class="muted"></p></section>
+<section aria-labelledby="fixture-inventory-heading">
+<h2 id="fixture-inventory-heading" data-i18n="inventoryDemoTitle">73 · Sentetik envanter örneği</h2>
+<p data-i18n="inventoryDemoNotice">Yalnızca sabit, çevrimdışı test deposu; gerçek hesap veya klasörler taranmaz.</p>
+<label for="inventory-filter" data-i18n="inventoryFilterLabel">Kaynak türüne göre filtrele</label>
+<select id="inventory-filter" name="inventory-filter">
+<option value="repository" data-i18n="inventoryTypeRepo">Depolar</option>
+<option value="folder" data-i18n="inventoryTypeFolder">Klasörler</option>
+<option value="service" data-i18n="inventoryTypeService">Servisler</option>
+<option value="data_source" data-i18n="inventoryTypeData">Veri kaynakları</option>
+</select>
+<p id="inventory-status" role="status" aria-live="polite">Sentetik depo verisi bekleniyor.</p>
+<ul id="inventory-items" class="state-list"></ul>
+</section>
 <section><h2 data-i18n="databaseTitle">PostgreSQL salt-okunur görünüm</h2><p id="db-status" aria-live="polite">Durum denetleniyor.</p>
 <ul id="states" class="state-list"></ul></section>
 <section><h2 data-i18n="securityTitle">Güvenlik sınırları</h2><div class="row"><div>
