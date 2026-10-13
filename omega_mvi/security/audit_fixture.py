@@ -57,7 +57,8 @@ def _timestamp(value: datetime) -> int:
 class FixtureAuditLedger:
     """Local synthetic-only file, with HMAC chain and external anchor verification."""
 
-    def __init__(self, folder: Path, key: bytes, *, create: bool = False):
+    def __init__(self, folder: Path, key: bytes, *, create: bool = False,
+                 expected_anchor: AuditAnchor | None = None):
         if not isinstance(key, bytes) or len(key) != 32:
             raise SecurityDenied("AUDIT_FIXTURE_KEY_REQUIRED")
         self._key = key  # Never logged, serialized, exported or put in SQLite.
@@ -96,7 +97,11 @@ class FixtureAuditLedger:
                 )}
                 if not {"audit_no_update", "audit_no_delete"}.issubset(names):
                     raise SecurityDenied("AUDIT_TRIGGER_MISSING")
-            self.verify()
+            verified = self.verify(expected_anchor=expected_anchor)
+            # Reopening a nonempty DB without an independently retained witness
+            # could silently accept tail truncation. Fail closed instead.
+            if not create and verified.sequence > 0 and expected_anchor is None:
+                raise SecurityDenied("AUDIT_EXTERNAL_ANCHOR_REQUIRED")
         except (sqlite3.Error, SecurityDenied) as exc:
             self._db.close()
             raise SecurityDenied("AUDIT_UNAVAILABLE_OR_TAMPERED") from None
