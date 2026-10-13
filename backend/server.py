@@ -132,7 +132,7 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
         data=json_bytes(payload),
         method="POST",
         headers={
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": "Bearer " + api_key,
             "Content-Type": "application/json",
             "User-Agent": f"mehmet-ai-backend/{VERSION}",
         },
