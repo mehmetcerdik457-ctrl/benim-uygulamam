@@ -135,3 +135,40 @@ def test_029_missing_sentinel_and_unexpected_existing_schema_fail_closed():
             create_memory_fixture(conn)
     finally:
         conn.close()
+
+
+def test_029_attached_in_memory_schema_cannot_bypass_isolation():
+    source = new_db()
+    fresh = sqlite3.connect(":memory:")
+    try:
+        source.execute("ATTACH DATABASE ':memory:' AS neighbor")
+        fresh.execute("ATTACH DATABASE ':memory:' AS neighbor")
+        with pytest.raises(SecurityDenied, match="RECOVERY_MEMORY_SQLITE_ONLY"):
+            export_memory_fixture(source, token_bytes(32))
+        with pytest.raises(SecurityDenied, match="RECOVERY_MEMORY_SQLITE_ONLY"):
+            create_memory_fixture(fresh)
+    finally:
+        source.close()
+        fresh.close()
+
+
+@pytest.mark.parametrize("schema_change", [
+    "CREATE VIEW extra AS SELECT 1",
+    "CREATE TRIGGER extra AFTER INSERT ON omega_fixture_records BEGIN SELECT 1; END",
+    "ALTER TABLE omega_fixture_records ADD COLUMN unexpected TEXT",
+    "CREATE TABLE unexpected(id INTEGER)",
+])
+def test_029_unexpected_fixture_schema_cannot_export_or_restore(schema_change):
+    source, target = new_db(), new_db()
+    key = token_bytes(32)
+    try:
+        snapshot = export_memory_fixture(source, key)
+        source.execute(schema_change)
+        target.execute(schema_change)
+        with pytest.raises(SecurityDenied, match="RECOVERY_UNEXPECTED_SCHEMA"):
+            export_memory_fixture(source, key)
+        with pytest.raises(SecurityDenied, match="RECOVERY_UNEXPECTED_SCHEMA"):
+            restore_memory_fixture(target, snapshot, key)
+    finally:
+        source.close()
+        target.close()
