@@ -16,6 +16,14 @@ PUBLIC_FIXTURE = {
 def inspect_offline_fixture():
     """Exercise ALL four modules in sequence, never a user-controlled input."""
     repository = inventory_from_public_metadata_fixture(dict(PUBLIC_FIXTURE))
+    # Public repository metadata can contain copied credentials or PII.
+    # Sanitize before the result is passed to HTTP or downstream models.
+    description = repository.get("description")
+    if description is not None:
+        sanitized = redact_text(description)
+        if not isinstance(sanitized, str):
+            raise PermissionError("REDACTION_FAILED")
+        repository["description"] = sanitized
     # Redact BEFORE passing a summary to the advisory review engine.
     redacted = redact_text("Review authorization scope and synthetic " +
                            "Bearer " + "synthetic-opaque-value")
