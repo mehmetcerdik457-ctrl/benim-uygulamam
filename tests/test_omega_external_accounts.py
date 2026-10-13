@@ -503,3 +503,26 @@ def test_ambiguous_quota_case_variations_fails_closed():
             "items": [{"name": "main"}]}
     with pytest.raises(InventoryIncomplete, match="Ambiguous"):
         github_metadata_pages(fetch, REPO, {REPO}, "branches")
+
+
+def test_normal_long_repo_and_branch_names_are_not_secret_false_positives():
+    def fetch(_url):
+        return {"status": 200, "headers": {}, "items": [
+            {"name": "omega/ui-security-and-ci-20261011"},
+            {"name": "improve/metadata-pagination-long-branch-example"},
+        ]}
+    result = github_metadata_pages(fetch, REPO, {REPO}, "branches")
+    assert result["count"] == 2
+    assert result["names"] == (
+        "omega/ui-security-and-ci-20261011",
+        "improve/metadata-pagination-long-branch-example",
+    )
+
+
+def test_normal_public_long_fork_slug_is_not_secret_false_positive():
+    fork = "example-owner/ordinary-project-repository-name-with-many-components"
+    def fetch(_url):
+        return {"status": 200, "headers": {}, "items": [{
+            "full_name": fork, "private": False, "visibility": "public"}]}
+    result = github_metadata_pages(fetch, REPO, {REPO}, "forks")
+    assert result["names"] == (fork,)
