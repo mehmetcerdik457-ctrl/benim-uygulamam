@@ -100,8 +100,13 @@ class FixtureAuditLedger:
             verified = self.verify(expected_anchor=expected_anchor)
             # Reopening a nonempty DB without an independently retained witness
             # could silently accept tail truncation. Fail closed instead.
-            if not create and verified.sequence > 0 and expected_anchor is None:
-                raise SecurityDenied("AUDIT_EXTERNAL_ANCHOR_REQUIRED")
+            if not create and verified.sequence > 0:
+                # An older valid prefix witness cannot detect a truncated tail.
+                # Re-open requires the exact independently retained latest tip.
+                if (expected_anchor is None
+                        or expected_anchor.sequence != verified.sequence
+                        or not hmac.compare_digest(expected_anchor.mac_hex, verified.mac_hex)):
+                    raise SecurityDenied("AUDIT_LATEST_ANCHOR_REQUIRED")
         except (sqlite3.Error, SecurityDenied) as exc:
             self._db.close()
             raise SecurityDenied("AUDIT_UNAVAILABLE_OR_TAMPERED") from None
