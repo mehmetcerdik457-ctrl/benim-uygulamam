@@ -166,6 +166,41 @@ Store in a secured owner-controlled system, **not** this public repository.
   enumeration, private Drive folders, Cloud IAM, key rotation or any owner
   hardware were **not** connected by these changes.
 
+## 13 Oct 2026 — GitHub canonical identifier and response-boundary audit
+
+- Fresh read-only connector observation, **13 Oct 2026**: the explicitly
+  supplied `mehmetcerdik457-ctrl/benim-uygulamam` repository was **public**,
+  with `main` as its default branch. GitHub REST branches
+  `?per_page=100&page=1` returned **60 entries** and page 2 returned **0**.
+  The repository's metadata reported `forks_count=0`.
+  This supersedes the older *observation* of 46 branches, not the old evidence;
+  no names or other repository/account data are placed in this public report.
+  An owner-scoped forks-list response and API rate-limit HTTP headers are
+  still **NOT VERIFIED / UNKNOWN**, even though the public counter was read.
+- The metadata helper now validates bounded canonical owner/repository slugs
+  (rejects ambiguous dot segments and URL/path delimiters before any callback)
+  and rejects secret-pattern branch/fork labels before reporting them. For
+  forks it additionally requires `private is False` **and**
+  `visibility == "public"`; a public source repository does **not** justify
+  emitting a private/uncertain fork name. This is strict fail-closed behavior
+  and may reject an incomplete provider response rather than guessing.
+  [Official GitHub forks REST response](https://docs.github.com/en/rest/repos/forks).
+- HTTP response `Link` and `X-RateLimit-Remaining` headers are read
+  **case-insensitively** with conflicting duplicate forms rejected. Invalid
+  rate-limit values, malformed or ambiguous `rel=next` syntax, and unsafe
+  cross-origin continuations fail closed. Missing rate-limit headers remain
+  **quota UNKNOWN** and a successful page fetch does not prove remaining
+  quota or atomic snapshot consistency.
+- Additional **synthetic negative tests** cover private/unknown fork
+  visibility, URL path traversal, suspicious branch labels, mixed-case and
+  duplicate HTTP headers, invalid rate-limit values, and long MIME strings.
+  No live secrets, GCP credentials, Drive folder IDs, private fork names or
+  cross-repository identifiers were used.
+- Status boundaries remain **11 PARTIAL**, **12 UNKNOWN/NOT_RUN**,
+  **13 PARTIAL_CODE/LIVE_UNKNOWN**, **17 PARTIAL**, **18 PROCEDURE_DRAFT**.
+  Production read-only API adapters and signed owner-private approval remain
+  blocked; the private 0.1.4-dev commit remains an untested separate codebase.
+
 ## Evidence / unresolved acceptance gates
 
 - Synthetic tests: `tests/test_omega_external_accounts.py`: allowlist,
