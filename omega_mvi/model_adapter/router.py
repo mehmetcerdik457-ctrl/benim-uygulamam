@@ -14,6 +14,8 @@ from enum import IntEnum
 from types import MappingProxyType
 from typing import Mapping, Protocol
 
+from .runtime_guard import BackendUnresponsive, bounded_inference
+
 
 class Privacy(IntEnum):
     PUBLIC = 0
@@ -106,11 +108,16 @@ class ModelRouter:
         *,
         global_concurrency: int = 1,
         max_inflight_requests: int = 8,
+        cancel_grace_ms: int = 250,
     ) -> None:
         if not _bounded_int(global_concurrency, 1, 32):
             raise ValueError("invalid global concurrency")
         if not _bounded_int(max_inflight_requests, global_concurrency, 1024):
             raise ValueError("invalid admission capacity")
+        if not _bounded_int(cancel_grace_ms, 1, 5000):
+            raise ValueError("invalid cancellation grace")
+        self._cancel_grace_s = cancel_grace_ms / 1000
+        self._quarantined = False
         self._global_semaphore = asyncio.Semaphore(global_concurrency)
         self._max_inflight_requests = max_inflight_requests
         self._inflight = 0
@@ -143,7 +150,13 @@ class ModelRouter:
             names.add(profile.name)
             self._models.append((profile, backend, asyncio.Semaphore(profile.concurrency)))
 
+    def _quarantine(self) -> None:
+        # Never clear automatically: a rogue local subprocess might remain alive.
+        self._quarantined = True
+
     async def generate(self, request: RouteRequest) -> Completion:
+        if self._quarantined:
+            raise RouteDenied("local model router quarantined after unsafe cancellation")
         if (type(request.task) is not str or not request.task
             or type(request.prompt) is not str or not request.prompt
             or (request.system_prompt is not None and type(request.system_prompt) is not str)
@@ -208,9 +221,15 @@ class ModelRouter:
                                 return await backend.generate(request, max_output_tokens=request.max_output_tokens)
 
                     try:
-                        result = await asyncio.wait_for(once(), timeout=remaining)
+                        result = await bounded_inference(
+                            once(), timeout_s=remaining,
+                            cancel_grace_s=self._cancel_grace_s,
+                            quarantine=self._quarantine,
+                        )
                     except asyncio.CancelledError:
                         raise  # No retry or fallback on cancellation.
+                    except BackendUnresponsive:
+                        raise InferenceFailed("local model cancellation integrity failed") from None
                     except (asyncio.TimeoutError, TransientModelError):
                         if attempt == profile.max_retries:
                             break
