@@ -7,6 +7,8 @@ on:
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
       - 'scripts/omega_runner_host_direct_route.py'
+      - 'scripts/omega_runner_egress_route_guard.py'
+      - 'tests/test_omega_runner_egress_route_guard.py'
       - 'scripts/omega_ci_ephemeral_loopback_relay.py'
       - 'tests/test_omega_ci_ephemeral_loopback_relay.py'
       - 'tests/test_omega_runner_host_direct_route.py'
@@ -35,10 +37,14 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v
       - name: Test direct host-to-internal route classifications (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
+      - name: Test no-default-egress-route classification with synthetic inputs
+        run: python3 -m unittest discover -s tests -p test_omega_runner_egress_route_guard.py -v
       - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+      - name: Enforce no default IPv4 or IPv6 route in isolated API
+        run: python3 scripts/omega_runner_egress_route_guard.py
       - name: Observe Docker binding, network, runner TCP and HTTP independently
         run: python3 scripts/omega_runner_host_diagnostic.py
       - name: Probe host-to-internal-container HTTP without network changes
