@@ -86,8 +86,6 @@ def test_fail_closed_if_sanitizer_returns_invalid_type(public_metadata, monkeypa
     import omega_mvi.inspection.github_inventory as gh_inventory
     public_metadata["description"] = "safe synthetic description"
     monkeypatch.setattr(gh_inventory, "redact_text", lambda _: invalid)
-    if invalid is None:  # a null return is never a valid sanitized description
-        pass
     with pytest.raises(PermissionError, match="METADATA_REDACTION_FAILED"):
         inventory_from_public_metadata_fixture(public_metadata)
 
