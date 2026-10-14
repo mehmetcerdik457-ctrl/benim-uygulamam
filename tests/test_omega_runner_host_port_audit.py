@@ -31,7 +31,16 @@ def runner(*, requested="127.0.0.1", effective=None, internal=True,
             return Proc("29.6.2")
         if args == [*audit.COMPOSE, "ps", "-q", "ingress"]:
             return Proc("disposable-container-id")
+        if args == [*audit.COMPOSE, "ps", "-q", "api"]:
+            return Proc("disposable-api-id")
+        if args == [*audit.COMPOSE, "ps", "-q", "db"]:
+            return Proc("disposable-db-id")
         if args[:3] == ["docker", "inspect", "--format"]:
+            if args[-1] in ("disposable-api-id", "disposable-db-id"):
+                if "NetworkSettings.Ports" in args[3]:
+                    port = "8000/tcp" if args[-1] == "disposable-api-id" else "5432/tcp"
+                    return Proc(json.dumps({port: None}))
+                return Proc(json.dumps({"omega-mvi-demo_isolated_demo": {}}))
             if "HostConfig.PortBindings" in args[3]:
                 return Proc(json.dumps(desired))
             if "NetworkSettings.Ports" in args[3]:
@@ -109,6 +118,41 @@ class PortAuditTests(unittest.TestCase):
         self.assertEqual(result["cause"], "API_CONTAINER_NOT_IDENTIFIED")
         self.assertNotIn("/private", repr(result))
 
+
+    def test_spoofed_project_network_suffix_is_unsafe(self):
+        original = audit._json
+        def spoof(args, fake_runner):
+            if "NetworkSettings.Networks" in str(args) and args[-1] == "disposable-container-id":
+                return {"untrusted_isolated_demo": {},
+                        "untrusted_loopback_ingress": {}}
+            return original(args, fake_runner)
+        with patch.object(audit, "_json", side_effect=spoof):
+            result = audit.audit(runner())
+        self.assertEqual(result["network"], "UNSAFE")
+        self.assertEqual(result["verdict"], "UNSAFE")
+
+    def test_private_services_with_extra_network_or_published_port_are_unsafe(self):
+        original = audit._json
+        for service in ("api", "db"):
+            for kind in ("extra_network", "published_port"):
+                def mutated(args, fake_runner):
+                    if args[-1] == "disposable-" + service + "-id":
+                        if kind == "extra_network" and "NetworkSettings.Networks" in str(args):
+                            return {"omega-mvi-demo_isolated_demo": {}, "external": {}}
+                        if kind == "published_port" and "NetworkSettings.Ports" in str(args):
+                            return {"5432/tcp": [{"HostIp": "0.0.0.0", "HostPort": "5432"}]}
+                    return original(args, fake_runner)
+                with patch.object(audit, "_json", side_effect=mutated):
+                    result = audit.audit(runner())
+                self.assertEqual(result["verdict"], "UNSAFE")
+
+    def test_missing_db_runtime_evidence_blocks_acceptance(self):
+        base = runner()
+        def missing(args, **kwargs):
+            if list(args) == [*audit.COMPOSE, "ps", "-q", "db"]:
+                return Proc("", 1)
+            return base(args, **kwargs)
+        self.assertEqual(audit.audit(missing)["verdict"], "BLOCKED_NOT_ACCEPTED")
 
 if __name__ == "__main__":
     unittest.main()
