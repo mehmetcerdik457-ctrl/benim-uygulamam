@@ -61,21 +61,25 @@ def _docker_evidence(runner=subprocess.run):
 
     try:
         networks = json.loads(networks_raw) if networks_raw is not None else None
-        if isinstance(networks, dict) and len(networks) == 2:
-            states = []
-            for name in networks:
-                raw = _run(["docker", "network", "inspect", "--format",
-                            "{{json .Internal}}", name], runner)
-                if raw is None:
-                    states = []
-                    break
-                states.append(json.loads(raw))
-            if len(states) == 2:
-                expected = {name.rsplit("_", 2)[-2] + "_" + name.rsplit("_", 2)[-1]: state
-                            for name, state in zip(networks, states)}
-                network = ("SEGMENTED_INGRESS"
-                           if expected == {"isolated_demo": True, "loopback_ingress": False}
-                           else "UNSAFE")
+        if isinstance(networks, dict):
+            # Verify the exact project-qualified network names, not suffixes.
+            expected = {"omega-mvi-demo_isolated_demo": True,
+                        "omega-mvi-demo_loopback_ingress": False}
+            if set(networks) != set(expected):
+                network = "UNSAFE"
+            else:
+                states = {}
+                for name in expected:
+                    raw = _run(["docker", "network", "inspect", "--format",
+                                "{{json .Internal}}", name], runner)
+                    if raw is None:
+                        break
+                    state = json.loads(raw)
+                    if type(state) is not bool:
+                        break
+                    states[name] = state
+                if len(states) == len(expected):
+                    network = "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
     except (ValueError, TypeError, AttributeError):
         pass
 
