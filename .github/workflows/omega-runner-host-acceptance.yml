@@ -14,6 +14,8 @@ on:
       - 'scripts/omega_probe_runner_loopback.py'
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
+      - 'scripts/omega_runner_egress_route_guard.py'
+      - 'tests/test_omega_runner_egress_route_guard.py'
       - 'scripts/omega_runner_host_direct_route.py'
       - 'scripts/omega_ci_ephemeral_loopback_relay.py'
       - 'tests/test_omega_ci_ephemeral_loopback_relay.py'
@@ -56,6 +58,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_port_audit.py -v
       - name: Test direct host-to-internal route classifications (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_runner_host_direct_route.py -v
+      - name: Test IPv4 and IPv6 default-route denial (synthetic)
+        run: python3 -m unittest discover -s tests -p test_omega_runner_egress_route_guard.py -v
       - name: Test ephemeral localhost-only relay with real synthetic TCP sockets
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Start disposable containers with unchanged Compose isolation
@@ -148,6 +152,9 @@ jobs:
           else
             python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
           fi
+      - name: Enforce API no-default IPv4 and IPv6 route in real disposable container
+        if: success() || failure()
+        run: python3 scripts/omega_runner_egress_route_guard.py
       - name: Enforce requested versus EFFECTIVE Docker host port mapping
         if: success() || failure()
         run: python3 scripts/omega_runner_host_port_audit.py
