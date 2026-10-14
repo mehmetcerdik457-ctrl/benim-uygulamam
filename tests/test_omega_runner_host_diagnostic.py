@@ -125,3 +125,40 @@ def test_effective_docker_port_mapping_missing_is_specific_blocker():
     assert report["tcp"] == "REFUSED"
     assert report["cause"] == "HOST_PORT_MAPPING_MISSING_UPSTREAM_CAUSE_UNKNOWN"
     assert report["verdict"] == "BLOCKED_NOT_ACCEPTED"
+
+
+def test_extra_duplicate_or_malformed_published_ports_are_unsafe():
+    base = runner_factory()
+    valid = {"HostIp": "127.0.0.1", "HostPort": "18080"}
+    for published in (
+        {"8080/tcp": [valid, valid]},
+        {"8080/tcp": [valid], "9999/tcp": [{"HostIp": "0.0.0.0", "HostPort": "9999"}]},
+        {"8080/tcp": [dict(valid, unexpected="field")]},
+        {"8080/tcp": ["not-a-port-mapping"]},
+        {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": 18080}]},
+    ):
+        def fake(args, **kwargs):
+            if args[:3] == ["docker", "inspect", "--format"] and "Ports" in args[3]:
+                return Result(json.dumps(published))
+            return base(args, **kwargs)
+        report = h.diagnose(runner=fake,
+                            connector=lambda *a, **k: Connection(),
+                            opener=denied_opener)
+        assert report["binding"] == "UNSAFE"
+        assert report["verdict"] == "UNSAFE"
+
+
+def test_unpublished_extra_exposed_port_does_not_fake_an_unsafe_bind():
+    base = runner_factory()
+    def fake(args, **kwargs):
+        if args[:3] == ["docker", "inspect", "--format"] and "Ports" in args[3]:
+            return Result(json.dumps({
+                "8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18080"}],
+                "8000/tcp": None,
+            }))
+        return base(args, **kwargs)
+    report = h.diagnose(runner=fake,
+                        connector=lambda *a, **k: Connection(),
+                        opener=denied_opener)
+    assert report["binding"] == "LOOPBACK_ONLY"
+    assert report["verdict"] == "PASS_RUNNER_ONLY_NOT_OWNER"
