@@ -16,7 +16,9 @@ import re
 import secrets
 import subprocess
 
-IMAGE = "python:3.12-slim"
+# Use the immutable image already built for the synthetic CI Compose API.
+# No credentials/environment from that service are inherited by the mock.
+IMAGE = "LOCAL_COMPOSE_BUILD_ONLY"
 IN_CONTAINER_PORT = "8000/tcp"
 _TAG = "omega-ci-netctrl-"
 _PORT_REGEX = re.compile(r"127\.0\.0\.1:(\d{1,5})\Z")
@@ -103,13 +105,17 @@ def _probe(runner):
     containers = {"internal": _TAG + run_id + "-a",
                   "normal": _TAG + run_id + "-b"}
     result = {"internal": "UNVERIFIED", "normal": "UNVERIFIED",
-              "verdict": "BLOCKED_INCONCLUSIVE"}
+              "stage": "PRECHECK", "verdict": "BLOCKED_INCONCLUSIVE"}
     created_nets = []
     created_containers = []
     try:
-        if _call(["docker", "image", "inspect", IMAGE, "--format",
-                  "{{.Id}}"], runner) is None:
+        image_id = _call(["docker", "compose", "-f", "compose.omega.yml",
+                          "images", "--quiet", "api"], runner)
+        if not image_id or not re.fullmatch(
+                r"(?:sha256:)?[0-9a-f]{12,64}", image_id):
+            result["stage"] = "LOCAL_BUILT_IMAGE_UNAVAILABLE"
             return result  # No image pulls or external downloads.
+        result["stage"] = "IMAGE_READY"
         for case in ("internal", "normal"):
             network = names[case]
             args = ["docker", "network", "create", "--driver", "bridge",
@@ -117,6 +123,7 @@ def _probe(runner):
             if case == "internal":
                 args.append("--internal")
             if _call([*args, network], runner) is None:
+                result["stage"] = "NETWORK_CREATE_FAILED_" + case.upper()
                 return result
             created_nets.append(network)
         for case in ("internal", "normal"):
@@ -126,13 +133,18 @@ def _probe(runner):
                    "--read-only", "--cap-drop", "ALL",
                    "--security-opt", "no-new-privileges:true",
                    "--publish", "127.0.0.1::8000",
-                   IMAGE, "python", "-m", "http.server", "8000",
-                   "--bind", "0.0.0.0"]
-            if _call(cmd, runner, timeout=30) is None:
-                return result
+                   image_id, "python", "-m", "http.server", "8000",
+                   "--bind", "0.0.0.0", "--directory", "/tmp"]
+            # Track the random name before starting, so a partially started
+            # disposable container also gets removed after a CLI error.
             created_containers.append(name)
+            if _call(cmd, runner, timeout=30) is None:
+                result["stage"] = "MOCK_CONTAINER_START_FAILED_" + case.upper()
+                return result
+        result["stage"] = "BOTH_MOCKS_STARTED"
         for case in ("internal", "normal"):
             result[case] = _inspect(containers[case], runner)
+        result["stage"] = "BOTH_PORTS_INSPECTED"
         result["verdict"] = classify(result["internal"], result["normal"])
         return result
     finally:
@@ -150,7 +162,7 @@ def main(argv=None):
         print("OMEGA_NETWORK_CONTROL=DISABLED_OUTSIDE_EXPLICIT_CI")
         return 2
     outcome = _probe(subprocess.run)
-    for k in ("internal", "normal", "verdict"):
+    for k in ("stage", "internal", "normal", "verdict"):
         print("OMEGA_NETWORK_CONTROL_" + k.upper() + "=" + outcome[k])
     if outcome["verdict"] == "UNSAFE_BINDING_IN_CONTROL":
         return 1
