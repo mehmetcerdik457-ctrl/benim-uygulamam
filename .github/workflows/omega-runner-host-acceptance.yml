@@ -2,8 +2,15 @@ name: OMEGA runner-host acceptance (separate P0 gate)
 on:
   pull_request:
     paths:
+      # The required runner/ingress acceptance must rerun on the exact HEAD
+      # of every MVI/API/privacy change, not just Compose or diagnostic edits.
       - 'compose.omega.yml'
-      - 'omega_mvi/ingress/**'
+      - 'omega_mvi/**'
+      - 'scripts/omega_ingress_config_gate.py'
+      - 'scripts/omega_network_topology_gate.py'
+      - 'tests/test_omega_ingress_config_contract.py'
+      - 'tests/test_omega_network_topology_gate.py'
+      - 'tests/test_omega_runner_host_workflow_coverage.py'
       - 'scripts/omega_probe_runner_loopback.py'
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
