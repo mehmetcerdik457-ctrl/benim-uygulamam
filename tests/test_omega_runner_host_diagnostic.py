@@ -37,7 +37,16 @@ def runner_factory(*, address="127.0.0.1", internal=True, inside="OK"):
         cmd = " ".join(args[:3])
         if args[-3:] == ["ps", "-q", "ingress"]:
             return Result("synthetic-container-id")
+        if args[-3:] == ["ps", "-q", "api"]:
+            return Result("synthetic-api-id")
+        if args[-3:] == ["ps", "-q", "db"]:
+            return Result("synthetic-db-id")
         if args[:3] == ["docker", "inspect", "--format"]:
+            if args[-1] in ("synthetic-api-id", "synthetic-db-id"):
+                if "Ports" in args[3]:
+                    port = "8000/tcp" if args[-1] == "synthetic-api-id" else "5432/tcp"
+                    return Result(json.dumps({port: None}))
+                return Result(json.dumps({"omega-mvi-demo_isolated_demo": {}}))
             if "Ports" in args[3]:
                 return Result(json.dumps({"8080/tcp": [
                     {"HostIp": address, "HostPort": "18080"}]}))
@@ -162,3 +171,58 @@ def test_unpublished_extra_exposed_port_does_not_fake_an_unsafe_bind():
                         opener=denied_opener)
     assert report["binding"] == "LOOPBACK_ONLY"
     assert report["verdict"] == "PASS_RUNNER_ONLY_NOT_OWNER"
+
+
+def test_project_network_name_suffix_spoof_is_unsafe():
+    base = runner_factory()
+    def spoof(args, **kwargs):
+        if (args[:3] == ["docker", "inspect", "--format"]
+                and "NetworkSettings.Networks" in args[3]
+                and args[-1] == "synthetic-container-id"):
+            return Result(json.dumps({
+                "untrusted_isolated_demo": {},
+                "untrusted_loopback_ingress": {},
+            }))
+        return base(args, **kwargs)
+    report = h.diagnose(runner=spoof,
+                        connector=lambda *a, **k: Connection(),
+                        opener=denied_opener)
+    assert report["network"] == "UNSAFE"
+    assert report["verdict"] == "UNSAFE"
+
+
+def test_live_api_db_extra_network_or_host_publication_is_unsafe():
+    base = runner_factory()
+    for service in ("api", "db"):
+        for kind in ("network", "published"):
+            def altered(args, **kwargs):
+                if (args[:3] == ["docker", "inspect", "--format"]
+                        and args[-1] == "synthetic-" + service + "-id"):
+                    if kind == "network" and "NetworkSettings.Networks" in args[3]:
+                        return Result(json.dumps({
+                            "omega-mvi-demo_isolated_demo": {},
+                            "unreviewed_external": {},
+                        }))
+                    if kind == "published" and "NetworkSettings.Ports" in args[3]:
+                        return Result(json.dumps({
+                            "5432/tcp": [{"HostIp": "0.0.0.0", "HostPort": "5432"}]
+                        }))
+                return base(args, **kwargs)
+            report = h.diagnose(runner=altered,
+                                connector=lambda *a, **k: Connection(),
+                                opener=denied_opener)
+            assert report["network"] == "UNSAFE"
+            assert report["verdict"] == "UNSAFE"
+
+
+def test_missing_runtime_database_blocks_host_acceptance():
+    base = runner_factory()
+    def missing(args, **kwargs):
+        if args[-3:] == ["ps", "-q", "db"]:
+            return Result("", rc=1)
+        return base(args, **kwargs)
+    report = h.diagnose(runner=missing,
+                        connector=lambda *a, **k: Connection(),
+                        opener=denied_opener)
+    assert report["network"] == "UNVERIFIED"
+    assert report["verdict"] == "BLOCKED_NOT_ACCEPTED"
