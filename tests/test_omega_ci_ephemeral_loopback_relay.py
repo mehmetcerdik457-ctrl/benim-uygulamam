@@ -62,6 +62,45 @@ class RelayTests(unittest.TestCase):
                 mock.shutdown()
                 mock_thread.join(timeout=3)
 
+    def test_shutdown_waits_for_accepted_connections_to_finish(self):
+        # A closed listener alone does not prove existing forwarding threads
+        # have exited. The with-block must wait until the handler is done.
+        import socket
+        import socketserver
+        import time
+        started = threading.Event()
+        release = threading.Event()
+        finished = threading.Event()
+
+        class BlockingHandler(socketserver.BaseRequestHandler):
+            def handle(self):
+                started.set()
+                release.wait(timeout=2)
+                finished.set()
+
+        with m._Relay(("127.0.0.1", 0), BlockingHandler,
+                      target="127.0.0.1") as relay:
+            worker = threading.Thread(target=relay.serve_forever,
+                                      kwargs={"poll_interval": 0.01}, daemon=True)
+            worker.start()
+            with socket.create_connection(relay.server_address, timeout=2):
+                self.assertTrue(started.wait(timeout=2))
+                relay.shutdown()
+                worker.join(timeout=2)
+                self.assertFalse(worker.is_alive())
+
+                def complete_handler():
+                    time.sleep(0.15)
+                    release.set()
+
+                unblocker = threading.Thread(target=complete_handler)
+                unblocker.start()
+        unblocker.join(timeout=2)
+        self.assertFalse(unblocker.is_alive())
+        self.assertTrue(finished.is_set(),
+                        "relay context returned before accepted handlers stopped")
+        self.assertEqual(relay._slots._value, relay.max_concurrent_connections)
+
     def test_wildcard_and_nonloopback_listeners_rejected_before_binding(self):
         for host in ("0.0.0.0", "192.168.1.20", "::", "localhost", ""):
             with self.subTest(host=host), self.assertRaises(ValueError):
