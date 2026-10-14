@@ -68,6 +68,25 @@ def _networks(table, runner):
     return "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
 
 
+def _private_services_isolated(runner):
+    """Require live API and DB to have only the internal network, no host ports."""
+    for service in ("api", "db"):
+        cid = _read((*COMPOSE, "ps", "-q", service), runner)
+        if not cid or len(cid.splitlines()) != 1:
+            return "UNVERIFIED"
+        networks = _json(["docker", "inspect", "--format",
+                          "{{json .NetworkSettings.Networks}}", cid], runner)
+        ports = _json(["docker", "inspect", "--format",
+                       "{{json .NetworkSettings.Ports}}", cid], runner)
+        if not isinstance(networks, dict) or not isinstance(ports, dict):
+            return "UNVERIFIED"
+        if set(networks) != {"omega-mvi-demo_isolated_demo"}:
+            return "UNSAFE"
+        if any(binding not in (None, []) for binding in ports.values()):
+            return "UNSAFE"
+    return "ISOLATED"
+
+
 def audit(runner=subprocess.run):
     cid = _read((*COMPOSE, "ps", "-q", "ingress"), runner)
     result = dict(requested="UNVERIFIED", effective="UNVERIFIED",
@@ -89,6 +108,11 @@ def audit(runner=subprocess.run):
     result["requested"] = _binding(requested)
     result["effective"] = _binding(effective)
     result["network"] = _networks(attached, runner)
+    private_services = _private_services_isolated(runner)
+    if private_services == "UNSAFE":
+        result["network"] = "UNSAFE"
+    elif private_services != "ISOLATED" and result["network"] == "SEGMENTED_INGRESS":
+        result["network"] = "UNVERIFIED"
     compose_port = _read((*COMPOSE, "port", "ingress", "8080"), runner)
     if not compose_port:
         result["compose_port"] = "MISSING"
