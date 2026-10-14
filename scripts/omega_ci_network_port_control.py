@@ -127,6 +127,14 @@ def _probe(runner):
                 return result
             created_nets.append(network)
         for case in ("internal", "normal"):
+            observed = _call(
+                ["docker", "network", "inspect", "--format",
+                 "{{json .Internal}}", names[case]], runner)
+            expected = "true" if case == "internal" else "false"
+            if observed != expected:
+                result["stage"] = "NETWORK_INTERNAL_FLAG_UNVERIFIED"
+                return result
+        for case in ("internal", "normal"):
             name = containers[case]
             cmd = ["docker", "run", "--detach", "--rm", "--name", name,
                    "--network", names[case], "--user", "65534:65534",
@@ -142,6 +150,17 @@ def _probe(runner):
                 result["stage"] = "MOCK_CONTAINER_START_FAILED_" + case.upper()
                 return result
         result["stage"] = "BOTH_MOCKS_STARTED"
+        for case in ("internal", "normal"):
+            attached_raw = _call(
+                ["docker", "inspect", "--format",
+                 "{{json .NetworkSettings.Networks}}", containers[case]], runner)
+            try:
+                attached = json.loads(attached_raw) if attached_raw else None
+            except (ValueError, TypeError):
+                attached = None
+            if not isinstance(attached, dict) or set(attached) != {names[case]}:
+                result["stage"] = "CONTAINER_NETWORK_SCOPE_UNVERIFIED"
+                return result
         for case in ("internal", "normal"):
             result[case] = _inspect(containers[case], runner)
         result["stage"] = "BOTH_PORTS_INSPECTED"
