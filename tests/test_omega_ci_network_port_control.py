@@ -61,6 +61,8 @@ class Controls(unittest.TestCase):
             calls.append(list(args))
             if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
                 return MockProcess("a"*64)
+            if args[:4] == ["docker", "network", "inspect", "--format"]:
+                return MockProcess("true" if args[-1].endswith("-int") else "false")
             if args[:3] == ["docker", "network", "create"] and "--internal" not in args:
                 return MockProcess(returncode=1)
             return MockProcess("synthetic")
@@ -77,7 +79,13 @@ class Controls(unittest.TestCase):
             commands.append(list(args))
             if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
                 return MockProcess("a"*64)
+            if args[:4] == ["docker", "network", "inspect", "--format"]:
+                return MockProcess("true" if args[-1].endswith("-int") else "false")
             if args[:3] == ["docker", "inspect", "--format"]:
+                if "NetworkSettings.Networks" in args[3]:
+                    suffix = "-int" if args[-1].endswith("-a") else "-norm"
+                    netname = args[-1][:-2] + suffix
+                    return MockProcess(json.dumps({netname: {}}))
                 value = (REQUEST if "HostConfig.PortBindings" in args[3] else
                          {"8000/tcp": None} if args[-1].endswith("-a") else LOOPBACK)
                 return MockProcess(json.dumps(value))
@@ -95,6 +103,30 @@ class Controls(unittest.TestCase):
         self.assertTrue(all(x[-1].startswith("omega-ci-netctrl-") for x in
                             removed_containers + removed_networks))
         self.assertFalse(any("omega-mvi-demo" in " ".join(x) for x in commands))
+
+    def test_wrong_internal_flag_prevents_causal_conclusion(self):
+        def runner(args, **kwargs):
+            if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
+                return MockProcess("a"*64)
+            if args[:4] == ["docker", "network", "inspect", "--format"]:
+                return MockProcess("false")  # Even the purported internal bridge
+            return MockProcess("synthetic")
+        result = control._probe(runner)
+        self.assertEqual(result["verdict"], "BLOCKED_INCONCLUSIVE")
+        self.assertEqual(result["stage"], "NETWORK_INTERNAL_FLAG_UNVERIFIED")
+
+    def test_unexpected_extra_attachment_prevents_causal_conclusion(self):
+        def runner(args, **kwargs):
+            if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
+                return MockProcess("a"*64)
+            if args[:4] == ["docker", "network", "inspect", "--format"]:
+                return MockProcess("true" if args[-1].endswith("-int") else "false")
+            if args[:3] == ["docker", "inspect", "--format"] and "NetworkSettings.Networks" in args[3]:
+                return MockProcess(json.dumps({"unexpected-extra-network": {}}))
+            return MockProcess("synthetic")
+        result = control._probe(runner)
+        self.assertEqual(result["verdict"], "BLOCKED_INCONCLUSIVE")
+        self.assertEqual(result["stage"], "CONTAINER_NETWORK_SCOPE_UNVERIFIED")
 
     def test_disabled_outside_ci_and_requires_explicit_flag(self):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
