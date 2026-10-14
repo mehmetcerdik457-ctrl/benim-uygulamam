@@ -39,12 +39,20 @@ def _docker_evidence(runner=subprocess.run):
     network = "UNVERIFIED"
     try:
         ports = json.loads(ports_raw) if ports_raw is not None else None
-        published = ports.get(CONTAINER_PORT) if isinstance(ports, dict) else None
-        if published is None:
-            binding = "MISSING"
-        elif isinstance(published, list) and published:
-            if all(x.get("HostIp") == "127.0.0.1" and
-                   str(x.get("HostPort")) == "18080" for x in published):
+        if isinstance(ports, dict):
+            # Fail closed on extra published ports and duplicated/malformed binds.
+            # Merely finding one allowed listener must never approve another one.
+            extras = any(port != CONTAINER_PORT and bindings not in (None, [])
+                         for port, bindings in ports.items())
+            published = ports.get(CONTAINER_PORT)
+            if extras:
+                binding = "UNSAFE"
+            elif published is None or published == []:
+                binding = "MISSING"
+            elif (isinstance(published, list) and len(published) == 1
+                  and isinstance(published[0], dict)
+                  and published[0] == {"HostIp": "127.0.0.1",
+                                       "HostPort": "18080"}):
                 binding = "LOOPBACK_ONLY"
             else:
                 binding = "UNSAFE"
