@@ -55,7 +55,11 @@ class _RelayHandler(socketserver.BaseRequestHandler):
 
 
 class _Relay(socketserver.ThreadingTCPServer):
-    daemon_threads = True
+    # Closing the listening socket is insufficient: daemon handler threads
+    # could still relay traffic after a PASS is printed. Join ALL accepted
+    # handler threads before the CI experiment can report success.
+    daemon_threads = False
+    block_on_close = True
     allow_reuse_address = False
     request_queue_size = 4
     max_concurrent_connections = 4
