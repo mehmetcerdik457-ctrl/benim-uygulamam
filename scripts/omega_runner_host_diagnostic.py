@@ -26,6 +26,31 @@ def _run(args, runner=subprocess.run):
     return result.stdout.strip()[:16000]
 
 
+def _private_services_isolated(runner):
+    """Check the *running* API and DB, rather than only Compose declarations."""
+    for service in ("api", "db"):
+        cid = _run(["docker", "compose", "-f", "compose.omega.yml",
+                    "ps", "-q", service], runner)
+        if not cid or len(cid.splitlines()) != 1:
+            return "UNVERIFIED"
+        raw_nets = _run(["docker", "inspect", "--format",
+                         "{{json .NetworkSettings.Networks}}", cid], runner)
+        raw_ports = _run(["docker", "inspect", "--format",
+                          "{{json .NetworkSettings.Ports}}", cid], runner)
+        try:
+            nets = json.loads(raw_nets) if raw_nets is not None else None
+            ports = json.loads(raw_ports) if raw_ports is not None else None
+        except (ValueError, TypeError):
+            return "UNVERIFIED"
+        if not isinstance(nets, dict) or not isinstance(ports, dict):
+            return "UNVERIFIED"
+        if set(nets) != {"omega-mvi-demo_isolated_demo"}:
+            return "UNSAFE"
+        if any(binding not in (None, []) for binding in ports.values()):
+            return "UNSAFE"
+    return "ISOLATED"
+
+
 def _docker_evidence(runner=subprocess.run):
     cid = _run(["docker", "compose", "-f", "compose.omega.yml", "ps", "-q", "ingress"], runner)
     if not cid or len(cid.splitlines()) != 1:
@@ -82,6 +107,12 @@ def _docker_evidence(runner=subprocess.run):
                     network = "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
     except (ValueError, TypeError, AttributeError):
         pass
+
+    private_services = _private_services_isolated(runner)
+    if private_services == "UNSAFE":
+        network = "UNSAFE"
+    elif private_services != "ISOLATED" and network == "SEGMENTED_INGRESS":
+        network = "UNVERIFIED"
 
     healthy = _run(
         ["docker", "compose", "-f", "compose.omega.yml", "exec", "-T", "api",
