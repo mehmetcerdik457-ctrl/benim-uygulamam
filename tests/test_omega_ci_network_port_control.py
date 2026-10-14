@@ -59,8 +59,8 @@ class Controls(unittest.TestCase):
         calls = []
         def runner(args, **kwargs):
             calls.append(list(args))
-            if args[:3] == ["docker", "image", "inspect"]:
-                return MockProcess("synthetic")
+            if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
+                return MockProcess("a"*64)
             if args[:3] == ["docker", "network", "create"] and "--internal" not in args:
                 return MockProcess(returncode=1)
             return MockProcess("synthetic")
@@ -75,8 +75,8 @@ class Controls(unittest.TestCase):
         commands = []
         def runner(args, **kwargs):
             commands.append(list(args))
-            if args[:3] == ["docker", "image", "inspect"]:
-                return MockProcess("synthetic")
+            if args[:6] == ["docker", "compose", "-f", "compose.omega.yml", "images", "--quiet"]:
+                return MockProcess("a"*64)
             if args[:3] == ["docker", "inspect", "--format"]:
                 value = (REQUEST if "HostConfig.PortBindings" in args[3] else
                          {"8000/tcp": None} if args[-1].endswith("-a") else LOOPBACK)
@@ -86,6 +86,7 @@ class Controls(unittest.TestCase):
             return MockProcess("synthetic")
         result = control._probe(runner)
         self.assertEqual(result, {"internal": "MISSING", "normal": "LOOPBACK_ONLY",
+                                  "stage": "BOTH_PORTS_INSPECTED",
                                   "verdict": "REPRODUCED_INTERNAL_ONLY_PORT_OMISSION"})
         removed_containers = [x for x in commands if x[:3] == ["docker", "rm", "--force"]]
         removed_networks = [x for x in commands if x[:3] == ["docker", "network", "rm"]]
