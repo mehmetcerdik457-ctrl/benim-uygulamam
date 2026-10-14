@@ -160,7 +160,9 @@ def test_extra_duplicate_or_malformed_published_ports_are_unsafe():
 def test_unpublished_extra_exposed_port_does_not_fake_an_unsafe_bind():
     base = runner_factory()
     def fake(args, **kwargs):
-        if args[:3] == ["docker", "inspect", "--format"] and "Ports" in args[3]:
+        # Only mutate ingress; API/DB must still report their own real fixture ports.
+        if (args[:3] == ["docker", "inspect", "--format"]
+                and "Ports" in args[3] and args[-1] == "synthetic-container-id"):
             return Result(json.dumps({
                 "8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18080"}],
                 "8000/tcp": None,
