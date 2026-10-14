@@ -51,24 +51,21 @@ def _binding(table):
 
 
 def _networks(table, runner):
-    # A second attachment is an unreviewed route, even if both are internal.
-    if not isinstance(table, dict) or len(table) != 2:
+    # A suffix-matching name is not an authorized Compose network.
+    expected = {"omega-mvi-demo_isolated_demo": True,
+                "omega-mvi-demo_loopback_ingress": False}
+    if not isinstance(table, dict):
         return "UNVERIFIED"
+    if set(table) != set(expected):
+        return "UNSAFE"
     states = {}
-    for name in table:
-        if not isinstance(name, str) or not name:
-            return "UNVERIFIED"
+    for name in expected:
         internal = _json(["docker", "network", "inspect", "--format",
                           "{{json .Internal}}", name], runner)
         if type(internal) is not bool:
             return "UNVERIFIED"
-        if name.endswith("_isolated_demo"):
-            states["isolated_demo"] = internal
-        elif name.endswith("_loopback_ingress"):
-            states["loopback_ingress"] = internal
-        else:
-            return "UNSAFE"
-    return "SEGMENTED_INGRESS" if states == {"isolated_demo": True, "loopback_ingress": False} else "UNSAFE"
+        states[name] = internal
+    return "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
 
 
 def audit(runner=subprocess.run):
