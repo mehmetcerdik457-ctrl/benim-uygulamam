@@ -1,4 +1,9 @@
-"""Build a narrow inventory from a supplied public GitHub metadata fixture."""
+"""Build a narrow, sanitized inventory from public GitHub metadata.
+
+Public metadata is untrusted input. Return redacted fields so all callers
+receive the same safety boundary, not just the current HTTP handler.
+"""
+from omega_mvi.inspection.redaction import redact_text
 
 TARGET_REPOSITORY = "mehmetcerdik457-ctrl/benim-uygulamam"
 _COUNT_FIELDS = {
@@ -23,8 +28,17 @@ def inventory_from_public_metadata_fixture(metadata):
         raise ValueError("Fixture is not public metadata for the authorized repository")
 
     description = metadata.get("description")
-    if description is not None and not isinstance(description, str):
-        raise ValueError("Repository description must be a string or null")
+    if description is not None:
+        if type(description) is not str:
+            raise ValueError("Repository description must be a string or null")
+        try:
+            safe_description = redact_text(description)
+        except Exception:
+            # Do not propagate provider text or sanitizer exception details.
+            raise PermissionError("METADATA_REDACTION_FAILED") from None
+        if type(safe_description) is not str:
+            raise PermissionError("METADATA_REDACTION_FAILED")
+        description = safe_description
 
     counts = {}
     for output_name, fixture_name in _COUNT_FIELDS.items():
