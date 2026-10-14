@@ -14,8 +14,17 @@ def test_four_modules_integrated_with_sources_redaction_and_zero_authority():
 
 def test_untrusted_inventory_description_is_redacted_in_http_demo(monkeypatch):
     from fastapi.testclient import TestClient
-    from omega_mvi.app.main import app
+    from importlib import import_module
     from omega_mvi.inspection import pipeline
+
+    # The disposable Dockerfile.test copies /omega_mvi/app into /app/app,
+    # while a repository checkout imports it as omega_mvi.app.
+    try:
+        app = import_module("omega_mvi.app.main").app
+    except ModuleNotFoundError as exc:
+        if exc.name not in ("omega_mvi.app", "omega_mvi.app.main"):
+            raise
+        app = import_module("app.main").app
 
     canary = "g" + "hp_" + ("Q" * 23)
     email = "fictional.owner" + "@" + "example.invalid"
