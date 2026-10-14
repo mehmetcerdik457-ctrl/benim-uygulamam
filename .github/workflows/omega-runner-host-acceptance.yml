@@ -31,6 +31,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Enforce exact PR source commit, not synthetic merge-ref
+        env:
+          OMEGA_EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$OMEGA_EXPECTED_SHA"
+          echo "OMEGA_HOST_ACCEPTANCE_EXACT_SOURCE=PASS"
       - name: Confirm network and publish config without printing credentials
         run: |
           python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8080' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
