@@ -32,6 +32,8 @@ def test_sensitive_implementation_changes_trigger_runner_host_gate():
         "scripts/omega_ingress_config_gate.py",
         "scripts/omega_runner_host_diagnostic.py",
         "scripts/omega_runner_host_port_audit.py",
+        "scripts/omega_runner_egress_route_guard.py",
+        "tests/test_omega_runner_egress_route_guard.py",
         "tests/test_omega_runner_host_workflow_coverage.py",
     ):
         assert any(fnmatchcase(source_path, pattern) for pattern in triggers), (
@@ -59,9 +61,13 @@ def test_required_host_and_port_enforcement_cannot_be_skipped():
     steps = job["steps"]
     port = next(step for step in steps if step.get("name") == "Enforce requested versus EFFECTIVE Docker host port mapping")
     host = next(step for step in steps if step.get("name") == "Enforce independent runner-host connectivity acceptance")
+    egress = next(step for step in steps if step.get("name") == "Enforce API no-default IPv4 and IPv6 route in real disposable container")
+    route_tests = next(step for step in steps if step.get("name") == "Test IPv4 and IPv6 default-route denial (synthetic)")
     assert port["run"].strip() == "python3 scripts/omega_runner_host_port_audit.py"
     assert host["run"].strip() == "python3 scripts/omega_runner_host_diagnostic.py --require-runner-host"
-    for step in (port, host):
+    assert egress["run"].strip() == "python3 scripts/omega_runner_egress_route_guard.py"
+    assert route_tests["run"].strip() == "python3 -m unittest discover -s tests -p test_omega_runner_egress_route_guard.py -v"
+    for step in (port, host, egress):
         assert step.get("if") == "success() || failure()"
         assert "continue-on-error" not in step
     assert not job.get("continue-on-error")
