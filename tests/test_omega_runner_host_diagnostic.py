@@ -157,6 +157,39 @@ def test_extra_duplicate_or_malformed_published_ports_are_unsafe():
         assert report["verdict"] == "UNSAFE"
 
 
+def test_malformed_falsey_extra_ports_are_unsafe_in_independent_host_gate():
+    base = runner_factory()
+    valid = {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18080"}]}
+    for malformed in (False, 0, "", {}, True, "invalid"):
+        def fake(args, **kwargs):
+            if (args[:3] == ["docker", "inspect", "--format"]
+                    and "NetworkSettings.Ports" in args[3]
+                    and args[-1] == "synthetic-container-id"):
+                return Result(json.dumps(dict(valid, **{"9999/tcp": malformed})))
+            return base(args, **kwargs)
+        report = h.diagnose(runner=fake,
+                            connector=lambda *a, **k: Connection(),
+                            opener=denied_opener)
+        assert report["binding"] == "UNSAFE"
+        assert report["verdict"] == "UNSAFE"
+
+
+def test_malformed_falsey_db_port_cannot_pass_runtime_service_isolation():
+    base = runner_factory()
+    for malformed in (False, 0, "", {}):
+        def fake(args, **kwargs):
+            if (args[:3] == ["docker", "inspect", "--format"]
+                    and "NetworkSettings.Ports" in args[3]
+                    and args[-1] == "synthetic-db-id"):
+                return Result(json.dumps({"5432/tcp": malformed}))
+            return base(args, **kwargs)
+        report = h.diagnose(runner=fake,
+                            connector=lambda *a, **k: Connection(),
+                            opener=denied_opener)
+        assert report["network"] == "UNSAFE"
+        assert report["verdict"] == "UNSAFE"
+
+
 def test_unpublished_extra_exposed_port_does_not_fake_an_unsafe_bind():
     base = runner_factory()
     def fake(args, **kwargs):
