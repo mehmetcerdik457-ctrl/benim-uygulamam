@@ -107,7 +107,8 @@ class _Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         # DNS-rebinding and confused-deputy controls, no Host variants.
-        if self.headers.get("Host") != "127.0.0.1:" + str(self.server.server_port):
+        hosts = self.headers.get_all("Host", [])
+        if len(hosts) != 1 or hosts[0] != "127.0.0.1:" + str(self.server.server_port):
             return self._reject()
         # Host may be trusted, but Origin, Upgrade and proxy auth are not.
         origin = self.headers.get("Origin")
@@ -123,6 +124,10 @@ class _Handler(BaseHTTPRequestHandler):
         if (parsed.scheme or parsed.netloc or parsed.query or parsed.fragment
                 or parsed.path not in ALLOWED or self.path != parsed.path):
             return self._reject(404)
+        # Even the aggregate demo endpoint is denied by default in this
+        # unauthenticated CI example. Never turn the mock DB into a public API.
+        if parsed.path == "/api/demo/task-status":
+            return self._reject()
         if not _is_mock(self.server.upstream, self.server.upstream_open):
             return self._reject(503)
         data = _fetch(self.server.upstream, parsed.path,
@@ -193,8 +198,11 @@ def experiment():
                         return status == expected and len(data) <= MAX_BODY
                     finally:
                         conn.close()
-                if not all(check("GET", path, 200) for path in ALLOWED):
+                if not all(check("GET", path, 200) for path in ALLOWED
+                           if path != "/api/demo/task-status"):
                     return "DASHBOARD_GET_NOT_VERIFIED"
+                if not check("GET", "/api/demo/task-status", 403):
+                    return "DATABASE_DENIAL_NOT_VERIFIED"
                 if not all(check("POST", path, 405) for path in (
                         "/api/execute", "/api/chat", "/api/demo/inspection")):
                     return "MUTATION_DENIAL_NOT_VERIFIED"
