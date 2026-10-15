@@ -183,16 +183,16 @@ class GatewayTests(unittest.TestCase):
 
     def test_mock_health_validation_rejects_wrong_service_and_unavailable(self):
         self.assertTrue(g._is_mock("172.28.0.4", self.fake))
-        self.assertFalse(g._is_mock("127.0.0.1", OpenMock(invalid_health=True)))
+        self.assertFalse(g._is_mock("172.28.0.4", OpenMock(invalid_health=True)))
         def blocked(request, timeout=3):
             raise OSError("not published")
-        self.assertFalse(g._is_mock("127.0.0.1", blocked))
+        self.assertFalse(g._is_mock("172.28.0.4", blocked))
 
     def test_only_exact_target_paths_can_be_fetched(self):
         before = len(self.fake.paths)
         self.assertIsNone(g._fetch("172.28.0.4", "http://evil.invalid/",
                                   opener=self.fake))
-        self.assertIsNone(g._fetch("127.0.0.1", "/admin", opener=self.fake))
+        self.assertIsNone(g._fetch("172.28.0.4", "/admin", opener=self.fake))
         self.assertEqual(len(self.fake.paths), before)
 
 
