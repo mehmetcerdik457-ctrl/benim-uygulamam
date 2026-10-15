@@ -7,6 +7,8 @@ on:
       - 'scripts/omega_runner_host_diagnostic.py'
       - 'scripts/omega_runner_host_port_audit.py'
       - 'scripts/omega_ci_network_port_control.py'
+      - 'scripts/omega_ci_readonly_dashboard_gateway.py'
+      - 'tests/test_omega_ci_readonly_dashboard_gateway.py'
       - 'tests/test_omega_ci_network_port_control.py'
       - 'scripts/omega_runner_host_direct_route.py'
       - 'scripts/omega_runner_egress_route_guard.py'
@@ -45,6 +47,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p test_omega_ci_ephemeral_loopback_relay.py -v
       - name: Test disposable A/B network-port control classifications (synthetic)
         run: python3 -m unittest discover -s tests -p test_omega_ci_network_port_control.py -v
+      - name: Test CI-only readonly dashboard ingress allowlist and denial (socket)
+        run: python3 -m unittest discover -s tests -p test_omega_ci_readonly_dashboard_gateway.py -v
       - name: Start disposable containers with unchanged Compose isolation
         run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
       - name: Observe Docker binding, network, runner TCP and HTTP independently
@@ -55,6 +59,8 @@ jobs:
         run: python3 scripts/omega_ci_ephemeral_loopback_relay.py --ci-disposable
       - name: Isolate Docker internal-only port omission using independent mock containers
         run: python3 scripts/omega_ci_network_port_control.py --ci-disposable
+      - name: Prove isolated Turkish dashboard via CI-only read-only localhost gateway
+        run: python3 scripts/omega_ci_readonly_dashboard_gateway.py --ci-disposable
       - name: Enforce no default IPv4 or IPv6 route in isolated API
         if: success() || failure()
         run: python3 scripts/omega_runner_egress_route_guard.py
