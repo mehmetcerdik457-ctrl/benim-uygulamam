@@ -104,6 +104,39 @@ class PortAuditTests(unittest.TestCase):
     def test_unexpected_additional_publication_is_unsafe(self):
         self.assertEqual(audit.audit(runner(extra_port=True))["verdict"], "UNSAFE")
 
+    def test_malformed_falsey_additional_port_can_never_claim_success(self):
+        valid = {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18080"}]}
+        for malformed in (False, 0, "", {}, True, "invalid"):
+            with self.subTest(malformed=malformed):
+                evidence = dict(valid, **{"9999/tcp": malformed})
+                result = audit.audit(runner(effective=evidence))
+                self.assertEqual(result["effective"], "UNSAFE")
+                self.assertEqual(result["verdict"], "UNSAFE")
+
+    def test_unpublished_extra_port_can_still_have_valid_mapping(self):
+        valid = {"8080/tcp": [{"HostIp": "127.0.0.1", "HostPort": "18080"}]}
+        for unpublished in (None, []):
+            with self.subTest(unpublished=unpublished):
+                result = audit.audit(runner(
+                    effective=dict(valid, **{"9999/tcp": unpublished})))
+                self.assertEqual(result["effective"], "LOOPBACK_ONLY")
+                self.assertEqual(result["verdict"],
+                                 "PORT_CONTRACT_PASS_NOT_HTTP_OR_OWNER")
+
+    def test_private_service_falsey_malformed_port_is_unsafe(self):
+        original = audit._json
+        for malformed in (False, 0, "", {}):
+            with self.subTest(malformed=malformed):
+                def mutation(args, fake_runner):
+                    if (args[-1] == "disposable-db-id"
+                            and "NetworkSettings.Ports" in str(args)):
+                        return {"5432/tcp": malformed}
+                    return original(args, fake_runner)
+                with patch.object(audit, "_json", side_effect=mutation):
+                    report = audit.audit(runner())
+                self.assertEqual(report["network"], "UNSAFE")
+                self.assertEqual(report["verdict"], "UNSAFE")
+
     def test_conflicting_compose_port_is_unsafe(self):
         self.assertEqual(audit.audit(runner(compose_port="0.0.0.0:18080"))["verdict"], "UNSAFE")
 
