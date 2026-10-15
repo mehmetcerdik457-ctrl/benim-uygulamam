@@ -45,11 +45,13 @@ def installed_model_metadata(model: str, port: int, timeout: int = 3):
             if isinstance(item, dict) and item.get("name") == model:
                 digest = item.get("digest")
                 size = item.get("size")
-                return {
-                    "digest": digest if isinstance(digest, str)
-                              and re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) else None,
-                    "size_bytes": size if type(size) is int and size >= 0 else None,
-                }
+                # A matching tag alone does not establish which weights were loaded.
+                # Reject malformed/missing digest and size BEFORE any generation.
+                if (not isinstance(digest, str)
+                    or re.fullmatch(r"sha256:[0-9a-fA-F]{64}", digest) is None
+                    or type(size) is not int or size <= 0):
+                    raise RuntimeError("local_model_identity_unverified")
+                return {"digest": digest, "size_bytes": size}
         raise RuntimeError("requested_model_not_installed")
     finally:
         conn.close()
