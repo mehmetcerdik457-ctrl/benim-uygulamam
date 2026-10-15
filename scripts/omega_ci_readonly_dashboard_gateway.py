@@ -172,6 +172,14 @@ class _Server(ThreadingHTTPServer):
     block_on_close = True
     allow_reuse_address = False
     max_concurrent_connections = 4
+    client_read_timeout_seconds = 4
+
+    def get_request(self):
+        client, address = super().get_request()
+        # Reject slow/idle connections: otherwise block_on_close could hang
+        # indefinitely waiting for a client that sends no HTTP request bytes.
+        client.settimeout(self.client_read_timeout_seconds)
+        return client, address
 
     def __init__(self, addr, upstream, opener=None):
         if (not isinstance(addr, tuple) or len(addr) != 2
