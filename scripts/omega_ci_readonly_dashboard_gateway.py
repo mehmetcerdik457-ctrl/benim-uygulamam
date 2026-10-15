@@ -10,6 +10,7 @@ A safe production ingress would need an independently approved identity,
 authorization, provenance, incident-recovery, and lifecycle design.
 """
 import argparse
+import ipaddress
 import json
 import os
 import socket
@@ -19,7 +20,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-from omega_runner_host_direct_route import target_ip
+from omega_runner_host_direct_route import RFC1918, target_ip
 from omega_runner_host_port_audit import audit
 
 HOST = "127.0.0.1"
@@ -111,8 +112,10 @@ class _Handler(BaseHTTPRequestHandler):
         if len(hosts) != 1 or hosts[0] != "127.0.0.1:" + str(self.server.server_port):
             return self._reject()
         # Host may be trusted, but Origin, Upgrade and proxy auth are not.
-        origin = self.headers.get("Origin")
-        if (origin not in (None, "http://127.0.0.1:" + str(self.server.server_port))
+        origins = self.headers.get_all("Origin", [])
+        if (len(origins) > 1
+                or any(v != "http://127.0.0.1:" + str(self.server.server_port)
+                       for v in origins)
                 or self.headers.get("Upgrade") is not None
                 or self.headers.get("Authorization") is not None
                 or self.headers.get("Proxy-Authorization") is not None
@@ -120,7 +123,10 @@ class _Handler(BaseHTTPRequestHandler):
                 or self.headers.get("Transfer-Encoding") is not None
                 or self.headers.get("Content-Length") is not None):
             return self._reject()
-        parsed = urlsplit(self.path)
+        try:
+            parsed = urlsplit(self.path)
+        except (TypeError, ValueError):
+            return self._reject(404)
         if (parsed.scheme or parsed.netloc or parsed.query or parsed.fragment
                 or parsed.path not in ALLOWED or self.path != parsed.path):
             return self._reject(404)
@@ -154,20 +160,50 @@ class _Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         return self._reject(405)
 
+    def do_CONNECT(self):
+        return self._reject(405)
+
+    def do_TRACE(self):
+        return self._reject(405)
+
 
 class _Server(ThreadingHTTPServer):
     daemon_threads = False
     block_on_close = True
     allow_reuse_address = False
+    max_concurrent_connections = 4
 
     def __init__(self, addr, upstream, opener=None):
         if (not isinstance(addr, tuple) or len(addr) != 2
                 or addr[0] != HOST or not isinstance(addr[1], int)
                 or isinstance(addr[1], bool) or not 0 <= addr[1] <= 65535):
             raise ValueError("CI-only IPv4 loopback required")
-        self.upstream = upstream
+        try:
+            target = ipaddress.IPv4Address(upstream)
+        except (ValueError, ipaddress.AddressValueError, TypeError):
+            raise ValueError("CI gateway target must be a fixed private IPv4 address") from None
+        if not any(target in net for net in RFC1918):
+            raise ValueError("CI gateway target must be RFC1918")
+        self.upstream = str(target)
         self.upstream_open = opener
+        self._slots = threading.BoundedSemaphore(self.max_concurrent_connections)
         super().__init__(addr, _Handler)
+
+    def process_request(self, request, client_address):
+        if not self._slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._slots.release()
 
 
 def experiment():
