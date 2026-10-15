@@ -46,7 +46,9 @@ def _private_services_isolated(runner):
             return "UNVERIFIED"
         if set(nets) != {"omega-mvi-demo_isolated_demo"}:
             return "UNSAFE"
-        if any(binding not in (None, []) for binding in ports.values()):
+        if any(binding is not None
+               and not (type(binding) is list and len(binding) == 0)
+               for binding in ports.values()):
             return "UNSAFE"
     return "ISOLATED"
 
@@ -67,7 +69,8 @@ def _docker_evidence(runner=subprocess.run):
         if isinstance(ports, dict):
             # Fail closed on extra published ports and duplicated/malformed binds.
             # Merely finding one allowed listener must never approve another one.
-            extras = any(port != CONTAINER_PORT and bindings not in (None, [])
+            extras = any(port != CONTAINER_PORT and bindings is not None
+                         and not (type(bindings) is list and len(bindings) == 0)
                          for port, bindings in ports.items())
             published = ports.get(CONTAINER_PORT)
             if extras:

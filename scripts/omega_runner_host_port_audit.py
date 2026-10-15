@@ -38,7 +38,11 @@ def _json(args, runner):
 def _binding(table):
     if not isinstance(table, dict):
         return "UNVERIFIED"
-    if any(port != EXPECTED_PORT and bindings for port, bindings in table.items()):
+    # Docker uses only null or [] for an exposed-but-unpublished port.
+    # False, 0, "", {} and other malformed extra mappings must fail closed.
+    if any(port != EXPECTED_PORT and bindings is not None
+           and not (type(bindings) is list and len(bindings) == 0)
+           for port, bindings in table.items()):
         return "UNSAFE"
     published = table.get(EXPECTED_PORT)
     if published is None or published == []:
@@ -82,7 +86,9 @@ def _private_services_isolated(runner):
             return "UNVERIFIED"
         if set(networks) != {"omega-mvi-demo_isolated_demo"}:
             return "UNSAFE"
-        if any(binding not in (None, []) for binding in ports.values()):
+        if any(binding is not None
+               and not (type(binding) is list and len(binding) == 0)
+               for binding in ports.values()):
             return "UNSAFE"
     return "ISOLATED"
 
