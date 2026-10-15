@@ -54,7 +54,7 @@ class OpenMock:
 
     @staticmethod
     def assert_url(url):
-        if not url.startswith("http://127.0.0.1:8000/"):
+        if not url.startswith("http://172.28.0.4:8000/"):
             raise AssertionError("unexpected upstream URL")
 
 
@@ -71,7 +71,7 @@ def request(port, method, path, *, headers=None):
 class GatewayTests(unittest.TestCase):
     def setUp(self):
         self.fake = OpenMock()
-        self.server = g._Server(("127.0.0.1", 0), "127.0.0.1",
+        self.server = g._Server(("127.0.0.1", 0), "172.28.0.4",
                                 opener=self.fake)
         self.thread = threading.Thread(target=self.server.serve_forever,
                                        kwargs={"poll_interval": 0.01}, daemon=True)
@@ -102,7 +102,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_any_write_method_is_denied_before_upstream(self):
         before = len(self.fake.paths)
-        for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"):
+        for method in ("POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "CONNECT", "TRACE"):
             with self.subTest(method=method):
                 status, _, _ = request(self.port, method, "/api/execute")
                 self.assertEqual(status, 405)
@@ -146,7 +146,32 @@ class GatewayTests(unittest.TestCase):
     def test_loopback_only_constructor_rejects_external_listeners(self):
         for ip in ("0.0.0.0", "::", "localhost", "192.168.1.2"):
             with self.subTest(ip=ip), self.assertRaises(ValueError):
-                g._Server((ip, 0), "127.0.0.1")
+                g._Server((ip, 0), "172.28.0.4")
+
+    def test_server_rejects_nonprivate_and_nonliteral_upstream_targets(self):
+        for target in ("8.8.8.8", "0.0.0.0", "127.0.0.1",
+                       "169.254.169.254", "example.com", "::1", ""):
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                g._Server(("127.0.0.1", 0), target)
+
+    def test_connections_are_bounded_and_fifth_is_rejected(self):
+        from unittest.mock import Mock
+        for _ in range(self.server.max_concurrent_connections):
+            self.assertTrue(self.server._slots.acquire(blocking=False))
+        self.assertFalse(self.server._slots.acquire(blocking=False))
+        with patch.object(self.server, "shutdown_request") as shutdown:
+            fake_client = Mock()
+            self.server.process_request(fake_client, ("127.0.0.1", 32000))
+            shutdown.assert_called_once_with(fake_client)
+        for _ in range(self.server.max_concurrent_connections):
+            self.server._slots.release()
+
+    def test_unsupported_origin_is_denied(self):
+        before = len(self.fake.paths)
+        result, _, _ = request(self.port, "GET", "/", headers={
+            "Origin": "http://evil.invalid"})
+        self.assertEqual(result, 403)
+        self.assertEqual(len(self.fake.paths), before)
 
     def test_disabled_without_explicit_ci_and_flag(self):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
@@ -157,7 +182,7 @@ class GatewayTests(unittest.TestCase):
                 self.assertEqual(g.main([]), 2)
 
     def test_mock_health_validation_rejects_wrong_service_and_unavailable(self):
-        self.assertTrue(g._is_mock("127.0.0.1", self.fake))
+        self.assertTrue(g._is_mock("172.28.0.4", self.fake))
         self.assertFalse(g._is_mock("127.0.0.1", OpenMock(invalid_health=True)))
         def blocked(request, timeout=3):
             raise OSError("not published")
@@ -165,7 +190,7 @@ class GatewayTests(unittest.TestCase):
 
     def test_only_exact_target_paths_can_be_fetched(self):
         before = len(self.fake.paths)
-        self.assertIsNone(g._fetch("127.0.0.1", "http://evil.invalid/",
+        self.assertIsNone(g._fetch("172.28.0.4", "http://evil.invalid/",
                                   opener=self.fake))
         self.assertIsNone(g._fetch("127.0.0.1", "/admin", opener=self.fake))
         self.assertEqual(len(self.fake.paths), before)
