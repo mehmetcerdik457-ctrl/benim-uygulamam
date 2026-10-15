@@ -173,6 +173,19 @@ class GatewayTests(unittest.TestCase):
         self.assertEqual(result, 403)
         self.assertEqual(len(self.fake.paths), before)
 
+    def test_accepted_idle_client_socket_has_read_deadline(self):
+        # A socket that never sends the HTTP request line must not pin
+        # shutdown indefinitely.
+        with g._Server(("127.0.0.1", 0), "172.28.0.4", opener=self.fake) as server:
+            with socket.create_connection(server.server_address, timeout=2):
+                accepted, _ = server.get_request()
+                try:
+                    self.assertEqual(
+                        accepted.gettimeout(), server.client_read_timeout_seconds)
+                    self.assertGreater(server.client_read_timeout_seconds, 0)
+                finally:
+                    accepted.close()
+
     def test_disabled_without_explicit_ci_and_flag(self):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
             with contextlib.redirect_stdout(io.StringIO()):
