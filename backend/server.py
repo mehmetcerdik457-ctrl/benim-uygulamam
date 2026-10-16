@@ -397,8 +397,15 @@ class Handler(BaseHTTPRequestHandler):
                               "organization_restricted", "access_terminated", "project_not_found",
                               "invalid_request_error", "model_not_available", "rate_limit_exceeded", "billing_hard_limit_reached"}
                 provider_type = provider_error.get("type") if isinstance(provider_error, dict) else None
-                provider_code = provider_code if provider_code in safe_codes else (provider_type if provider_type in safe_codes else "UNCLASSIFIED_PROVIDER_ERROR")
-            except (ValueError, AttributeError):
+                # Untrusted provider fields can be arrays/objects; never hash
+                # arbitrary values or forward provider text into diagnostics.
+                if isinstance(provider_code, str) and provider_code in safe_codes:
+                    pass
+                elif isinstance(provider_type, str) and provider_type in safe_codes:
+                    provider_code = provider_type
+                else:
+                    provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
+            except (ValueError, AttributeError, TypeError):
                 provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
             print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code} provider_code={provider_code}", flush=True)
             self._send(
@@ -417,8 +424,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send(504, {"error": "UPSTREAM_TIMEOUT", "request_id": request_id}, request_id)
             return
         except Exception as exc:
-            code = str(exc)
-            print(f"CHAT_ERROR request_id={request_id} code={code}", flush=True)
+            # Unknown exception messages may contain provider credentials,
+            # private URLs, request contents or upstream response fragments.
+            # Only fixed internal codes may cross the HTTP/log boundary.
+            safe_codes = {
+                "PROVIDER_NOT_CONFIGURED", "PROVIDER_MODEL_NOT_ALLOWED",
+                "INVALID_OUTPUT_TOKEN_LIMIT", "EMPTY_PROVIDER_RESPONSE",
+            }
+            raw_code = str(exc) if isinstance(exc, RuntimeError) else ""
+            code = raw_code if raw_code in safe_codes else "INTERNAL_PROVIDER_ERROR"
+            print(f"CHAT_ERROR request_id={request_id} code={code} exception_type={type(exc).__name__}", flush=True)
             self._send(502, {"error": code, "request_id": request_id}, request_id)
             return
 
