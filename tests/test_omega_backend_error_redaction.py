@@ -104,3 +104,42 @@ def test_allowlisted_provider_code_returns_only_safe_code(incoming):
     assert reply["upstream_status"] == 404
     assert reply["upstream_code"] == "model_not_found"
     assert "sk-sensitive" not in json.dumps(reply)
+
+
+@pytest.mark.parametrize("code", [200, "502"])
+def test_http_access_log_redacts_request_line_and_query(capsys, code):
+    """Stdlib request-line logger receives potentially sensitive query data."""
+    handler = object.__new__(server.Handler)
+    handler.log_message(
+        '"%s" %s %s',
+        "GET /api/chat?access_token=PRIVATE_QUERY_SENTINEL HTTP/1.1",
+        code, "-",
+    )
+    log = capsys.readouterr().out
+    assert log.strip() == f"HTTP_REQUEST status={code}"
+    assert "PRIVATE_QUERY_SENTINEL" not in log
+
+
+@pytest.mark.parametrize("bad_format, bad_args", [
+    ("%s", ("PRIVATE_ACCESS_LOG_SENTINEL",)),
+    ("unexpected PRIVATE_LOG_SENTINEL", ()),
+    ('"%s" %s %s', ("PRIVATE_LOG_SENTINEL", "200\r\nINJECTED", "-")),
+    ('"%s" %s %s', ("PRIVATE_LOG_SENTINEL", 999, "-")),
+])
+def test_http_log_never_formats_untrusted_content(capsys, bad_format, bad_args):
+    handler = object.__new__(server.Handler)
+    handler.log_message(bad_format, *bad_args)
+    log = capsys.readouterr().out
+    assert log.strip() == "HTTP_REQUEST status=UNKNOWN"
+    assert "PRIVATE" not in log
+    assert "INJECTED" not in log
+
+
+@pytest.mark.parametrize("safe", [
+    "UPSTREAM_RESPONSE_TOO_LARGE", "INVALID_PROVIDER_RESPONSE",
+])
+def test_provider_body_size_or_shape_errors_are_safe_internal_codes(incoming, safe):
+    issue, _ = incoming
+    status, reply = issue(RuntimeError(safe))
+    assert status == 502
+    assert reply["error"] == safe
