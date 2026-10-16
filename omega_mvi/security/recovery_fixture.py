@@ -35,7 +35,8 @@ def _memory_guard(conn: sqlite3.Connection):
         raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
     try:
         databases = conn.execute("PRAGMA database_list").fetchall()
-        if not databases or any(row[2] for row in databases):
+        if (len(databases) != 1 or databases[0][1] != "main"
+                or databases[0][2] != ""):
             raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
         marker = conn.execute(
             "SELECT marker FROM omega_fixture_sentinel WHERE id = 1"
@@ -51,7 +52,8 @@ def create_memory_fixture(conn: sqlite3.Connection):
     if type(conn) is not sqlite3.Connection:
         raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
     databases = conn.execute("PRAGMA database_list").fetchall()
-    if not databases or any(row[2] for row in databases):
+    if (len(databases) != 1 or databases[0][1] != "main"
+                or databases[0][2] != ""):
         raise SecurityDenied("RECOVERY_MEMORY_SQLITE_ONLY")
     existing = [x[0] for x in conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
