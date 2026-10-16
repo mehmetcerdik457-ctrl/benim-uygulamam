@@ -118,10 +118,28 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
     )
 
 
-def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
+def call_openai(
+    message: str,
+    attachments: list[dict[str, Any]],
+    *,
+    max_output_tokens: int | None = None,
+) -> tuple[str, str]:
+    """Send one Responses request; optional limit is request-local, never global.
+
+    The limit may only *reduce* the configured ceiling. Invalid values fail
+    closed before network access, including bool (a subclass of int).
+    """
+    if type(MAX_OUTPUT_TOKENS) is not int or MAX_OUTPUT_TOKENS < 1:
+        raise RuntimeError("INVALID_OUTPUT_TOKEN_LIMIT")
+    request_limit = MAX_OUTPUT_TOKENS if max_output_tokens is None else max_output_tokens
+    if type(request_limit) is not int or not 1 <= request_limit <= MAX_OUTPUT_TOKENS:
+        raise RuntimeError("INVALID_OUTPUT_TOKEN_LIMIT")
+
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    if not ALLOWED_MODELS:
+        raise RuntimeError("PROVIDER_MODEL_NOT_ALLOWED")
 
     model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
     payload = {
@@ -137,7 +155,7 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
                 ],
             }
         ],
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_output_tokens": request_limit,
         "store": False,
     }
     req = urllib.request.Request(
