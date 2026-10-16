@@ -106,3 +106,29 @@ def test_unexpected_empty_response_is_denied(fake_provider, monkeypatch):
     monkeypatch.setattr(server.urllib.request, "urlopen", empty_response)
     with pytest.raises(RuntimeError, match="EMPTY_PROVIDER_RESPONSE"):
         server.call_openai("hello", [], max_output_tokens=16)
+
+
+def test_simultaneous_requests_keep_independent_caps(fake_provider, monkeypatch):
+    """Both requests enter the fake upstream together; neither touches global state."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    rendezvous = Barrier(2, timeout=5)
+    payloads = []
+
+    def concurrent_urlopen(req, timeout=None):
+        payloads.append(json.loads(req.data.decode("utf-8"))["max_output_tokens"])
+        rendezvous.wait()
+        return FakeResponse(b'{"output_text":"synthetic reply"}')
+
+    monkeypatch.setattr(server.urllib.request, "urlopen", concurrent_urlopen)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [
+            pool.submit(server.call_openai, "first", [], max_output_tokens=16),
+            pool.submit(server.call_openai, "second", [], max_output_tokens=32),
+        ]
+        assert [job.result(timeout=8)[0] for job in futures] == [
+            "synthetic reply", "synthetic reply",
+        ]
+    assert sorted(payloads) == [16, 32]
+    assert server.MAX_OUTPUT_TOKENS == 128
