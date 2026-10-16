@@ -41,7 +41,7 @@ def incoming(monkeypatch):
 
 def test_unexpected_provider_exception_never_reflects_sensitive_message(incoming, capsys):
     issue, calls = incoming
-    bad = "sk-synthetic-private-string-do-not-log"
+    bad = "PRIVATE_EXCEPTION_SENTINEL_DO_NOT_LOG"
     status, reply = issue(RuntimeError("provider failure " + bad))
     log = capsys.readouterr().out
     assert calls == [True]
@@ -94,7 +94,7 @@ def test_untrusted_provider_error_code_types_cannot_break_error_handler(
 
 def test_allowlisted_provider_code_returns_only_safe_code(incoming):
     issue, _ = incoming
-    body = json.dumps({"error":{"code":"model_not_found","message":"sk-sensitive-not-shared"}}).encode()
+    body = json.dumps({"error":{"code":"model_not_found","message":"PRIVATE_UPSTREAM_BODY_SENTINEL"}}).encode()
     exc = urllib.error.HTTPError(
         "https://api.openai.com/v1/responses", 404, "Not found", None,
         io.BytesIO(body)
