@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """OMEGA P1 provider preflight: offline by default, never a deployment-time live request.
 
-LIVE mode is an *explicit, single billable request*, NOT for Railway preDeployCommand.
+LIVE mode is disabled until a per-request bounded provider adapter is implemented.
 No credentials, prompts, provider replies, or exception messages are printed.
 """
 from __future__ import annotations
@@ -63,15 +63,12 @@ def execute(mode: str, backend: object, environ: dict[str, str]) -> int:
         print("OMEGA_PROVIDER_SMOKE=OWNER_APPROVAL_OR_MODEL_DENIED")
         return 2
     # This is a standalone, manually approved test, NEVER a deploy/CI step.
-    old_limit = backend.MAX_OUTPUT_TOKENS
-    backend.MAX_OUTPUT_TOKENS = min(old_limit, MAX_PROBE_OUTPUT_TOKENS)
-    try:
-        reply, model = backend.call_openai(PROMPT, [])
-    except Exception:
-        print("OMEGA_PROVIDER_SMOKE=UPSTREAM_FAILED")
-        return 1
-    finally:
-        backend.MAX_OUTPUT_TOKENS = old_limit
+    # Do not mutate a shared module-level token limit: threaded callers may race.
+    # This inherited backend does not accept a per-request output cap.
+    # Refuse LIVE requests instead of falsely claiming that changing its global
+    # module attribute constrains other concurrently executing provider calls.
+    print("OMEGA_PROVIDER_SMOKE=SAFE_LIVE_ADAPTER_NOT_IMPLEMENTED")
+    return 2
     if model != backend.DEFAULT_MODEL or not exact_reply_ok(reply):
         print("OMEGA_PROVIDER_SMOKE=RESPONSE_MISMATCH")
         return 1
