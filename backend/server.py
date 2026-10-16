@@ -138,10 +138,12 @@ def call_openai(
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
-    if not ALLOWED_MODELS:
+    # A stale/typoed model must never silently route to a different provider
+    # model (different capabilities, prices or data-handling assumptions).
+    if not ALLOWED_MODELS or DEFAULT_MODEL not in ALLOWED_MODELS:
         raise RuntimeError("PROVIDER_MODEL_NOT_ALLOWED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    model = DEFAULT_MODEL
     payload = {
         "model": model,
         "input": [
