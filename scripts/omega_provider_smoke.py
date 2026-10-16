@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """OMEGA P1 provider preflight: offline by default, never a deployment-time live request.
 
-LIVE mode is disabled until a per-request bounded provider adapter is implemented.
+LIVE mode makes one approved billable request only outside CI/hosted Railway.
+It is never part of Railway pre-deploy; approval and model identity are explicit.
 No credentials, prompts, provider replies, or exception messages are printed.
 """
 from __future__ import annotations
@@ -62,13 +63,25 @@ def execute(mode: str, backend: object, environ: dict[str, str]) -> int:
             or environ.get("OMEGA_SINGLE_PROVIDER_PROBE_MODEL") != backend.DEFAULT_MODEL):
         print("OMEGA_PROVIDER_SMOKE=OWNER_APPROVAL_OR_MODEL_DENIED")
         return 2
-    # This is a standalone, manually approved test, NEVER a deploy/CI step.
-    # Do not mutate a shared module-level token limit: threaded callers may race.
-    # This inherited backend does not accept a per-request output cap.
-    # Refuse LIVE requests instead of falsely claiming that changing its global
-    # module attribute constrains other concurrently executing provider calls.
-    print("OMEGA_PROVIDER_SMOKE=SAFE_LIVE_ADAPTER_NOT_IMPLEMENTED")
-    return 2
+    # Automation must never be able to spend money even if an approval flag
+    # is accidentally present. Production Railway must use --mode offline.
+    if any(environ.get(name) for name in (
+            "CI", "GITHUB_ACTIONS", "RAILWAY_ENVIRONMENT_ID",
+            "RAILWAY_SERVICE_ID", "RAILWAY_PROJECT_ID")):
+        print("OMEGA_PROVIDER_SMOKE=AUTOMATED_OR_HOSTED_RUNTIME_DENIED")
+        return 2
+    # The backend explicitly supports a request-local limit; never alter a
+    # shared module-level default in a concurrent server.
+    if not callable(getattr(backend, "call_openai", None)):
+        print("OMEGA_PROVIDER_SMOKE=SAFE_LIVE_ADAPTER_NOT_IMPLEMENTED")
+        return 2
+    try:
+        reply, model = backend.call_openai(
+            PROMPT, [], max_output_tokens=MAX_PROBE_OUTPUT_TOKENS,
+        )
+    except Exception:
+        print("OMEGA_PROVIDER_SMOKE=UPSTREAM_FAILED")
+        return 1
     if model != backend.DEFAULT_MODEL or not exact_reply_ok(reply):
         print("OMEGA_PROVIDER_SMOKE=RESPONSE_MISMATCH")
         return 1
