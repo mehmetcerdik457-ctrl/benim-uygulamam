@@ -32,6 +32,8 @@ MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "65536"))
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "32000"))
 MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
 UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))
+# Hard response ceiling: independent of model output-token configuration.
+MAX_PROVIDER_RESPONSE_BYTES = 1_048_576
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
@@ -118,12 +120,32 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
     )
 
 
-def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
+def call_openai(
+    message: str,
+    attachments: list[dict[str, Any]],
+    *,
+    max_output_tokens: int | None = None,
+) -> tuple[str, str]:
+    """Send one Responses request; optional limit is request-local, never global.
+
+    The limit may only *reduce* the configured ceiling. Invalid values fail
+    closed before network access, including bool (a subclass of int).
+    """
+    if type(MAX_OUTPUT_TOKENS) is not int or MAX_OUTPUT_TOKENS < 1:
+        raise RuntimeError("INVALID_OUTPUT_TOKEN_LIMIT")
+    request_limit = MAX_OUTPUT_TOKENS if max_output_tokens is None else max_output_tokens
+    if type(request_limit) is not int or not 1 <= request_limit <= MAX_OUTPUT_TOKENS:
+        raise RuntimeError("INVALID_OUTPUT_TOKEN_LIMIT")
+
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    # A stale/typoed model must never silently route to a different provider
+    # model (different capabilities, prices or data-handling assumptions).
+    if not ALLOWED_MODELS or DEFAULT_MODEL not in ALLOWED_MODELS:
+        raise RuntimeError("PROVIDER_MODEL_NOT_ALLOWED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    model = DEFAULT_MODEL
     payload = {
         "model": model,
         "input": [
@@ -137,7 +159,7 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
                 ],
             }
         ],
-        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_output_tokens": request_limit,
         "store": False,
     }
     req = urllib.request.Request(
@@ -151,8 +173,12 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
         },
     )
     with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
-        raw = response.read()
+        raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise RuntimeError("UPSTREAM_RESPONSE_TOO_LARGE")
     data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise RuntimeError("INVALID_PROVIDER_RESPONSE")
     text = extract_response_text(data)
     if not text:
         raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
@@ -379,8 +405,15 @@ class Handler(BaseHTTPRequestHandler):
                               "organization_restricted", "access_terminated", "project_not_found",
                               "invalid_request_error", "model_not_available", "rate_limit_exceeded", "billing_hard_limit_reached"}
                 provider_type = provider_error.get("type") if isinstance(provider_error, dict) else None
-                provider_code = provider_code if provider_code in safe_codes else (provider_type if provider_type in safe_codes else "UNCLASSIFIED_PROVIDER_ERROR")
-            except (ValueError, AttributeError):
+                # Untrusted provider fields can be arrays/objects; never hash
+                # arbitrary values or forward provider text into diagnostics.
+                if isinstance(provider_code, str) and provider_code in safe_codes:
+                    pass
+                elif isinstance(provider_type, str) and provider_type in safe_codes:
+                    provider_code = provider_type
+                else:
+                    provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
+            except (ValueError, AttributeError, TypeError):
                 provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
             print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code} provider_code={provider_code}", flush=True)
             self._send(
@@ -399,8 +432,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(504, {"error": "UPSTREAM_TIMEOUT", "request_id": request_id}, request_id)
             return
         except Exception as exc:
-            code = str(exc)
-            print(f"CHAT_ERROR request_id={request_id} code={code}", flush=True)
+            # Unknown exception messages may contain provider credentials,
+            # private URLs, request contents or upstream response fragments.
+            # Only fixed internal codes may cross the HTTP/log boundary.
+            safe_codes = {
+                "PROVIDER_NOT_CONFIGURED", "PROVIDER_MODEL_NOT_ALLOWED",
+                "INVALID_OUTPUT_TOKEN_LIMIT", "EMPTY_PROVIDER_RESPONSE",
+                "UPSTREAM_RESPONSE_TOO_LARGE", "INVALID_PROVIDER_RESPONSE",
+            }
+            raw_code = str(exc) if isinstance(exc, RuntimeError) else ""
+            code = raw_code if raw_code in safe_codes else "INTERNAL_PROVIDER_ERROR"
+            print(f"CHAT_ERROR request_id={request_id} code={code} exception_type={type(exc).__name__}", flush=True)
             self._send(502, {"error": code, "request_id": request_id}, request_id)
             return
 
@@ -416,7 +458,15 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # The standard BaseHTTPRequestHandler request line may include query
+        # strings, headers, or user-supplied control characters. Never log it.
+        status = "UNKNOWN"
+        if fmt == '"%s" %s %s' and len(args) == 3 and type(args[1]) in (int, str):
+            candidate = str(args[1])
+            if len(candidate) == 3 and candidate.isascii() and candidate.isdigit():
+                if 100 <= int(candidate) <= 599:
+                    status = candidate
+        print(f"HTTP_REQUEST status={status}", flush=True)
 
 
 def main() -> None:
