@@ -132,3 +132,17 @@ def test_simultaneous_requests_keep_independent_caps(fake_provider, monkeypatch)
         ]
     assert sorted(payloads) == [16, 32]
     assert server.MAX_OUTPUT_TOKENS == 128
+
+
+def test_configured_model_not_in_allowlist_is_denied_before_network(fake_provider, monkeypatch):
+    monkeypatch.setattr(server, "DEFAULT_MODEL", "unexpected-model")
+    with pytest.raises(RuntimeError, match="PROVIDER_MODEL_NOT_ALLOWED"):
+        server.call_openai("hello", [], max_output_tokens=16)
+    assert fake_provider == []
+
+
+def test_configured_model_mismatch_never_falls_back_to_first_model(fake_provider, monkeypatch):
+    monkeypatch.setattr(server, "ALLOWED_MODELS", ("other-model", "another-model"))
+    with pytest.raises(RuntimeError, match="PROVIDER_MODEL_NOT_ALLOWED"):
+        server.call_openai("hello", [])
+    assert fake_provider == []
