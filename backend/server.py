@@ -32,6 +32,8 @@ MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "65536"))
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "32000"))
 MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
 UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))
+# Hard response ceiling: independent of model output-token configuration.
+MAX_PROVIDER_RESPONSE_BYTES = 1_048_576
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
@@ -171,8 +173,12 @@ def call_openai(
         },
     )
     with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
-        raw = response.read()
+        raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise RuntimeError("UPSTREAM_RESPONSE_TOO_LARGE")
     data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise RuntimeError("INVALID_PROVIDER_RESPONSE")
     text = extract_response_text(data)
     if not text:
         raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
@@ -432,6 +438,7 @@ class Handler(BaseHTTPRequestHandler):
             safe_codes = {
                 "PROVIDER_NOT_CONFIGURED", "PROVIDER_MODEL_NOT_ALLOWED",
                 "INVALID_OUTPUT_TOKEN_LIMIT", "EMPTY_PROVIDER_RESPONSE",
+                "UPSTREAM_RESPONSE_TOO_LARGE", "INVALID_PROVIDER_RESPONSE",
             }
             raw_code = str(exc) if isinstance(exc, RuntimeError) else ""
             code = raw_code if raw_code in safe_codes else "INTERNAL_PROVIDER_ERROR"
@@ -451,7 +458,15 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # The standard BaseHTTPRequestHandler request line may include query
+        # strings, headers, or user-supplied control characters. Never log it.
+        status = "UNKNOWN"
+        if fmt == '"%s" %s %s' and len(args) == 3 and type(args[1]) in (int, str):
+            candidate = str(args[1])
+            if len(candidate) == 3 and candidate.isascii() and candidate.isdigit():
+                if 100 <= int(candidate) <= 599:
+                    status = candidate
+        print(f"HTTP_REQUEST status={status}", flush=True)
 
 
 def main() -> None:
