@@ -18,8 +18,8 @@ class FakeResponse:
     def __exit__(self, *args):
         return False
 
-    def read(self):
-        return self.body
+    def read(self, size=-1):
+        return self.body if size is None or size < 0 else self.body[:size]
 
 
 @pytest.fixture
@@ -146,3 +146,53 @@ def test_configured_model_mismatch_never_falls_back_to_first_model(fake_provider
     with pytest.raises(RuntimeError, match="PROVIDER_MODEL_NOT_ALLOWED"):
         server.call_openai("hello", [])
     assert fake_provider == []
+
+
+def test_provider_response_is_read_with_hard_ceiling(fake_provider, monkeypatch):
+    """Upstream read must be bounded, not a bare response.read()."""
+    read_sizes = []
+    class RecordingResponse(FakeResponse):
+        def read(self, size=-1):
+            read_sizes.append(size)
+            return super().read(size)
+    monkeypatch.setattr(
+        server.urllib.request, "urlopen",
+        lambda req, timeout=None: RecordingResponse(b'{"output_text":"safe"}')
+    )
+    assert server.call_openai("hello", [], max_output_tokens=16)[0] == "safe"
+    assert read_sizes == [server.MAX_PROVIDER_RESPONSE_BYTES + 1]
+
+
+def test_provider_large_payload_is_rejected_not_logged(fake_provider, monkeypatch):
+    """A provider ignoring output-token limits must not exhaust memory."""
+    big = b'{"output_text":"' + b'X' * (server.MAX_PROVIDER_RESPONSE_BYTES + 1) + b'"}'
+    monkeypatch.setattr(
+        server.urllib.request, "urlopen",
+        lambda req, timeout=None: FakeResponse(big)
+    )
+    with pytest.raises(RuntimeError, match="UPSTREAM_RESPONSE_TOO_LARGE"):
+        server.call_openai("hello", [], max_output_tokens=16)
+
+
+@pytest.mark.parametrize("body", [b"[]", b'"wrong shape"', b"42", b"null"])
+def test_non_object_provider_response_fails_closed(fake_provider, monkeypatch, body):
+    monkeypatch.setattr(
+        server.urllib.request, "urlopen",
+        lambda req, timeout=None: FakeResponse(body)
+    )
+    with pytest.raises(RuntimeError, match="INVALID_PROVIDER_RESPONSE"):
+        server.call_openai("hello", [], max_output_tokens=16)
+
+
+def test_bounded_json_accepted_at_one_megabyte(fake_provider, monkeypatch):
+    # Max-size check is byte-exact and does not wrongly reject valid JSON.
+    suffix = b'{"output_text":"'
+    trailer = b'"}'
+    body = suffix + b'a' * (server.MAX_PROVIDER_RESPONSE_BYTES-len(suffix)-len(trailer)) + trailer
+    assert len(body) == server.MAX_PROVIDER_RESPONSE_BYTES
+    monkeypatch.setattr(
+        server.urllib.request, "urlopen",
+        lambda req, timeout=None: FakeResponse(body)
+    )
+    reply, _ = server.call_openai("hello", [], max_output_tokens=16)
+    assert len(reply) == server.MAX_PROVIDER_RESPONSE_BYTES-len(suffix)-len(trailer)
