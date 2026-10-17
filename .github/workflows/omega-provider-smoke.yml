@@ -7,6 +7,7 @@ on:
       - "tests/test_omega_provider_smoke.py"
       - "tests/test_omega_provider_request_cap.py"
       - "tests/test_omega_backend_error_redaction.py"
+      - "tests/test_omega_provider_rate_limit_identity.py"
       - "backend/server.py"
       - ".github/workflows/omega-provider-smoke.yml"
   workflow_dispatch:
@@ -38,4 +39,4 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check pytest==8.4.2
           python -m compileall -q backend scripts tests
-          python -m pytest -q tests/test_omega_provider_smoke.py tests/test_omega_provider_request_cap.py tests/test_omega_backend_error_redaction.py
+          python -m pytest -q tests/test_omega_provider_smoke.py tests/test_omega_provider_request_cap.py tests/test_omega_backend_error_redaction.py tests/test_omega_provider_rate_limit_identity.py
