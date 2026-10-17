@@ -60,8 +60,12 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    # No verified trusted-proxy boundary exists for X-Forwarded-For.
+    # A caller-controlled forwarded address could otherwise select a new
+    # rate-limit bucket on every request. Default to the socket peer.
+    # TODO: authenticated per-user identity is required for fair limits
+    # when several users share the same upstream proxy connection.
+    return peer_ip
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
