@@ -125,3 +125,35 @@ def test_provider_exception_cannot_leak_secret_to_response_or_logs(
     assert status == 502
     assert secret not in body
     assert secret not in captured.out
+
+
+def test_root_health_alias_is_not_defined(backend_url):
+    status, body = request(backend_url + "/health")
+    assert status == 404
+    assert json.loads(body)["error"] == "NOT_FOUND"
+
+
+def test_http_json_array_is_rejected(backend_url):
+    status, body = request(
+        backend_url + "/api/chat",
+        method="POST",
+        body=b"[]",
+    )
+    assert status == 400
+    assert json.loads(body)["error"] == "JSON_OBJECT_REQUIRED"
+
+
+def test_http_non_array_attachments_are_rejected(backend_url, monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "OMEGA_TEST_ONLY_NOT_A_REAL_KEY")
+
+    def must_not_call_provider(*args, **kwargs):
+        raise AssertionError("provider should not be called for invalid attachments")
+
+    monkeypatch.setattr(server, "call_openai", must_not_call_provider)
+    status, body = request(
+        backend_url + "/api/chat",
+        method="POST",
+        body=b'{"message":"hello","attachments":{}}',
+    )
+    assert status == 400
+    assert json.loads(body)["error"] == "ATTACHMENTS_MUST_BE_ARRAY"
