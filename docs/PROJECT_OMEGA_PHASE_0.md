@@ -13,7 +13,7 @@ and explicit authorization boundaries.
 | Area | Current contents | Status |
 | --- | --- | --- |
 | Backend | `backend/server.py`, Python standard library HTTP server | Exists; not FastAPI |
-| Tests | `tests/test_backend_contract.py`, placeholder test | Small contract suite |
+| Tests | `tests/test_backend_contract.py`, `tests/test_repository_contract.py` | Deterministic contract suite |
 | Dependencies | `requirements.txt` states stdlib-only | No application packages pinned |
 | Configuration | `.env.example` | Placeholders; includes external provider configuration |
 | CI | GitHub workflows, including a reusable Python baseline | Present; branch protections not verified |
