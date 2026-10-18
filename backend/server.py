@@ -394,9 +394,15 @@ class Handler(BaseHTTPRequestHandler):
             self._send(504, {"error": "UPSTREAM_TIMEOUT", "request_id": request_id}, request_id)
             return
         except Exception as exc:
-            code = str(exc)
-            print(f"CHAT_ERROR request_id={request_id} code={code}", flush=True)
-            self._send(502, {"error": code, "request_id": request_id}, request_id)
+            # Never reflect arbitrary provider/runtime exception text to clients or logs:
+            # exception strings can contain credentials or upstream response fragments.
+            error_type = type(exc).__name__
+            print(f"CHAT_ERROR request_id={request_id} type={error_type}", flush=True)
+            self._send(
+                502,
+                {"error": "UPSTREAM_PROVIDER_ERROR", "request_id": request_id},
+                request_id,
+            )
             return
 
         self._send(
