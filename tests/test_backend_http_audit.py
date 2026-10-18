@@ -1,15 +1,19 @@
 """Isolated HTTP contract and secret-leak regression tests for the backend.
 
-All provider calls are monkeypatched. No real API key or network request is used.
+All provider calls are monkeypatched. No real API key or provider request is used.
 """
 import json
+import sys
 import threading
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "backend"))
 import server
 
 
@@ -28,8 +32,7 @@ def backend_url(monkeypatch):
 
 
 def request(url, method="GET", body=None):
-    data = None if body is None else body
-    req = urllib.request.Request(url, data=data, method=method)
+    req = urllib.request.Request(url, data=body, method=method)
     try:
         with urllib.request.urlopen(req, timeout=2) as response:
             return response.status, response.read().decode("utf-8")
