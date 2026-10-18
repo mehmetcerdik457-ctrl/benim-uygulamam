@@ -18,6 +18,7 @@ from typing import Any
 
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
+OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
 ALLOWED_MODELS = tuple(
     x.strip()
@@ -103,6 +104,34 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
         + "\n\n[Attachment metadata only; file contents are not present]\n"
         + json.dumps(safe, ensure_ascii=False, separators=(",", ":"))
     )
+
+
+
+def fetch_openai_model_ids() -> set[str]:
+    """Fetch the account-visible model IDs from OpenAI; never expose provider response bodies."""
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not api_key:
+        raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+
+    req = urllib.request.Request(
+        OPENAI_MODELS_URL,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": f"mehmet-ai-backend/{VERSION}",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=min(UPSTREAM_TIMEOUT_SECONDS, 10.0)) as response:
+        payload = json.loads(response.read())
+
+    rows = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("INVALID_MODEL_LIST_RESPONSE")
+    return {
+        row["id"]
+        for row in rows
+        if isinstance(row, dict) and isinstance(row.get("id"), str) and row["id"]
+    }
 
 
 def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
@@ -212,11 +241,28 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/models":
+            if not configured():
+                self._send(503, {"error": "PROVIDER_NOT_CONFIGURED"})
+                return
+            try:
+                live_ids = fetch_openai_model_ids()
+            except urllib.error.HTTPError as exc:
+                self._send(502, {"error": "MODEL_LIST_UPSTREAM_ERROR", "upstream_status": exc.code})
+                return
+            except (urllib.error.URLError, TimeoutError):
+                self._send(504, {"error": "MODEL_LIST_TIMEOUT"})
+                return
+            except (ValueError, RuntimeError):
+                self._send(502, {"error": "MODEL_LIST_UNAVAILABLE"})
+                return
+
+            allowed_live = sorted(set(ALLOWED_MODELS) & live_ids)
             self._send(
                 200,
                 {
-                    "default": DEFAULT_MODEL,
-                    "allowed": list(ALLOWED_MODELS),
+                    "default": DEFAULT_MODEL if DEFAULT_MODEL in allowed_live else None,
+                    "allowed": allowed_live,
+                    "unavailable_allowed": sorted(set(ALLOWED_MODELS) - live_ids),
                 },
             )
             return

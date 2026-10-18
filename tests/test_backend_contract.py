@@ -62,3 +62,67 @@ def test_configured_false_without_key(monkeypatch):
 def test_configured_true_with_key(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     assert server.configured() is True
+
+
+
+def test_fetch_openai_model_ids_uses_authenticated_models_endpoint(monkeypatch):
+    import io
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"data":[{"id":"gpt-5.6-luna"},{"id":"other-model"},{"id":7},{}]}'
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["authorization"] = request.get_header("Authorization")
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(server.urllib.request, "urlopen", fake_urlopen)
+    assert server.fetch_openai_model_ids() == {"gpt-5.6-luna", "other-model"}
+    assert captured["url"] == "https://api.openai.com/v1/models"
+    assert captured["authorization"] == "Bearer test-only-not-a-real-key"
+    assert captured["timeout"] <= 10
+
+
+def test_fetch_openai_model_ids_requires_api_key(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    try:
+        server.fetch_openai_model_ids()
+    except RuntimeError as exc:
+        assert str(exc) == "PROVIDER_NOT_CONFIGURED"
+    else:
+        raise AssertionError("Expected missing-key failure")
+
+
+def test_fetch_openai_model_ids_rejects_invalid_shape(monkeypatch):
+    import io
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"models":[]}'
+
+    monkeypatch.setattr(server.urllib.request, "urlopen", lambda *args, **kwargs: FakeResponse())
+    try:
+        server.fetch_openai_model_ids()
+    except ValueError as exc:
+        assert str(exc) == "INVALID_MODEL_LIST_RESPONSE"
+    else:
+        raise AssertionError("Expected invalid-response failure")
