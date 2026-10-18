@@ -370,7 +370,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(413, {"error": "MESSAGE_TOO_LARGE", "request_id": request_id}, request_id)
             return
 
-        attachments = body.get("attachments") or []
+        attachments = body.get("attachments", [])
+        if attachments is None:
+            attachments = []
         if not isinstance(attachments, list):
             self._send(400, {"error": "ATTACHMENTS_MUST_BE_ARRAY", "request_id": request_id}, request_id)
             return
