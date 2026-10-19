@@ -46,8 +46,13 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    """Rate-limit by the TCP peer, never by caller-controlled forwarding headers.
+
+    X-Forwarded-For / Forwarded / X-Real-IP are untrusted unless a verified
+    reverse-proxy trust chain exists.  Behind a shared proxy this intentionally
+    uses one bucket for that peer rather than allowing header-based bypass.
+    """
+    return peer_ip or "UNKNOWN_PEER"
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
@@ -419,7 +424,13 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # BaseHTTPRequestHandler's default log includes the raw request line,
+        # including attacker-controlled paths and query parameters. Only log
+        # a sanitized numeric HTTP status; never serialize the raw request.
+        if fmt == '"%s" %s %s' and len(args) >= 2:
+            status = str(args[1])
+            if len(status) == 3 and status.isascii() and status.isdigit():
+                print(f"HTTP_STATUS status={status}", flush=True)
 
 
 def main() -> None:
