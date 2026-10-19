@@ -40,24 +40,30 @@ def _relative(value: Any) -> PurePosixPath:
 
 
 def _open_regular_no_links(root: Path, relative: PurePosixPath) -> int:
-    current = root
-    for part in relative.parts:
-        current = current / part
-        # Do not follow any symlink, including directory components.
-        if current.is_symlink():
-            raise EvidenceError("UNSAFE_PATH")
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    """Open every path segment via dir_fd without following symlinks.
+
+    A name-based is_symlink precheck alone would be vulnerable to a directory
+    rename race; directory handles and O_NOFOLLOW protect each traversal step.
+    """
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    file_flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    opened_dirs = []
     try:
-        fd = os.open(current, flags)
-    except OSError as exc:
-        raise EvidenceError("FILE_UNAVAILABLE") from None
-    try:
+        root_fd = os.open(root, directory_flags)
+        opened_dirs.append(root_fd)
+        for component in relative.parts[:-1]:
+            child_fd = os.open(component, directory_flags, dir_fd=opened_dirs[-1])
+            opened_dirs.append(child_fd)
+        fd = os.open(relative.parts[-1], file_flags, dir_fd=opened_dirs[-1])
         if not stat.S_ISREG(os.fstat(fd).st_mode):
+            os.close(fd)
             raise EvidenceError("NOT_REGULAR_FILE")
         return fd
-    except BaseException:
-        os.close(fd)
-        raise
+    except OSError:
+        raise EvidenceError("FILE_UNAVAILABLE") from None
+    finally:
+        for dfd in reversed(opened_dirs):
+            os.close(dfd)
 
 
 def _sha256_fd(fd: int) -> str:
