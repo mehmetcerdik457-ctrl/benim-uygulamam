@@ -41,6 +41,17 @@ def configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
 
 
+def owner_execution_authorized() -> bool:
+    """Deny provider egress until a verified owner identity service exists.
+
+    API keys, HTTP headers, reverse-proxy hints and environment switches are
+    not owner authentication. This function must not be made configurable via
+    a boolean flag; only a separately reviewed identity integration may
+    replace this fail-closed gate.
+    """
+    return False
+
+
 def json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
@@ -260,6 +271,9 @@ class Handler(BaseHTTPRequestHandler):
             if not configured():
                 self._send(503, {"error": "PROVIDER_NOT_CONFIGURED"})
                 return
+            if not owner_execution_authorized():
+                self._send(403, {"error": "OWNER_AUTH_REQUIRED"})
+                return
             try:
                 live_ids = fetch_openai_model_ids()
             except urllib.error.HTTPError as exc:
@@ -391,6 +405,12 @@ class Handler(BaseHTTPRequestHandler):
             attachments = []
         if not isinstance(attachments, list):
             self._send(400, {"error": "ATTACHMENTS_MUST_BE_ARRAY", "request_id": request_id}, request_id)
+            return
+
+        # An upstream API key does not prove who is calling this endpoint.
+        # Never call the external provider while owner auth is unprovisioned.
+        if not owner_execution_authorized():
+            self._send(403, {"error": "OWNER_AUTH_REQUIRED", "request_id": request_id}, request_id)
             return
 
         try:
