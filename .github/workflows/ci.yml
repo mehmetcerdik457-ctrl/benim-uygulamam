@@ -1,13 +1,20 @@
 name: CI
-
 on:
   push:
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   baseline:
-    uses: mehmetcerdik457-ctrl/.github/.github/workflows/reusable-python-baseline.yml@fea0cdba87dd09c88648eb29302e65c32ba7fd44
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run existing Python regression tests
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m pytest -q
