@@ -35,8 +35,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git grep -nE '(sk-proj-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.env.example'; then
-            echo "Potential live secret detected"
+          set +e
+          git grep -a -q -E '(sk-proj-[A-Za-z0-9_-]{16,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})' -- ':!*.md' ':!.env.example'
+          scan_status=$?
+          set -e
+          if test "$scan_status" -eq 0; then
+            echo "Potential live secret detected (value and path suppressed)"
+            exit 1
+          elif test "$scan_status" -ne 1; then
+            echo "Secret scan failed closed (details suppressed)"
             exit 1
           fi
           echo "SECRET_PATTERN_GUARD=PASS"
