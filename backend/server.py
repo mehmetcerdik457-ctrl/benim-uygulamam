@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import threading
 import time
 import uuid
 import urllib.error
@@ -35,6 +37,19 @@ UPSTREAM_TIMEOUT_SECONDS = float(os.getenv("UPSTREAM_TIMEOUT_SECONDS", "45"))
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))
 
 _rate_buckets: dict[str, deque[float]] = defaultdict(deque)
+_rate_lock = threading.Lock()
+MAX_RATE_BUCKETS = 4096
+REQUEST_READ_TIMEOUT_SECONDS = 5.0
+_SECRET_PATTERN = re.compile(r"(?i)(?:sk-[a-z0-9_-]{16,}|gh[pousr]_[a-z0-9]{20,}|AIza[a-z0-9_-]{30,})")
+_REDACTED = "[GIZLI_DEGER_MASKELENDI]"
+
+
+def redact_sensitive_text(value: str) -> str:
+    """Mask configured credentials and recognized token forms before model/log output."""
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if len(key) >= 8:
+        value = value.replace(key, _REDACTED)
+    return _SECRET_PATTERN.sub(_REDACTED, value)
 
 
 def configured() -> bool:
@@ -46,20 +61,28 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    # This local service has no configured trusted reverse proxy. Client-supplied
+    # forwarding headers cannot establish identity or bypass rate limits.
+    return peer_ip
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
     now = time.time() if now is None else now
-    bucket = _rate_buckets[key]
-    cutoff = now - 60.0
-    while bucket and bucket[0] < cutoff:
-        bucket.popleft()
-    if len(bucket) >= RATE_LIMIT_PER_MINUTE:
-        return False
-    bucket.append(now)
-    return True
+    with _rate_lock:
+        cutoff = now - 60.0
+        if key not in _rate_buckets and len(_rate_buckets) >= MAX_RATE_BUCKETS:
+            stale = [name for name, items in _rate_buckets.items() if not items or items[-1] < cutoff]
+            for name in stale:
+                del _rate_buckets[name]
+            if len(_rate_buckets) >= MAX_RATE_BUCKETS:
+                return False
+        bucket = _rate_buckets[key]
+        while bucket and bucket[0] < cutoff:
+            bucket.popleft()
+        if len(bucket) >= RATE_LIMIT_PER_MINUTE:
+            return False
+        bucket.append(now)
+        return True
 
 
 def extract_response_text(data: dict[str, Any]) -> str:
@@ -82,6 +105,7 @@ def extract_response_text(data: dict[str, Any]) -> str:
 
 
 def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
+    message = redact_sensitive_text(message)
     if not attachments:
         return message
     safe = []
@@ -90,11 +114,11 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
             continue
         safe.append(
             {
-                "name": str(item.get("name", ""))[:256],
-                "type": str(item.get("type", ""))[:128],
-                "size": item.get("size"),
-                "sha256": str(item.get("sha256", ""))[:128],
-                "source": str(item.get("source", ""))[:64],
+                "name": redact_sensitive_text(str(item.get("name", "")))[:256],
+                "type": redact_sensitive_text(str(item.get("type", "")))[:128],
+                "size": item.get("size") if type(item.get("size")) is int and item["size"] >= 0 else None,
+                "sha256": redact_sensitive_text(str(item.get("sha256", "")))[:128],
+                "source": redact_sensitive_text(str(item.get("source", "")))[:64],
             }
         )
     if not safe:
@@ -172,11 +196,15 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     text = extract_response_text(data)
     if not text:
         raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
-    return text, model
+    return redact_sensitive_text(text), model
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "MEHMET-AI-Backend/" + VERSION
+
+    def setup(self) -> None:
+        super().setup()
+        self.connection.settimeout(REQUEST_READ_TIMEOUT_SECONDS)
 
     def _send(self, status: int, payload: dict[str, Any], request_id: str | None = None) -> None:
         body = json_bytes(payload)
@@ -203,7 +231,7 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(length)
         try:
             value = json.loads(raw)
-        except json.JSONDecodeError as exc:
+        except (json.JSONDecodeError, RecursionError) as exc:
             raise ValueError("INVALID_JSON") from exc
         if not isinstance(value, dict):
             raise ValueError("JSON_OBJECT_REQUIRED")
@@ -252,7 +280,9 @@ class Handler(BaseHTTPRequestHandler):
             except (urllib.error.URLError, TimeoutError):
                 self._send(504, {"error": "MODEL_LIST_TIMEOUT"})
                 return
-            except (ValueError, RuntimeError):
+            except Exception:
+                # Provider exceptions can contain credentials. Do not let the
+                # server's default exception traceback reach container logs.
                 self._send(502, {"error": "MODEL_LIST_UNAVAILABLE"})
                 return
 
@@ -333,7 +363,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(413, {"error": "BODY_TOO_LARGE", "request_id": request_id}, request_id)
             return
         except ValueError as exc:
-            self._send(400, {"error": str(exc), "request_id": request_id}, request_id)
+            allowed = {"INVALID_CONTENT_LENGTH", "EMPTY_BODY", "INVALID_JSON", "JSON_OBJECT_REQUIRED"}
+            error = str(exc) if str(exc) in allowed else "INVALID_JSON"
+            self._send(400, {"error": error, "request_id": request_id}, request_id)
+            return
+        except TimeoutError:
+            self._send(408, {"error": "REQUEST_TIMEOUT", "request_id": request_id}, request_id)
             return
 
         provider = body.get("provider")
@@ -418,8 +453,19 @@ class Handler(BaseHTTPRequestHandler):
             request_id,
         )
 
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+        routes = {"/api/health", "/api/models", "/api/providers", "/api/vault/status", "/api/owner/status", "/api/chat", "/api/research"}
+        path = getattr(self, "path", "").split("?", 1)[0]
+        route = path if path in routes else "UNKNOWN_ROUTE"
+        method = getattr(self, "command", "")
+        method = method if method in {"GET", "POST", "HEAD", "OPTIONS", "PUT", "DELETE", "PATCH"} else "UNKNOWN_METHOD"
+        status = int(code) if str(code).isdigit() else None
+        print(json.dumps({"event": "http", "method": method, "route": route, "status": status}), flush=True)
+
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # BaseHTTPRequestHandler also calls this for malformed request lines.
+        # Neither formatting arguments nor arbitrary client paths are safe logs.
+        print('{"event":"http_protocol_error"}', flush=True)
 
 
 def main() -> None:
