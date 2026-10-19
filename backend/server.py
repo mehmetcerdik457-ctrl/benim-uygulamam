@@ -139,12 +139,23 @@ def fetch_openai_model_ids() -> set[str]:
     }
 
 
+def select_model() -> str:
+    """Select only the explicitly configured default model.
+
+    Do not silently fall back to another allowed model: fallback is a new
+    routing decision that needs its own verified policy and consent.
+    """
+    if not DEFAULT_MODEL or DEFAULT_MODEL not in ALLOWED_MODELS:
+        raise RuntimeError("MODEL_POLICY_DENIED")
+    return DEFAULT_MODEL
+
+
 def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    model = select_model()
     payload = {
         "model": model,
         "input": [
