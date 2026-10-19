@@ -115,6 +115,9 @@ def test_provider_exception_cannot_leak_secret_to_response_or_logs(
     def simulated_provider_failure(*args, **kwargs):
         raise RuntimeError("simulated provider exception containing " + secret)
 
+    # Test-only bypass of the unfinished owner identity boundary to exercise
+    # sanitized provider-error behavior. This is NOT a real owner authorization.
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
     monkeypatch.setattr(server, "call_openai", simulated_provider_failure)
     status, body = request(
         backend_url + "/api/chat",
