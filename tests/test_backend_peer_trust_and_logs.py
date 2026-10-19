@@ -47,7 +47,7 @@ def test_raw_request_line_and_synthetic_secret_never_logged(capsys):
     marker = "SYNTHETIC_SECRET_MUST_NOT_APPEAR"
     handler.log_message('"%s" %s %s', f"GET /api/chat?key={marker} HTTP/1.1", "400", "-")
     output = capsys.readouterr().out
-    assert output == "HTTP_STATUS status=400\\n"
+    assert output == "HTTP_STATUS status=400\n"
     assert marker not in output
     assert "/api/chat" not in output
 
