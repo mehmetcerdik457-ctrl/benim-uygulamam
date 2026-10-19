@@ -245,6 +245,8 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "PASS",
                     "version": VERSION,
                     "provider_configured": configured(),
+                    "owner_identity_verified": owner_execution_authorized(),
+                    "execution_enabled": configured() and owner_execution_authorized(),
                     "default_model": DEFAULT_MODEL,
                 },
             )
