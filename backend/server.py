@@ -46,8 +46,12 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    """Use the TCP peer, never an unauthenticated forwarding header.
+
+    When deploying behind a trusted proxy, configure a vetted identity
+    source at the proxy boundary; do not trust arbitrary X-Forwarded-For.
+    """
+    return peer_ip
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
@@ -419,7 +423,22 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # BaseHTTPRequestHandler's default access log contains the raw
+        # request target; querystrings can carry credentials or private data.
+        # Never emit user-controlled request targets, headers, or exception text.
+        method = self.command if self.command in {"GET", "POST"} else "OTHER"
+        route = self.path.split("?", 1)[0]
+        allowed_routes = {
+            "/api/health", "/api/providers", "/api/models", "/api/chat",
+            "/api/research", "/api/vault/status", "/api/owner/status",
+        }
+        route = route if route in allowed_routes else "OTHER"
+        status = "UNKNOWN"
+        if fmt == '"%s" %s %s' and len(args) >= 2:
+            candidate = str(args[1])
+            if candidate.isdecimal() and len(candidate) == 3:
+                status = candidate
+        print(f"HTTP method={method} route={route} status={status}", flush=True)
 
 
 def main() -> None:
