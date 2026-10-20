@@ -1,0 +1,80 @@
+# OMEGA disposable demo only; no user data or production deployment.
+name: omega-mvi-demo
+services:
+  api:
+    build:
+      context: ./omega_mvi
+    environment:
+      OMEGA_MODE: mock
+      OMEGA_DEMO_READS_ENABLED: ${OMEGA_DEMO_READS_ENABLED:-false}
+      OMEGA_DEMO_READER_URL: postgresql://omega_demo_reader:${OMEGA_DEMO_READER_PASSWORD:-}@db:5432/omega_demo
+      OMEGA_EXTERNAL_API_ENABLED: "false"
+      OMEGA_OWNER_DEVICE: UNKNOWN
+    ports:
+      - "127.0.0.1:18080:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  tests:
+    profiles: ["integration"]
+    build:
+      context: ./omega_mvi
+      dockerfile: Dockerfile.test
+    environment:
+      OMEGA_DATABASE_URL: postgresql://omega_demo:${OMEGA_DEV_DB_PASSWORD}@db:5432/omega_demo
+      OMEGA_TEST_DB_SENTINEL: ${OMEGA_TEST_DB_SENTINEL:-}
+      OMEGA_REQUIRE_REAL_DB: "1"
+      OMEGA_TEST_RUNTIME_PASSWORD: ${OMEGA_TEST_RUNTIME_PASSWORD:-}
+      OMEGA_DEMO_READER_PASSWORD: ${OMEGA_DEMO_READER_PASSWORD:-}
+      OMEGA_REQUIRE_COMBINED_E2E: ${OMEGA_REQUIRE_COMBINED_E2E:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: omega_demo
+      POSTGRES_USER: omega_demo
+      POSTGRES_PASSWORD: ${OMEGA_DEV_DB_PASSWORD:?Set a NON-PRODUCTION demonstration database password in a private local environment}
+    tmpfs:
+      - /var/lib/postgresql/data:rw,nosuid,size=256m
+    networks:
+      - isolated_demo
+    restart: "no"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U omega_demo -d omega_demo"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  isolated_demo:
+    internal: true

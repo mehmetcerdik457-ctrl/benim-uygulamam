@@ -35,3 +35,8 @@ and direct adapter functions deny before a network request without independently
 reviewed Owner enrollment. Tests explicitly monkeypatch the deny function for
 simulated provider coverage; this is not a deployable enrollment mechanism.
 Do not replace the deny function with a config toggle or accept this PR as Owner enrollment.
+
+## Separately restored MVI code is NOT an Owner egress grant
+The recovered `omega_mvi/` FastAPI demo from PR #58 uses a different HTTP
+server, mocks all identities and denies operations. It must not use the Owner
+v1 proof as an approval token or bypass the fixed-false backend runtime policy.

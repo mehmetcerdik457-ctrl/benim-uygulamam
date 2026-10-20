@@ -1,13 +1,19 @@
 name: Privacy Guard
-
 on:
   push:
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   guard:
-    uses: mehmetcerdik457-ctrl/.github/.github/workflows/reusable-privacy-guard.yml@328c770208878e97aa0765265b6201322fa39cd2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Fail closed on tracked private filenames without logging names
+        run: python3 scripts/omega_privacy_filename_check.py
+      - name: Fail closed on binary and text secret matches without logging content
+        run: python3 scripts/omega_safe_secret_scan.py
