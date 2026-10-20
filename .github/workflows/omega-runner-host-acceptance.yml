@@ -1,0 +1,36 @@
+name: OMEGA runner-host acceptance (separate P0 gate)
+on:
+  pull_request:
+    paths:
+      - 'compose.omega.yml'
+      - 'scripts/omega_probe_runner_loopback.py'
+      - 'scripts/omega_runner_host_diagnostic.py'
+      - 'tests/test_omega_runner_host_diagnostic.py'
+      - '.github/workflows/omega-runner-host-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  runner-host-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Confirm network and publish config without printing credentials
+        run: |
+          python3 -c "from pathlib import Path; s=Path('compose.omega.yml').read_text(); assert 'internal: true' in s; assert '127.0.0.1:18080:8000' in s; assert '0.0.0.0:18080' not in s; print('OMEGA_PORT_POLICY=PASS')"
+      - name: Generate disposable database password only for this isolated job
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+      - name: Start disposable containers with unchanged Compose isolation
+        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+      - name: Observe Docker binding, network, runner TCP and HTTP independently
+        run: python3 scripts/omega_runner_host_diagnostic.py
+      - name: Enforce independent runner-host connectivity acceptance
+        run: python3 scripts/omega_runner_host_diagnostic.py --require-runner-host
+      - name: Clean up ONLY containers and temporary volumes made in this CI runner
+        if: always()
+        run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans
