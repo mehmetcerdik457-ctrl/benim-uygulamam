@@ -58,7 +58,7 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 def client_key(headers: Any, peer_ip: str) -> str:
     # The backend has no verified trusted-proxy list: forwarded headers are untrusted.
-    return peer_ip
+    return peer_ip or "UNKNOWN_PEER"
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
@@ -147,6 +147,13 @@ def fetch_openai_model_ids() -> set[str]:
     }
 
 
+def select_model() -> str:
+    """Never silently fall back to an unreviewed alternate model."""
+    if not DEFAULT_MODEL or DEFAULT_MODEL not in ALLOWED_MODELS:
+        raise RuntimeError("MODEL_POLICY_DENIED")
+    return DEFAULT_MODEL
+
+
 def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
@@ -154,7 +161,7 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     if not owner_execution_authorized():
         raise RuntimeError("OWNER_EXECUTION_NOT_APPROVED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    model = select_model()
     payload = {
         "model": model,
         "input": [
@@ -510,9 +517,12 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        # http.server supplies attacker-controlled request targets, including query strings.
-        # Until structured sanitized request logging exists, do not print them.
-        print("HTTP_REQUEST", flush=True)
+        # BaseHTTPRequestHandler default request lines contain untrusted query values.
+        # Only emit strictly validated HTTP status codes, never raw request targets.
+        if fmt == '"%s" %s %s' and len(args) >= 2:
+            status = str(args[1])
+            if len(status) == 3 and status.isascii() and status.isdigit():
+                print(f"HTTP_STATUS status={status}", flush=True)
 
 
 def main() -> None:

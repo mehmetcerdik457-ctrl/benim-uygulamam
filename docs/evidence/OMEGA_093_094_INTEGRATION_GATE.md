@@ -14,3 +14,8 @@
 
 - Second-pass provenance hardening: unsafe symlink paths count as `files_unsafe`;
   all manifest entries and source_version are validated before reading archive bytes.
+
+- Further regression import: model allowlist strict selection from PR #91 HEAD
+  `78d216a04b769f622387b5987a13ec9ef8307c7b`, and untrusted
+  HTTP peer/log tests from PR #90 HEAD `5e736393fa1d1534b5e01ef436a9925acf2b628e`.
+  These are code/test transfers, not claims that PR #90/#91 are merged.
