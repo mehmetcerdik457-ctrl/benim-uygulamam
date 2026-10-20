@@ -46,8 +46,27 @@ def test_public_index_endpoint_does_not_turn_into_owner_authority(monkeypatch):
     })
     assert before.status_code == 200
     assert after.status_code == 200
+    assert before.headers["cache-control"] == "no-store"
+    assert before.headers["x-content-type-options"] == "nosniff"
+    assert after.headers["cache-control"] == "no-store"
     assert after.json() == before.json()
     assert after.json()["authenticated_owner"] is False
     assert after.json()["production_ready"] is False
     assert after.json()["acceptance"] == "NOT_ACCEPTED"
     assert client.post("/api/execute", json={"target": "synthetic"}).status_code == 403
+
+
+def test_public_index_read_error_fails_closed_with_generic_message(monkeypatch):
+    """Raw paths, source snippets and operating-system errors never reach UI."""
+    from fastapi.testclient import TestClient
+    from omega_mvi.inspection import source_index
+    sys.path.insert(0, str(ROOT))
+    from app.main import app
+
+    def unavailable():
+        raise source_index.SourceIndexError("PRIVATE_SOURCE_SENTINEL")
+    monkeypatch.setattr(source_index, "index_public_sources", unavailable)
+    result = TestClient(app).get("/api/demo/source-index")
+    assert result.status_code == 503
+    assert result.json() == {"detail": "PUBLIC_SOURCE_INDEX_UNAVAILABLE"}
+    assert "PRIVATE_SOURCE_SENTINEL" not in result.text
