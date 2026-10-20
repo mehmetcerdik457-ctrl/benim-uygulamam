@@ -116,22 +116,22 @@ test("stale out-of-order refresh response cannot replace newer visible data", as
     fetch:(url)=>new Promise(resolve=>requests.push({url,resolve}))
   });
   vm.runInContext(dashboard,context,{timeout:1000}); // initial batch pending
-  assert.equal(requests.length,3);
+  assert.equal(requests.length,4); // health, inspection, public AST, DB
   const newer=context.refresh();
-  assert.equal(requests.length,6);
+  assert.equal(requests.length,8);
   const reply=(request,payload)=>request.resolve({ok:true,json:async()=>payload});
   const goodHealth={service:"omega-mvi-demo",mode:"mock",status:"ok",production_ready:false};
   const goodDb={mode:"disposable-synthetic-only",production_ready:false,
     task_details_available:false,aggregate:[{state:"CREATED",count:1}]};
   const goodInspection=valid();
-  for(const r of requests.slice(3)){
+  for(const r of requests.slice(4)){
     reply(r,r.url.includes("health")?goodHealth:r.url.includes("task-status")?goodDb:goodInspection);
   }
   await newer;
   assert.match(elements.get("health").textContent,/Üretim: KAPALI/);
   assert.equal(elements.get("sources").textContent,provenance);
   assert.deepEqual(elements.get("states").children.map(x=>x.textContent),["CREATED: 1"]);
-  for(const r of requests.slice(0,3)){
+  for(const r of requests.slice(0,4)){
     reply(r,r.url.includes("health")?{...goodHealth,status:"spoof"}:
       r.url.includes("task-status")?{...goodDb,aggregate:[{state:"FAILED",count:99}]}:
       {...goodInspection,sources:[{ref:"synthetic://forged",score:1}]});
