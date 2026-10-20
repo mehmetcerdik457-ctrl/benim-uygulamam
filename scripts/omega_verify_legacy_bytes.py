@@ -9,6 +9,7 @@ network access, execution of legacy content, or mutation of source data.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -59,7 +60,10 @@ def _open_regular_no_links(root: Path, relative: PurePosixPath) -> int:
             os.close(fd)
             raise EvidenceError("NOT_REGULAR_FILE")
         return fd
-    except OSError:
+    except OSError as exc:
+        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+            # Includes symlinked ancestors and unsafe intermediate components.
+            raise EvidenceError("UNSAFE_PATH") from None
         raise EvidenceError("FILE_UNAVAILABLE") from None
     finally:
         for dfd in reversed(opened_dirs):
@@ -89,10 +93,14 @@ def verify(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
     records = manifest["items"]
     if not 1 <= len(records) <= MAX_ITEMS:
         raise EvidenceError("INVALID_MANIFEST")
+    version = manifest.get("source_version")
+    if not isinstance(version, str) or re.fullmatch(r"[A-Za-z0-9._-]{1,80}", version) is None:
+        raise EvidenceError("INVALID_SOURCE_VERSION")
     if not root.is_dir() or root.is_symlink():
         raise EvidenceError("ROOT_UNAVAILABLE")
+    # Validate the entire manifest before opening even the first data file.
     seen: set[str] = set()
-    checked = matched = missing = mismatch = unsafe = 0
+    entries: list[tuple[PurePosixPath, str]] = []
     for rec in records:
         if not isinstance(rec, dict):
             raise EvidenceError("INVALID_MANIFEST")
@@ -103,6 +111,10 @@ def verify(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
         if str(rel) in seen:
             raise EvidenceError("DUPLICATE_PATH")
         seen.add(str(rel))
+        entries.append((rel, sha))
+
+    checked = matched = missing = mismatch = unsafe = 0
+    for rel, sha in entries:
         checked += 1
         try:
             fd = _open_regular_no_links(root, rel)
@@ -122,7 +134,7 @@ def verify(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
             mismatch += 1
     return {
         "schema": SCHEMA,
-        "source_version": str(manifest.get("source_version", "UNVERIFIED"))[:80],
+        "source_version": version,
         "files_checked": checked,
         "files_matched": matched,
         "files_missing": missing,

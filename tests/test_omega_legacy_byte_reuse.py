@@ -70,6 +70,37 @@ def test_symlinked_artifacts_must_not_be_followed(tmp_path):
     (tmp_path / "linked.bin").symlink_to(tmp_path / "real.bin")
     result = verify(tmp_path, manifest(entry("linked.bin", b"secret-not-to-read")))
     assert result["byte_integrity_passed"] is False
+    assert result["files_unsafe"] == 1
+    assert result["files_missing"] == 0
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="symlinks not available")
+def test_symlinked_parent_folder_classified_unsafe(tmp_path):
+    real = tmp_path / "real"
+    real.mkdir()
+    (real / "archive.bin").write_bytes(b"synthetic")
+    (tmp_path / "redirect").symlink_to(real, target_is_directory=True)
+    result = verify(tmp_path, manifest(entry("redirect/archive.bin", b"synthetic")))
+    assert result["files_unsafe"] == 1
+    assert result["files_missing"] == 0
+    assert result["byte_integrity_passed"] is False
+
+
+@pytest.mark.parametrize("source_version", [None, 5, {"secret": "redact"}, "line\nunsafe", "x" * 81])
+def test_invalid_source_version_rejected(source_version, tmp_path):
+    data = manifest(entry("anything.bin", b"synthetic"))
+    data["source_version"] = source_version
+    with pytest.raises(EvidenceError, match="INVALID_SOURCE_VERSION"):
+        verify(tmp_path, data)
+
+
+def test_invalid_manifest_rejected_before_any_file_is_read(tmp_path, monkeypatch):
+    import scripts.omega_verify_legacy_bytes as verifier
+    data = manifest(entry("first.bin", b"x"), entry("first.bin", b"x"))
+    monkeypatch.setattr(verifier, "_open_regular_no_links",
+                        lambda *args: pytest.fail("opened data file before validating manifest"))
+    with pytest.raises(EvidenceError, match="DUPLICATE_PATH"):
+        verify(tmp_path, data)
 
 
 def test_cli_outputs_only_count_evidence_and_nonzero_on_mismatch(tmp_path, capsys):

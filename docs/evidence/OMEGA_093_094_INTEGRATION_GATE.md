@@ -11,3 +11,6 @@
 - Required next steps: independent Owner enrollment, test on real device, signed
   Android client validation, original archive bytes, production network/backup
   and full cross-module E2E.
+
+- Second-pass provenance hardening: unsafe symlink paths count as `files_unsafe`;
+  all manifest entries and source_version are validated before reading archive bytes.
