@@ -56,6 +56,10 @@ def authorize(headers, raw, method="POST", path=PATH, now=None):
         if not all(isinstance(v, str) and v for v in h.values()):
             return False, "OWNER_AUTH_REQUIRED"
         owner, device = h["X-Omega-Owner-Id"], h["X-Omega-Device-Id"]
+        # Match the Android signed envelope exactly; do not accept alternate IDs.
+        if (not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", owner)
+            or not re.fullmatch(r"[a-f0-9]{64}", device)):
+            return False, "OWNER_IDENTITY_DENIED"
         if owner != os.environ["OMEGA_OWNER_ID"] or device != os.environ["OMEGA_DEVICE_ID"]:
             return False, "OWNER_IDENTITY_DENIED"
         ts = h["X-Omega-Timestamp"]
