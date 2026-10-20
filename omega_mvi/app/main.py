@@ -82,6 +82,18 @@ def demo_task_status():
         raise HTTPException(status_code=503,detail="DEMO_DATABASE_UNAVAILABLE") from exc
 
 
+# Read-only analysis of REAL public OMEGA source bytes included in the image.
+# Neither URLs, filesystem paths, nor owner identity are accepted from clients.
+@app.get("/api/demo/source-index", include_in_schema=False)
+def demo_public_source_index():
+    from omega_mvi.inspection.source_index import SourceIndexError, index_public_sources
+    try:
+        result = index_public_sources()
+    except SourceIndexError:
+        raise HTTPException(status_code=503, detail="PUBLIC_SOURCE_INDEX_UNAVAILABLE") from None
+    return result
+
+
 # Fixed read-only static assets: no directory traversal or externally hosted scripts.
 @app.get("/assets/dashboard.js", include_in_schema=False)
 def dashboard_javascript():
