@@ -6,8 +6,9 @@ library backend, not the complete platform or the Minimum Viable Inspector.
 
 ## Current verified state
 
-- `backend/server.py` serves a small HTTP API and can call OpenAI when
-  `OPENAI_API_KEY` is configured.
+- `backend/server.py` serves a small HTTP API. All provider calls are
+  **blocked by default** until independent Owner enrollment and policy review;
+  `OPENAI_API_KEY` alone never enables provider execution.
 - No local model runtime, database, task queue, inventory, RAG, web interface,
   or approval workflow is implemented.
 - Provider credentials and external integrations are not provisioned by this

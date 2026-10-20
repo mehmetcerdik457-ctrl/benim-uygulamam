@@ -43,13 +43,22 @@ def configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
 
 
+def owner_execution_authorized() -> bool:
+    """Fail closed until an independently verified Owner enrollment is implemented.
+
+    Signatures and environment switches are not proof of an approved owner.
+    This must not be turned on by a header, token, or configuration flag.
+    """
+    return False
+
+
 def json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    # The backend has no verified trusted-proxy list: forwarded headers are untrusted.
+    return peer_ip
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
@@ -114,6 +123,8 @@ def fetch_openai_model_ids() -> set[str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    if not owner_execution_authorized():
+        raise RuntimeError("OWNER_EXECUTION_NOT_APPROVED")
 
     req = urllib.request.Request(
         OPENAI_MODELS_URL,
@@ -140,6 +151,8 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    if not owner_execution_authorized():
+        raise RuntimeError("OWNER_EXECUTION_NOT_APPROVED")
 
     model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
     payload = {
@@ -255,6 +268,9 @@ class Handler(BaseHTTPRequestHandler):
         if not configured():
             self._send(503, {"error": "PROVIDER_NOT_CONFIGURED", "request_id": request_id}, request_id)
             return
+        if not owner_execution_authorized():
+            self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED", "request_id": request_id}, request_id)
+            return
         try:
             text, model = call_openai(message.strip(), attachments)
         except urllib.error.HTTPError as exc:
@@ -279,6 +295,8 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "PASS",
                     "version": VERSION,
                     "provider_configured": configured(),
+                    "owner_identity_verified": False,
+                    "execution_enabled": owner_execution_authorized(),
                     "default_model": DEFAULT_MODEL,
                 },
             )
@@ -304,6 +322,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/models":
             if not configured():
                 self._send(503, {"error": "PROVIDER_NOT_CONFIGURED"})
+                return
+            if not owner_execution_authorized():
+                self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED"})
                 return
             try:
                 live_ids = fetch_openai_model_ids()
@@ -349,6 +370,8 @@ class Handler(BaseHTTPRequestHandler):
                         "AUTH_METHOD": "UNPROVISIONED",
                     },
                     "runtime": "P1_BACKEND_ONLY",
+                    "owner_identity_verified": False,
+                    "execution_enabled": owner_execution_authorized(),
                 },
             )
             return
@@ -441,6 +464,9 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(attachments, list):
             self._send(400, {"error": "ATTACHMENTS_MUST_BE_ARRAY", "request_id": request_id}, request_id)
             return
+        if not owner_execution_authorized():
+            self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED", "request_id": request_id}, request_id)
+            return
 
         try:
             reply, model = call_openai(message, attachments)
@@ -484,7 +510,9 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # http.server supplies attacker-controlled request targets, including query strings.
+        # Until structured sanitized request logging exists, do not print them.
+        print("HTTP_REQUEST", flush=True)
 
 
 def main() -> None:

@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import owner_auth_v1 as auth
 import server
 
+server_execution_default = server.owner_execution_authorized
+
 
 def b64(data):
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
@@ -36,6 +38,8 @@ def gate(tmp_path, monkeypatch):
     monkeypatch.setenv("OMEGA_DEVICE_PUBLIC_DER_B64", b64(der(device)))
     monkeypatch.setenv("OMEGA_NONCE_DB", str(tmp_path / "nonce.sqlite"))
     monkeypatch.setenv("OPENAI_API_KEY", "SYNTHETIC_KEY_NEVER_TRANSMITTED")
+    # Test-only escape hatch supplied by pytest, not a runtime configuration.
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
     def fake_call(message, attachments):
         assert message == "Merhaba"
         assert not attachments
@@ -147,3 +151,25 @@ def test_missing_provider_key_blocks_after_auth(gate, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY")
     status, data = post(url, raw, signed_headers(owner, device, raw))
     assert (status, data["error"]) == (503, "PROVIDER_NOT_CONFIGURED")
+
+
+def test_valid_signatures_never_authorize_live_execution_without_enrollment(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: False)
+    def no_provider(*args, **kwargs):
+        raise AssertionError("Unenrolled Owner must not reach provider")
+    monkeypatch.setattr(server, "call_openai", no_provider)
+    raw = b'{"message":"Merhaba"}'
+    status, body = post(url, raw, signed_headers(owner, device, raw))
+    assert (status, body["error"]) == (403, "OWNER_EXECUTION_NOT_APPROVED")
+
+
+def test_runtime_env_switch_cannot_enable_owner_execution(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.setattr(server, "owner_execution_authorized", server_execution_default)
+    monkeypatch.setenv("OMEGA_EXECUTION_ENABLED", "true")
+    monkeypatch.setenv("OMEGA_OWNER_VERIFIED", "true")
+    raw = b'{"message":"Merhaba"}'
+    status, body = post(url, raw, signed_headers(owner, device, raw))
+    assert status == 403
+    assert body["error"] == "OWNER_EXECUTION_NOT_APPROVED"

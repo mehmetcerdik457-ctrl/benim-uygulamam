@@ -26,3 +26,12 @@ Errors are fixed: OWNER_IDENTITY_NOT_PROVISIONED, OWNER_AUTH_REQUIRED, OWNER_AUT
 - Persistent nonce SQLite file must reside on a filesystem surviving restarts, with restricted write permissions; never replace this with an in-memory cache.
 - Do not expose local-only Compose service beyond 127.0.0.1 without approved TLS termination, reverse-proxy authentication and independent review.
 - No shell/phone action is authorized by /api/v1/owner/chat; no privilege escalation is exposed.
+
+## Integration hold — Owner authority remains unprovisioned
+The source-level `owner_execution_authorized()` returns `False` unconditionally.
+**Neither valid test signatures, environment flags nor an API key authorize egress.**
+All HTTP provider routes (`/api/chat`, `/api/models`, `/api/v1/owner/chat`)
+and direct adapter functions deny before a network request without independently
+reviewed Owner enrollment. Tests explicitly monkeypatch the deny function for
+simulated provider coverage; this is not a deployable enrollment mechanism.
+Do not replace the deny function with a config toggle or accept this PR as Owner enrollment.

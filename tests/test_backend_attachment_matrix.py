@@ -20,6 +20,7 @@ import server
 @pytest.fixture
 def backend_url(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "OMEGA_TEST_ONLY_NOT_A_REAL_KEY")
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
