@@ -106,3 +106,42 @@ test("malicious index never appears in browser and clears stale details",async()
   assert.equal(els.get("source-index-detail").textContent,"");
   assert.ok(!source.includes("innerHTML"));
 });
+
+test("out-of-order HTTP results cannot replace a newer verified index",async()=>{
+  const els=new Map(["refresh","health","inspection","sources","source-index",
+    "source-index-detail","db-status","states"].map(k=>[k,element()]));
+  const requests=[];
+  const ctx=vm.createContext({
+    document:{
+      getElementById(id){return els.get(id)||null},
+      createElement(){return element()}
+    },
+    fetch:async(url)=>{
+      if(url==="/api/demo/source-index"){
+        return new Promise(resolve=>requests.push(resolve));
+      }
+      const other=url==="/api/health"?
+        {mode:"mock",production_ready:false,status:"ok"}:
+        url==="/api/demo/inspection"?
+        {mode:"synthetic_offline_only",production_ready:false,
+         authority:"none",redaction_applied:true,sources:[]}:
+        {mode:"disposable-synthetic-only",production_ready:false,
+         task_details_available:false,aggregate:[]};
+      return {ok:true,json:async()=>other};
+    }
+  });
+  vm.runInContext(source,ctx,{timeout:1000}); // first old request
+  assert.equal(requests.length,1);
+  const newer=ctx.publicSources(); // second request
+  assert.equal(requests.length,2);
+  requests[1]({ok:true,json:async()=>fixture});
+  await newer;
+  assert.match(els.get("source-index").textContent,/KABUL EDİLMEDİ/);
+  const stable=els.get("source-index-detail").textContent;
+  requests[0]({ok:true,json:async()=>({
+    ...copy(),files:[{path:"private/.env",sha256:"a".repeat(64)}]
+  })});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(els.get("source-index").textContent,/KABUL EDİLMEDİ/);
+  assert.equal(els.get("source-index-detail").textContent,stable);
+});
