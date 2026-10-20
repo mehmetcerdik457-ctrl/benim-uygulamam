@@ -1,6 +1,6 @@
 """OMEGA Phase 0 demonstration: health only, no provider integrations."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 
 app = FastAPI(title="OMEGA demo", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -85,7 +85,10 @@ def demo_task_status():
 # Read-only analysis of REAL public OMEGA source bytes included in the image.
 # Neither URLs, filesystem paths, nor owner identity are accepted from clients.
 @app.get("/api/demo/source-index", include_in_schema=False)
-def demo_public_source_index():
+def demo_public_source_index(response: Response):
+    # Always revalidate current local source bytes, never cache a stale index.
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     from omega_mvi.inspection.source_index import SourceIndexError, index_public_sources
     try:
         result = index_public_sources()
