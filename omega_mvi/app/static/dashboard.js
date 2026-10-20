@@ -88,9 +88,15 @@ function validatePublicSourceIndex(x){
      sum!==x.symbol_count)return null;
   return x;
 }
+let publicSourceGeneration=0;
 async function publicSources(){
+  // An older slower response must never replace newer source bytes or failure.
+  const generation=++publicSourceGeneration;
+  show("source-index","Public kaynak dosyaları yeniden doğrulanıyor…");
+  show("source-index-detail","");
   try {
     const raw=await json("/api/demo/source-index");
+    if(generation!==publicSourceGeneration)return;
     const index=validatePublicSourceIndex(raw);
     if(!index)throw Error("invalid_public_source_index");
     show("source-index","Gerçek public kod indeksi: "+index.files.length+
@@ -99,6 +105,7 @@ async function publicSources(){
     show("source-index-detail",index.files.map(f=>f.path+
       " — SHA-256: "+f.sha256.slice(0,12)+"…").join(" | "));
   } catch(_) {
+    if(generation!==publicSourceGeneration)return;
     show("source-index","Public kaynak indeksi DOĞRULANAMADI / KAPALI.");
     show("source-index-detail","");
   }
