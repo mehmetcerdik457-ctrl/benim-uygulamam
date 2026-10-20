@@ -25,6 +25,28 @@ async function inspection(){
     show("sources",sources.map(s=>s.ref).join(" | "));
   } catch(_) {show("inspection","Sentetik denetim kullanılamıyor; erişim genişletilmez.");show("sources","");}
 }
+async function publicSources(){
+  try {
+    const x=await json("/api/demo/source-index");
+    if(x.mode!=="real-public-source-ast" || x.production_ready!==false ||
+       x.external_calls!==false || x.read_only!==true ||
+       x.authenticated_owner!==false || x.acceptance!=="NOT_ACCEPTED" ||
+       !Array.isArray(x.files) || x.files.length!==5)throw Error("index_untrusted");
+    const safe=x.files.every(f=>typeof f.path==="string" &&
+       f.path.startsWith("omega_mvi/inspection/") &&
+       /^[a-f0-9]{64}$/.test(f.sha256) &&
+       Number.isSafeInteger(f.byte_length) && f.byte_length>=0 &&
+       Array.isArray(f.symbols) && Array.isArray(f.imports) &&
+       Array.isArray(f.call_edges));
+    if(!safe)throw Error("index_invalid");
+    show("source-index","Gerçek kaynak indeksi: "+x.files.length+
+       " Python dosyası, "+Number(x.symbol_count)+" sembol. Çalıştırma: KAPALI.");
+    show("source-index-detail",x.files.map(f=>f.path+" — SHA256: "+f.sha256.slice(0,12)+"…").join(" | "));
+  } catch(_) {
+    show("source-index","Gerçek public kaynak indeksi erişilemiyor.");
+    show("source-index-detail","");
+  }
+}
 async function db(){
   const output=$("states");output.replaceChildren();
   try{
@@ -44,6 +66,6 @@ async function db(){
     show("db-status","PostgreSQL görünümü KAPALI / ERİŞİLEMİYOR. Kimlik ve yetki olmadan gerçek görev okunmaz.");
   }
 }
-async function refresh(){await Promise.all([health(),inspection(),db()]);}
+async function refresh(){await Promise.all([health(),inspection(),publicSources(),db()]);}
 $("refresh").addEventListener("click",refresh);
 refresh();
