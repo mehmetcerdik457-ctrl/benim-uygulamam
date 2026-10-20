@@ -114,3 +114,33 @@ def test_live_fastapi_dashboard_assets_and_strict_browser_policy(ready_demo):
     assert "http://" not in js.text and "https://" not in js.text
     assert "application/javascript" in js.headers["content-type"] or "text/javascript" in js.headers["content-type"]
     assert "text/css" in css.headers["content-type"]
+
+
+def test_live_docker_http_real_public_ast_and_postgres_coexist(ready_demo):
+    """Same real FastAPI container used for the sentinel-verified PostgreSQL E2E."""
+    origin="http://api:8000"
+    indexed=httpx.get(origin+"/api/demo/source-index",timeout=5)
+    assert indexed.status_code==200,indexed.text
+    payload=indexed.json()
+    assert payload["mode"]=="real-public-source-ast"
+    assert payload["files_indexed"]==5
+    assert payload["symbol_count"]>=10
+    assert payload["external_calls"] is False
+    assert payload["authenticated_owner"] is False
+    assert payload["production_ready"] is False
+    assert payload["acceptance"]=="NOT_ACCEPTED"
+    # Real paths/AST edges calculated from installed code, not synthetic source fixtures.
+    assert any("pipeline.py" in x["path"] and
+        any(y["symbol"]=="inspect_offline_fixture" for y in x["symbols"])
+        for x in payload["files"])
+    assert all(len(x["sha256"])==64 and x["byte_length"]>0 for x in payload["files"])
+    assert any(x["call_edges"] for x in payload["files"])
+    assert "OPENAI_API_KEY" not in indexed.text
+    assert "omega_demo_reader" not in indexed.text
+    # In the SAME container, the PostgreSQL role is still aggregate read-only
+    # and the model and task executor still reject all requests.
+    db=httpx.get(origin+"/api/demo/task-status",timeout=5)
+    assert db.status_code==200
+    assert db.json()["task_details_available"] is False
+    assert httpx.post(origin+"/api/chat",json={"message":"synthetic"},timeout=5).status_code==403
+    assert httpx.post(origin+"/api/execute",json={"task":"synthetic"},timeout=5).status_code==403
