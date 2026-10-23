@@ -53,3 +53,19 @@ misconfiguration gap without activating any provider call or enrolling anyone.
 The Python wire-vector test directly matches Gpt-asistan Java test source
 commit `639ac11db15ea658992c5b91b9c33c1a767902f6`;
 the physical Android device, signing key and release remain unverified.
+
+## Signed KRAL Android model-list route — structural compatibility only
+
+OMEGA recognizes `POST /api/v1/owner/models`, matching existing KRAL
+`OmegaEnvelope.MODELS`. The signed envelope has the **exact request path** in
+its canonical bytes and reuses pinned dual P-256 proofs, nonce replay DB,
+30-second freshness and SHA-256(DER) device identity rules.
+
+Even with both signatures valid, this route returns **403
+OWNER_EXECUTION_NOT_APPROVED**. It cannot enumerate models, call a provider,
+change Owner provisioning or activate task execution. This fixes the earlier
+404 route mismatch, **not** Owner enrollment, actual model availability or
+KRAL's complete signed model protocol. The signed `/api/v1/owner/chat`
+route and original `main` remain unchanged. Real Android Keystore signing,
+physical device, secure server enrollment and authorized model catalog still
+need independent acceptance.

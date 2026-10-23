@@ -17,6 +17,7 @@ except ImportError:
     hashes = serialization = ec = None
 
 PATH = "/api/v1/owner/chat"
+MODELS_PATH = "/api/v1/owner/models"
 REQUIRED = ("X-Omega-Owner-Id", "X-Omega-Device-Id", "X-Omega-Timestamp",
             "X-Omega-Nonce", "X-Omega-Owner-Proof", "X-Omega-Device-Proof")
 
@@ -50,6 +51,8 @@ def canonical(method, path, raw, timestamp, nonce, owner, device):
 
 def authorize(headers, raw, method="POST", path=PATH, now=None):
     """Return a fixed error; never log/request-key material or reveal internals."""
+    if method != "POST" or path not in (PATH, MODELS_PATH):
+        return False, "OWNER_AUTH_DENIED"
     if not configured():
         return False, "OWNER_IDENTITY_NOT_PROVISIONED"
     try:

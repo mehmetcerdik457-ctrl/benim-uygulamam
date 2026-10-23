@@ -59,14 +59,14 @@ def gate(tmp_path, monkeypatch):
         thread.join(timeout=3)
 
 
-def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=None):
+def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=None, path=auth.PATH):
     if device_identity is None:
         der = device.public_key().public_bytes(
             serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
         device_identity = hashlib.sha256(der).hexdigest()
     ts = str(int(time.time()) if timestamp is None else timestamp)
     nonce = nonce or uuid.uuid4().hex
-    proof = auth.canonical("POST", auth.PATH, raw, ts, nonce, "owner-test", device_identity)
+    proof = auth.canonical("POST", path, raw, ts, nonce, "owner-test", device_identity)
     return {
         "Content-Type": "application/json",
         "X-Omega-Owner-Id": "owner-test",
@@ -78,8 +78,8 @@ def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_ide
     }
 
 
-def post(url, raw, headers):
-    req = urllib.request.Request(url + auth.PATH, data=raw, method="POST", headers=headers)
+def post(url, raw, headers, path=auth.PATH):
+    req = urllib.request.Request(url + path, data=raw, method="POST", headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=3) as response:
             return response.status, json.loads(response.read())
@@ -241,3 +241,81 @@ def test_fixture_device_id_really_matches_its_public_key(gate, monkeypatch):
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     assert os.environ["OMEGA_DEVICE_ID"] == hashlib.sha256(der).hexdigest()
     assert len(os.environ["OMEGA_DEVICE_ID"]) == 64
+
+
+def test_signed_models_route_is_recognized_but_hard_denied(gate, monkeypatch):
+    url, owner, device = gate
+    raw = b"{}"
+    def no_list(*args, **kwargs):
+        raise AssertionError("models endpoint must never call provider")
+    monkeypatch.setattr(server, "fetch_openai_model_ids", no_list)
+    status, body = post(
+        url, raw, signed_headers(owner, device, raw, path=auth.MODELS_PATH),
+        path=auth.MODELS_PATH
+    )
+    assert (status, body["error"]) == (403, "OWNER_EXECUTION_NOT_APPROVED")
+
+
+def test_signed_models_request_replay_denied(gate):
+    url, owner, device = gate
+    raw = b"{}"
+    headers = signed_headers(owner, device, raw, path=auth.MODELS_PATH)
+    assert post(url, raw, headers, path=auth.MODELS_PATH)[0] == 403
+    status, body = post(url, raw, headers, path=auth.MODELS_PATH)
+    assert (status, body["error"]) == (403, "OWNER_AUTH_REPLAY_OR_STORAGE_DENIED")
+
+
+def test_signed_chat_proof_cannot_be_reused_for_models(gate):
+    url, owner, device = gate
+    raw = b"{}"
+    status, body = post(
+        url, raw, signed_headers(owner, device, raw), path=auth.MODELS_PATH
+    )
+    assert (status, body["error"]) == (403, "OWNER_AUTH_DENIED")
+
+
+def test_unprovisioned_models_route_refuses_without_model_call(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.delenv("OMEGA_OWNER_PUBLIC_DER_B64")
+    raw = b"{}"
+    status, body = post(
+        url, raw, signed_headers(owner, device, raw, path=auth.MODELS_PATH),
+        path=auth.MODELS_PATH
+    )
+    assert (status, body["error"]) == (503, "OWNER_IDENTITY_NOT_PROVISIONED")
+
+
+def test_signed_models_body_injection_is_rejected(gate):
+    url, owner, device = gate
+    raw = b'{"provider":"fake","model":"fake"}'
+    status, body = post(
+        url, raw, signed_headers(owner, device, raw, path=auth.MODELS_PATH),
+        path=auth.MODELS_PATH
+    )
+    assert (status, body["error"]) == (400, "MODELS_BODY_DENIED")
+
+
+def test_unsigned_models_route_never_lists_models(gate):
+    url, _, _ = gate
+    status, body = post(url, b"{}", {"Content-Type": "application/json"},
+                        path=auth.MODELS_PATH)
+    assert (status, body["error"]) == (403, "OWNER_AUTH_REQUIRED")
+
+
+def test_owner_models_wrong_method_path_denied_without_nonce_store(gate):
+    url, owner, device = gate
+    raw = b"{}"
+    headers = signed_headers(owner, device, raw, path=auth.MODELS_PATH)
+    assert auth.authorize(headers, raw, path="/api/not-a-model-route")[0] is False
+    assert auth.authorize(headers, raw, method="GET", path=auth.MODELS_PATH)[0] is False
+
+
+def test_valid_signed_models_never_enable_execution_switch(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.setattr(server, "owner_execution_authorized", server_execution_default)
+    monkeypatch.setenv("OMEGA_OWNER_VERIFIED", "true")
+    monkeypatch.setenv("OMEGA_EXECUTION_ENABLED", "true")
+    raw = b"{}"
+    status, body = post(url, raw,
+        signed_headers(owner, device, raw, path=auth.MODELS_PATH), path=auth.MODELS_PATH)
+    assert (status, body["error"]) == (403, "OWNER_EXECUTION_NOT_APPROVED")

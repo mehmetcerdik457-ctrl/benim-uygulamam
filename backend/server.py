@@ -293,6 +293,49 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {"text": text, "model": model, "provider": "openai",
                          "request_id": request_id, "contract": "OMEGA-OWNER-API-V1"}, request_id)
 
+    def _owner_models_v1(self, request_id: str) -> None:
+        """Recognize Android OwnerGateway signed model-list route; NEVER grant models.
+
+        The cryptographic signature contract is exercised before a hard deny,
+        preserving replay prevention and device-key binding. Provisioning,
+        allowlisting, real model verification and approval remain separate.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_BODY_BYTES:
+                self._send(413, {"error": "BODY_SIZE_DENIED", "request_id": request_id}, request_id)
+                return
+            raw = self.rfile.read(length)
+            if len(raw) != length:
+                self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+                return
+        except (ValueError, TypeError):
+            self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+            return
+
+        signed, reason = owner_auth_v1.authorize(
+            self.headers, raw, method="POST", path=owner_auth_v1.MODELS_PATH
+        )
+        if not signed:
+            code = 503 if reason in {"OWNER_IDENTITY_NOT_PROVISIONED", "OWNER_AUTH_STORE_UNAVAILABLE"} else 403
+            self._send(code, {"error": reason, "request_id": request_id}, request_id)
+            return
+
+        # KRAL Android currently signs an empty JSON object for model requests.
+        # Do not accept arbitrary client instructions before Owner enrollment.
+        try:
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, ValueError):
+            payload = None
+        if not isinstance(payload, dict) or payload:
+            self._send(400, {"error": "MODELS_BODY_DENIED", "request_id": request_id}, request_id)
+            return
+
+        # No model enumeration, provider network call, enrollment or execution.
+        # This must remain hard-denied even with mathematically valid signatures.
+        self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED",
+                         "request_id": request_id}, request_id)
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/api/health":
@@ -391,6 +434,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == owner_auth_v1.PATH:
             self._owner_chat_v1(request_id)
+            return
+
+        if path == owner_auth_v1.MODELS_PATH:
+            self._owner_models_v1(request_id)
             return
 
         if path == "/api/research":
