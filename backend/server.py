@@ -16,6 +16,8 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+import owner_auth_v1
+
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 OPENAI_MODELS_URL = "https://api.openai.com/v1/models"
@@ -209,6 +211,65 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("JSON_OBJECT_REQUIRED")
         return value
 
+    def _owner_chat_v1(self, request_id: str) -> None:
+        """Private, dual-signed Owner -> backend contract; no implicit enrollment."""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_BODY_BYTES:
+                self._send(413, {"error": "BODY_SIZE_DENIED", "request_id": request_id}, request_id)
+                return
+            raw = self.rfile.read(length)
+            if len(raw) != length:
+                self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+                return
+        except (TypeError, ValueError):
+            self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+            return
+
+        authorized, error = owner_auth_v1.authorize(self.headers, raw)
+        if not authorized:
+            code = 503 if error in {"OWNER_IDENTITY_NOT_PROVISIONED", "OWNER_AUTH_STORE_UNAVAILABLE"} else 403
+            self._send(code, {"error": error, "request_id": request_id}, request_id)
+            return
+        if not rate_allowed("owner:" + self.headers.get("X-Omega-Device-Id", "")):
+            self._send(429, {"error": "RATE_LIMITED", "request_id": request_id}, request_id)
+            return
+        try:
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, ValueError):
+            payload = None
+        if not isinstance(payload, dict):
+            self._send(400, {"error": "INVALID_JSON", "request_id": request_id}, request_id)
+            return
+        if payload.get("provider", "openai") != "openai":
+            self._send(409, {"error": "PROVIDER_DENIED", "request_id": request_id}, request_id)
+            return
+        message = payload.get("message")
+        if not isinstance(message, str) or not 0 < len(message.strip()) <= MAX_MESSAGE_CHARS:
+            self._send(400, {"error": "MESSAGE_DENIED", "request_id": request_id}, request_id)
+            return
+        attachments = payload.get("attachments", [])
+        if not isinstance(attachments, list):
+            self._send(400, {"error": "ATTACHMENTS_DENIED", "request_id": request_id}, request_id)
+            return
+        if not configured():
+            self._send(503, {"error": "PROVIDER_NOT_CONFIGURED", "request_id": request_id}, request_id)
+            return
+        try:
+            text, model = call_openai(message.strip(), attachments)
+        except urllib.error.HTTPError as exc:
+            self._send(502, {"error": "UPSTREAM_PROVIDER_ERROR", "upstream_status": exc.code, "request_id": request_id}, request_id)
+            return
+        except (urllib.error.URLError, TimeoutError):
+            self._send(504, {"error": "UPSTREAM_TIMEOUT", "request_id": request_id}, request_id)
+            return
+        except Exception as exc:
+            print(f"OWNER_PROVIDER_ERROR request_id={request_id} type={type(exc).__name__}", flush=True)
+            self._send(502, {"error": "UPSTREAM_PROVIDER_ERROR", "request_id": request_id}, request_id)
+            return
+        self._send(200, {"text": text, "model": model, "provider": "openai",
+                         "request_id": request_id, "contract": "OMEGA-OWNER-API-V1"}, request_id)
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/api/health":
@@ -297,6 +358,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         request_id = str(uuid.uuid4())
+
+        if path == owner_auth_v1.PATH:
+            self._owner_chat_v1(request_id)
+            return
 
         if path == "/api/research":
             self._send(

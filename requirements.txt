@@ -1,1 +1,3 @@
-# P1 backend uses Python standard library only.
+# P1 backend: only cryptographic verification for opt-in Owner v1 boundary.
+# No provider credentials are stored here.
+cryptography==46.0.4

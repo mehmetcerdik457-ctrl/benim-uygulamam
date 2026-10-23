@@ -1,5 +1,4 @@
-# Local-only Compose draft. Binds only to loopback; no public endpoint is created.
-# Supply OPENAI_API_KEY in the invoking shell. Never commit a .env file or key.
+# Local-only Compose draft: no public port, no automatic owner enrollment.
 services:
   backend:
     build:
@@ -9,6 +8,15 @@ services:
       PORT: "8080"
       OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in your shell for a real provider test}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-luna}
+      OMEGA_OWNER_ID: ${OMEGA_OWNER_ID:-}
+      OMEGA_DEVICE_ID: ${OMEGA_DEVICE_ID:-}
+      OMEGA_OWNER_PUBLIC_DER_B64: ${OMEGA_OWNER_PUBLIC_DER_B64:-}
+      OMEGA_DEVICE_PUBLIC_DER_B64: ${OMEGA_DEVICE_PUBLIC_DER_B64:-}
+      OMEGA_NONCE_DB: /var/lib/omega/owner_nonce.sqlite
+    volumes:
+      - omega_owner_nonce:/var/lib/omega
     ports:
       - "127.0.0.1:8080:8080"
     restart: "no"
+volumes:
+  omega_owner_nonce:
