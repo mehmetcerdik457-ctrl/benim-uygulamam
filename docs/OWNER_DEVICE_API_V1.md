@@ -43,3 +43,13 @@ v1 proof as an approval token or bypass the fixed-false backend runtime policy.
 
 ### Updated signed device ID validation (PR #94, 23 Oct 2026)
 The request envelope requires an Owner ID matching `[A-Za-z0-9_-]{1,64}` and a device identifier matching `[a-f0-9]{64}`. A matching configured string alone is NOT enrollment. The runtime provider-execution gate stays disabled. Tests use a synthetic 64-character digest only.
+
+### Android device public-key binding (23 October 2026)
+The Android TrustedDeviceManager.deviceId() returns hex SHA-256 of the device
+Keystore public-key SubjectPublicKeyInfo DER. OMEGA now requires the asserted
+device identifier to equal SHA-256(pinned device DER) and rejects using the same
+public key for both Owner and Device. This closes a real wire-identity
+misconfiguration gap without activating any provider call or enrolling anyone.
+The Python wire-vector test directly matches Gpt-asistan Java test source
+commit `639ac11db15ea658992c5b91b9c33c1a767902f6`;
+the physical Android device, signing key and release remain unverified.

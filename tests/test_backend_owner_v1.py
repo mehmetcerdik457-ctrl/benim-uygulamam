@@ -1,5 +1,6 @@
 """Real P-256 signature/replay HTTP integration, synthetic provider; no real credentials."""
 import base64
+import hashlib
 import json
 import os
 import sys
@@ -19,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import owner_auth_v1 as auth
 import server
 
-TEST_DEVICE_ID = "a" * 64  # Synthetic SHA-256-shaped device ID, not real enrollment.
 server_execution_default = server.owner_execution_authorized
 
 
@@ -34,7 +34,8 @@ def gate(tmp_path, monkeypatch):
     der = lambda k: k.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     monkeypatch.setenv("OMEGA_OWNER_ID", "owner-test")
-    monkeypatch.setenv("OMEGA_DEVICE_ID", TEST_DEVICE_ID)
+    # Device identity must match the actual synthetic SPKI DER bytes.
+    monkeypatch.setenv("OMEGA_DEVICE_ID", hashlib.sha256(der(device)).hexdigest())
     monkeypatch.setenv("OMEGA_OWNER_PUBLIC_DER_B64", b64(der(owner)))
     monkeypatch.setenv("OMEGA_DEVICE_PUBLIC_DER_B64", b64(der(device)))
     monkeypatch.setenv("OMEGA_NONCE_DB", str(tmp_path / "nonce.sqlite"))
@@ -58,7 +59,11 @@ def gate(tmp_path, monkeypatch):
         thread.join(timeout=3)
 
 
-def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=TEST_DEVICE_ID):
+def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=None):
+    if device_identity is None:
+        der = device.public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+        device_identity = hashlib.sha256(der).hexdigest()
     ts = str(int(time.time()) if timestamp is None else timestamp)
     nonce = nonce or uuid.uuid4().hex
     proof = auth.canonical("POST", auth.PATH, raw, ts, nonce, "owner-test", device_identity)
@@ -199,3 +204,31 @@ def test_invalid_owner_identity_is_denied_even_if_signatures_are_valid(gate, mon
     headers["X-Omega-Owner-Id"] = "invalid owner"
     status, data = post(url, raw, headers)
     assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+
+def test_matching_but_unbound_sha256_device_identifier_denied(gate, monkeypatch):
+    url, owner, device = gate
+    arbitrary = "f" * 64
+    monkeypatch.setenv("OMEGA_DEVICE_ID", arbitrary)
+    raw = b'{"message":"Merhaba"}'
+    status, body = post(url, raw, signed_headers(owner, device, raw, device_identity=arbitrary))
+    assert (status, body["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+
+def test_owner_and_device_cannot_be_same_pinned_key(gate, monkeypatch):
+    url, owner, device = gate
+    owner_der = owner.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    monkeypatch.setenv("OMEGA_DEVICE_PUBLIC_DER_B64", b64(owner_der))
+    monkeypatch.setenv("OMEGA_DEVICE_ID", hashlib.sha256(owner_der).hexdigest())
+    raw = b'{"message":"Merhaba"}'
+    status, body = post(url, raw, signed_headers(owner, owner, raw))
+    assert (status, body["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+
+def test_fixture_device_id_really_matches_its_public_key(gate, monkeypatch):
+    url, owner, device = gate
+    der = device.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    assert os.environ["OMEGA_DEVICE_ID"] == hashlib.sha256(der).hexdigest()
+    assert len(os.environ["OMEGA_DEVICE_ID"]) == 64
