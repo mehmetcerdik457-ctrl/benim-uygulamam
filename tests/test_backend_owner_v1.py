@@ -147,7 +147,16 @@ def test_invalid_signature_denied(gate):
     url, owner, device = gate
     raw = b'{"message":"Merhaba"}'
     other_key = ec.generate_private_key(ec.SECP256R1())
-    status, data = post(url, raw, signed_headers(owner, other_key, raw))
+    headers = signed_headers(owner, device, raw)
+    # Keep the correctly bound device identity but replace ONLY its signature.
+    proof = auth.canonical("POST", auth.PATH, raw,
+                           headers["X-Omega-Timestamp"],
+                           headers["X-Omega-Nonce"],
+                           headers["X-Omega-Owner-Id"],
+                           headers["X-Omega-Device-Id"])
+    headers["X-Omega-Device-Proof"] = b64(
+        other_key.sign(proof, ec.ECDSA(hashes.SHA256())))
+    status, data = post(url, raw, headers)
     assert (status, data["error"]) == (403, "OWNER_AUTH_DENIED")
 
 
