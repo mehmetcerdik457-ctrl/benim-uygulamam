@@ -40,3 +40,6 @@ Do not replace the deny function with a config toggle or accept this PR as Owner
 The recovered `omega_mvi/` FastAPI demo from PR #58 uses a different HTTP
 server, mocks all identities and denies operations. It must not use the Owner
 v1 proof as an approval token or bypass the fixed-false backend runtime policy.
+
+### Updated signed device ID validation (PR #94, 23 Oct 2026)
+The request envelope requires an Owner ID matching `[A-Za-z0-9_-]{1,64}` and a device identifier matching `[a-f0-9]{64}`. A matching configured string alone is NOT enrollment. The runtime provider-execution gate stays disabled. Tests use a synthetic 64-character digest only.

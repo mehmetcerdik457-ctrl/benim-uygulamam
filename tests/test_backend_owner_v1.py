@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import owner_auth_v1 as auth
 import server
 
+TEST_DEVICE_ID = "a" * 64  # Synthetic SHA-256-shaped device ID, not real enrollment.
 server_execution_default = server.owner_execution_authorized
 
 
@@ -33,7 +34,7 @@ def gate(tmp_path, monkeypatch):
     der = lambda k: k.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     monkeypatch.setenv("OMEGA_OWNER_ID", "owner-test")
-    monkeypatch.setenv("OMEGA_DEVICE_ID", "device-test")
+    monkeypatch.setenv("OMEGA_DEVICE_ID", TEST_DEVICE_ID)
     monkeypatch.setenv("OMEGA_OWNER_PUBLIC_DER_B64", b64(der(owner)))
     monkeypatch.setenv("OMEGA_DEVICE_PUBLIC_DER_B64", b64(der(device)))
     monkeypatch.setenv("OMEGA_NONCE_DB", str(tmp_path / "nonce.sqlite"))
@@ -57,7 +58,7 @@ def gate(tmp_path, monkeypatch):
         thread.join(timeout=3)
 
 
-def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity="device-test"):
+def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=TEST_DEVICE_ID):
     ts = str(int(time.time()) if timestamp is None else timestamp)
     nonce = nonce or uuid.uuid4().hex
     proof = auth.canonical("POST", auth.PATH, raw, ts, nonce, "owner-test", device_identity)
@@ -124,7 +125,7 @@ def test_stale_timestamp_denied(gate):
 def test_wrong_device_denied(gate):
     url, owner, device = gate
     raw = b'{"message":"Merhaba"}'
-    status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="unknown-device"))
+    status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="b" * 64))
     assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
 
 
@@ -173,3 +174,28 @@ def test_runtime_env_switch_cannot_enable_owner_execution(gate, monkeypatch):
     status, body = post(url, raw, signed_headers(owner, device, raw))
     assert status == 403
     assert body["error"] == "OWNER_EXECUTION_NOT_APPROVED"
+
+
+def test_device_identity_without_sha256_shape_is_rejected(gate):
+    url, owner, device = gate
+    raw = b'{"message":"Merhaba"}'
+    status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="invalid-device"))
+    assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+
+def test_matching_but_malformed_provisioned_device_identity_is_denied(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.setenv("OMEGA_DEVICE_ID", "invalid-device")
+    raw = b'{"message":"Merhaba"}'
+    status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="invalid-device"))
+    assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+
+def test_invalid_owner_identity_is_denied_even_if_signatures_are_valid(gate, monkeypatch):
+    url, owner, device = gate
+    monkeypatch.setenv("OMEGA_OWNER_ID", "invalid owner")
+    raw = b'{"message":"Merhaba"}'
+    headers = signed_headers(owner, device, raw)
+    headers["X-Omega-Owner-Id"] = "invalid owner"
+    status, data = post(url, raw, headers)
+    assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
