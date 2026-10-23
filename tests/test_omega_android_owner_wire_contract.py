@@ -17,9 +17,9 @@ DEVICE="a"*64
 
 def test_android_java_reference_exact_canonical_bytes():
     expected=(
-        "OMEGA-OWNER-API-V1\\nPOST\\n/api/v1/owner/chat\\n"
-        "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\\n"
-        "1792440000\\n"+NONCE+"\\nowner-test\\n"+DEVICE
+        "OMEGA-OWNER-API-V1\nPOST\n/api/v1/owner/chat\n"
+        "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\n"
+        "1792440000\n"+NONCE+"\nowner-test\n"+DEVICE
     ).encode("utf-8")
     assert auth.canonical("POST",auth.PATH,b"{}","1792440000",NONCE,"owner-test",DEVICE)==expected
 
