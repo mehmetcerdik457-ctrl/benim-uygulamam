@@ -19,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 import owner_auth_v1 as auth
 import server
 
+TEST_DEVICE_ID = "a" * 64  # Synthetic lowercase SHA-256-shaped device identity.
+
 
 def b64(data):
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
@@ -31,7 +33,7 @@ def gate(tmp_path, monkeypatch):
     der = lambda k: k.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
     monkeypatch.setenv("OMEGA_OWNER_ID", "owner-test")
-    monkeypatch.setenv("OMEGA_DEVICE_ID", "device-test")
+    monkeypatch.setenv("OMEGA_DEVICE_ID", TEST_DEVICE_ID)
     monkeypatch.setenv("OMEGA_OWNER_PUBLIC_DER_B64", b64(der(owner)))
     monkeypatch.setenv("OMEGA_DEVICE_PUBLIC_DER_B64", b64(der(device)))
     monkeypatch.setenv("OMEGA_NONCE_DB", str(tmp_path / "nonce.sqlite"))
@@ -53,7 +55,7 @@ def gate(tmp_path, monkeypatch):
         thread.join(timeout=3)
 
 
-def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity="device-test"):
+def signed_headers(owner, device, raw, *, timestamp=None, nonce=None, device_identity=TEST_DEVICE_ID):
     ts = str(int(time.time()) if timestamp is None else timestamp)
     nonce = nonce or uuid.uuid4().hex
     proof = auth.canonical("POST", auth.PATH, raw, ts, nonce, "owner-test", device_identity)
@@ -118,6 +120,13 @@ def test_stale_timestamp_denied(gate):
 
 
 def test_wrong_device_denied(gate):
+    url, owner, device = gate
+    raw = b'{"message":"Merhaba"}'
+    status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="b" * 64))
+    assert (status, data["error"]) == (403, "OWNER_IDENTITY_DENIED")
+
+ 
+def test_malformed_device_identity_denied(gate):
     url, owner, device = gate
     raw = b'{"message":"Merhaba"}'
     status, data = post(url, raw, signed_headers(owner, device, raw, device_identity="unknown-device"))
