@@ -1,0 +1,62 @@
+name: OMEGA four-module live inspector E2E
+on:
+  push:
+    branches: [omega/integrated-inspector-modules-20261011]
+  pull_request:
+    paths:
+      - 'omega_mvi/**'
+      - 'compose.omega.yml'
+      - 'scripts/omega_safe_secret_scan.py'
+      - 'tests/test_omega_safe_secret_scan.py'
+      - '.github/workflows/omega-inspector-e2e.yml'
+permissions:
+  contents: read
+jobs:
+  real-postgres-and-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Quiet secret scan BEFORE running any tests
+        run: python3 scripts/omega_safe_secret_scan.py
+      - name: Create ephemeral DEMO ONLY DB, sentinel and restricted reader password
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+          marker="$(openssl rand -hex 16)"
+          echo "::add-mask::$marker"
+          echo "OMEGA_TEST_DB_SENTINEL=$marker" >> "$GITHUB_ENV"
+          runtime_pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$runtime_pw"
+          echo "OMEGA_TEST_RUNTIME_PASSWORD=$runtime_pw" >> "$GITHUB_ENV"
+          reader_pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$reader_pw"
+          echo "OMEGA_DEMO_READER_PASSWORD=$reader_pw" >> "$GITHUB_ENV"
+          echo "OMEGA_DEMO_READS_ENABLED=true" >> "$GITHUB_ENV"
+      - name: Start ONE Compose with PostgreSQL and localhost-bound API
+        run: docker compose -f compose.omega.yml up -d --build --wait --wait-timeout 120 db api
+      - name: Probe runner-host loopback; preserve BLOCKED acceptance status
+        run: python3 scripts/omega_probe_runner_loopback.py
+      - name: Classify runner-host binding, internal network and TCP without claiming owner acceptance
+        run: python3 scripts/omega_runner_host_diagnostic.py
+      - name: Seed disposable DB guard token (never real data)
+        run: |
+          docker compose -f compose.omega.yml exec -T db psql -v ON_ERROR_STOP=1 -U omega_demo -d omega_demo -c "CREATE TABLE omega_test_sentinel(marker_id integer PRIMARY KEY CHECK(marker_id=1),marker text NOT NULL); INSERT INTO omega_test_sentinel VALUES (1,'${OMEGA_TEST_DB_SENTINEL}');"
+      - name: Real DB security, v4 migration, all offline modules regressions
+        run: docker compose -f compose.omega.yml --profile integration run --rm --build tests
+      - name: E2E real DB to least-privilege view to FastAPI HTTP plus four-module pipeline
+        run: |
+          docker compose -f compose.omega.yml --profile integration run --rm -e OMEGA_REQUIRE_COMBINED_E2E=1 tests python -m pytest -q -rs tests/test_db_readonly_api.py
+      - name: Cross-project Copilot module, budget policy, redaction and CI-log tests
+        run: |
+          python3 -m pip install --quiet -r requirements.txt -r omega_mvi/requirements-test.txt
+          python3 -m pytest -q tests omega_mvi/tests/test_mvi_health.py omega_mvi/tests/test_dashboard_tr.py omega_mvi/tests/test_pipeline_integration.py omega_mvi/tests/test_task_policy.py omega_mvi/inspection/github_inventory/test_github_inventory.py omega_mvi/inspection/redaction/test_redaction.py omega_mvi/model_adapter/test_adapter.py omega_mvi/approval/test_contract.py
+      - name: Confirm CI job did not skip critical E2E and API remains non-production
+        run: |
+          docker compose -f compose.omega.yml exec -T api python -c "import urllib.request; v=urllib.request.urlopen('http://127.0.0.1:8000/api/readiness', timeout=4).read(); assert b'\"production_ready\":false' in v.replace(b' ',b''); print('OMEGA_E2E_PRODUCTION_DENIED=PASS')"
+      - name: Always remove disposable resources
+        if: always()
+        run: docker compose -f compose.omega.yml --profile integration down --volumes --remove-orphans

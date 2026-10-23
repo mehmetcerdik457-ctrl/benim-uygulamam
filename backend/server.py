@@ -43,13 +43,22 @@ def configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
 
 
+def owner_execution_authorized() -> bool:
+    """Fail closed until an independently verified Owner enrollment is implemented.
+
+    Signatures and environment switches are not proof of an approved owner.
+    This must not be turned on by a header, token, or configuration flag.
+    """
+    return False
+
+
 def json_bytes(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def client_key(headers: Any, peer_ip: str) -> str:
-    forwarded = (headers.get("X-Forwarded-For") or "").split(",", 1)[0].strip()
-    return forwarded or peer_ip
+    # The backend has no verified trusted-proxy list: forwarded headers are untrusted.
+    return peer_ip or "UNKNOWN_PEER"
 
 
 def rate_allowed(key: str, now: float | None = None) -> bool:
@@ -114,6 +123,8 @@ def fetch_openai_model_ids() -> set[str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    if not owner_execution_authorized():
+        raise RuntimeError("OWNER_EXECUTION_NOT_APPROVED")
 
     req = urllib.request.Request(
         OPENAI_MODELS_URL,
@@ -136,12 +147,21 @@ def fetch_openai_model_ids() -> set[str]:
     }
 
 
+def select_model() -> str:
+    """Never silently fall back to an unreviewed alternate model."""
+    if not DEFAULT_MODEL or DEFAULT_MODEL not in ALLOWED_MODELS:
+        raise RuntimeError("MODEL_POLICY_DENIED")
+    return DEFAULT_MODEL
+
+
 def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+    if not owner_execution_authorized():
+        raise RuntimeError("OWNER_EXECUTION_NOT_APPROVED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    model = select_model()
     payload = {
         "model": model,
         "input": [
@@ -255,6 +275,9 @@ class Handler(BaseHTTPRequestHandler):
         if not configured():
             self._send(503, {"error": "PROVIDER_NOT_CONFIGURED", "request_id": request_id}, request_id)
             return
+        if not owner_execution_authorized():
+            self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED", "request_id": request_id}, request_id)
+            return
         try:
             text, model = call_openai(message.strip(), attachments)
         except urllib.error.HTTPError as exc:
@@ -270,6 +293,49 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, {"text": text, "model": model, "provider": "openai",
                          "request_id": request_id, "contract": "OMEGA-OWNER-API-V1"}, request_id)
 
+    def _owner_models_v1(self, request_id: str) -> None:
+        """Recognize Android OwnerGateway signed model-list route; NEVER grant models.
+
+        The cryptographic signature contract is exercised before a hard deny,
+        preserving replay prevention and device-key binding. Provisioning,
+        allowlisting, real model verification and approval remain separate.
+        """
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if not 0 < length <= MAX_BODY_BYTES:
+                self._send(413, {"error": "BODY_SIZE_DENIED", "request_id": request_id}, request_id)
+                return
+            raw = self.rfile.read(length)
+            if len(raw) != length:
+                self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+                return
+        except (ValueError, TypeError):
+            self._send(400, {"error": "INVALID_BODY", "request_id": request_id}, request_id)
+            return
+
+        signed, reason = owner_auth_v1.authorize(
+            self.headers, raw, method="POST", path=owner_auth_v1.MODELS_PATH
+        )
+        if not signed:
+            code = 503 if reason in {"OWNER_IDENTITY_NOT_PROVISIONED", "OWNER_AUTH_STORE_UNAVAILABLE"} else 403
+            self._send(code, {"error": reason, "request_id": request_id}, request_id)
+            return
+
+        # KRAL Android currently signs an empty JSON object for model requests.
+        # Do not accept arbitrary client instructions before Owner enrollment.
+        try:
+            payload = json.loads(raw)
+        except (UnicodeDecodeError, ValueError):
+            payload = None
+        if not isinstance(payload, dict) or payload:
+            self._send(400, {"error": "MODELS_BODY_DENIED", "request_id": request_id}, request_id)
+            return
+
+        # No model enumeration, provider network call, enrollment or execution.
+        # This must remain hard-denied even with mathematically valid signatures.
+        self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED",
+                         "request_id": request_id}, request_id)
+
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/api/health":
@@ -279,6 +345,8 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "PASS",
                     "version": VERSION,
                     "provider_configured": configured(),
+                    "owner_identity_verified": False,
+                    "execution_enabled": owner_execution_authorized(),
                     "default_model": DEFAULT_MODEL,
                 },
             )
@@ -304,6 +372,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/models":
             if not configured():
                 self._send(503, {"error": "PROVIDER_NOT_CONFIGURED"})
+                return
+            if not owner_execution_authorized():
+                self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED"})
                 return
             try:
                 live_ids = fetch_openai_model_ids()
@@ -349,6 +420,8 @@ class Handler(BaseHTTPRequestHandler):
                         "AUTH_METHOD": "UNPROVISIONED",
                     },
                     "runtime": "P1_BACKEND_ONLY",
+                    "owner_identity_verified": False,
+                    "execution_enabled": owner_execution_authorized(),
                 },
             )
             return
@@ -361,6 +434,10 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == owner_auth_v1.PATH:
             self._owner_chat_v1(request_id)
+            return
+
+        if path == owner_auth_v1.MODELS_PATH:
+            self._owner_models_v1(request_id)
             return
 
         if path == "/api/research":
@@ -441,6 +518,9 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(attachments, list):
             self._send(400, {"error": "ATTACHMENTS_MUST_BE_ARRAY", "request_id": request_id}, request_id)
             return
+        if not owner_execution_authorized():
+            self._send(403, {"error": "OWNER_EXECUTION_NOT_APPROVED", "request_id": request_id}, request_id)
+            return
 
         try:
             reply, model = call_openai(message, attachments)
@@ -484,7 +564,12 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        print("HTTP " + (fmt % args), flush=True)
+        # BaseHTTPRequestHandler default request lines contain untrusted query values.
+        # Only emit strictly validated HTTP status codes, never raw request targets.
+        if fmt == '"%s" %s %s' and len(args) >= 2:
+            status = str(args[1])
+            if len(status) == 3 and status.isascii() and status.isdigit():
+                print(f"HTTP_STATUS status={status}", flush=True)
 
 
 def main() -> None:

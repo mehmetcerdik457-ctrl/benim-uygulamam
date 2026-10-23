@@ -1,0 +1,66 @@
+name: OMEGA runner-host restricted demo gateway acceptance
+on:
+  pull_request:
+    paths:
+      - 'compose.omega.yml'
+      - 'compose.omega-host.yml'
+      - 'omega_host_gateway/**'
+      - 'scripts/omega_host_gateway_acceptance.py'
+      - 'tests/test_omega_host_gateway_contract.py'
+      - '.github/workflows/omega-runner-host-acceptance.yml'
+  push:
+    paths:
+      - 'compose.omega.yml'
+      - 'compose.omega-host.yml'
+      - 'omega_host_gateway/**'
+      - 'scripts/omega_host_gateway_acceptance.py'
+      - 'tests/test_omega_host_gateway_contract.py'
+      - '.github/workflows/omega-runner-host-acceptance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runner-host-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Verify static isolation and gateway negative unit tests
+        run: |
+          python3 -m pip install --quiet pytest PyYAML
+          PYTHONPATH=.:omega_mvi python3 -m pytest -q tests/test_omega_host_gateway_contract.py
+      - name: Generate disposable test-only DB password
+        run: |
+          pw="$(openssl rand -hex 18)"
+          echo "::add-mask::$pw"
+          echo "OMEGA_DEV_DB_PASSWORD=$pw" >> "$GITHUB_ENV"
+      - name: Verify Compose overlay removes direct private API ports
+        run: |
+          docker compose -f compose.omega.yml -f compose.omega-host.yml config -q
+          docker compose -f compose.omega.yml -f compose.omega-host.yml config --format json > /tmp/omega-host-config.json
+          python3 -c 'import json; x=json.load(open("/tmp/omega-host-config.json")); a=x["services"]["api"]; g=x["services"]["host-gateway"]; assert not a.get("ports"); assert g["ports"][0]["host_ip"]=="127.0.0.1"; assert g["ports"][0]["published"]=="18081"; assert x["networks"]["isolated_demo"]["internal"] is True; print("OMEGA_GATEWAY_CONFIG=PASS")'
+      - name: Start isolated DB/API plus restricted loopback gateway
+        run: docker compose -f compose.omega.yml -f compose.omega-host.yml up -d --build --wait --wait-timeout 150 db api host-gateway
+      - name: Verify actual Docker network and live denial over runner loopback
+        run: python3 scripts/omega_host_gateway_acceptance.py
+      - name: Assert gateway does not accept Owner/LLM routes
+        run: |
+          python3 - <<'PY'
+          from urllib.request import Request,build_opener,ProxyHandler
+          from urllib.error import HTTPError
+          opener=build_opener(ProxyHandler({}))
+          for path in ("/api/chat", "/api/v1/owner/chat"):
+              req=Request("http://127.0.0.1:18081"+path,data=b"{}",method="POST")
+              try:
+                  opener.open(req,timeout=3)
+              except HTTPError as e:
+                  assert e.code==403
+              else:
+                  raise RuntimeError("UNAUTHORIZED_ROUTE_ACCEPTED")
+          print("OMEGA_GATEWAY_UNAUTHORIZED_ROUTES=DENIED")
+          PY
+      - name: Remove only disposable CI demo containers and temporary volumes
+        if: always()
+        run: docker compose -f compose.omega.yml -f compose.omega-host.yml --profile integration down --volumes --remove-orphans

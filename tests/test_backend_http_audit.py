@@ -111,6 +111,8 @@ def test_provider_exception_cannot_leak_secret_to_response_or_logs(
 ):
     secret = "OMEGA_SECRET_SENTINEL_DO_NOT_LOG"
     monkeypatch.setenv("OPENAI_API_KEY", secret)
+    # Retain isolated provider-error/redaction coverage with synthetic authorization.
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
 
     def simulated_provider_failure(*args, **kwargs):
         raise RuntimeError("simulated provider exception containing " + secret)

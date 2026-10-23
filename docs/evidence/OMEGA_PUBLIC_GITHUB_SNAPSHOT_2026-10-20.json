@@ -1,0 +1,22 @@
+{
+  "schema": "omega-public-repository-snapshot-v1",
+  "provenance": {
+    "provider": "GitHub REST API",
+    "source_url": "https://api.github.com/repos/mehmetcerdik457-ctrl/benim-uygulamam",
+    "read_date_utc": "2026-10-20",
+    "verified_main_head": "f410e09466026a19fb47193f70d25d3c5f8544a5",
+    "mode": "public_read_only_connector_export",
+    "live_refresh_enabled": false
+  },
+  "metadata": {
+    "full_name": "mehmetcerdik457-ctrl/benim-uygulamam",
+    "name": "benim-uygulamam",
+    "visibility": "public",
+    "private": false,
+    "description": null,
+    "stargazers_count": 1,
+    "forks_count": 0,
+    "watchers_count": 1,
+    "open_issues_count": 83
+  }
+}

@@ -1,6 +1,7 @@
 """OMEGA Owner v1: dual P-256 signature gate. No enrollment on this public endpoint."""
 import base64
 import hashlib
+import hmac
 import os
 import re
 import sqlite3
@@ -16,6 +17,7 @@ except ImportError:
     hashes = serialization = ec = None
 
 PATH = "/api/v1/owner/chat"
+MODELS_PATH = "/api/v1/owner/models"
 REQUIRED = ("X-Omega-Owner-Id", "X-Omega-Device-Id", "X-Omega-Timestamp",
             "X-Omega-Nonce", "X-Omega-Owner-Proof", "X-Omega-Device-Proof")
 
@@ -49,6 +51,8 @@ def canonical(method, path, raw, timestamp, nonce, owner, device):
 
 def authorize(headers, raw, method="POST", path=PATH, now=None):
     """Return a fixed error; never log/request-key material or reveal internals."""
+    if method != "POST" or path not in (PATH, MODELS_PATH):
+        return False, "OWNER_AUTH_DENIED"
     if not configured():
         return False, "OWNER_IDENTITY_NOT_PROVISIONED"
     try:
@@ -61,6 +65,15 @@ def authorize(headers, raw, method="POST", path=PATH, now=None):
             or not re.fullmatch(r"[a-f0-9]{64}", device)):
             return False, "OWNER_IDENTITY_DENIED"
         if owner != os.environ["OMEGA_OWNER_ID"] or device != os.environ["OMEGA_DEVICE_ID"]:
+            return False, "OWNER_IDENTITY_DENIED"
+        # Android TrustedDeviceManager.deviceId() is SHA-256(SPKI DER bytes).
+        # The pinned key and the asserted device ID must be the same identity,
+        # and Owner/Device proof keys must be independent. Neither implies
+        # enrollment or approval of actual execution.
+        owner_der = _decode(os.environ["OMEGA_OWNER_PUBLIC_DER_B64"])
+        device_der = _decode(os.environ["OMEGA_DEVICE_PUBLIC_DER_B64"])
+        if (not hmac.compare_digest(hashlib.sha256(device_der).hexdigest(), device)
+                or hmac.compare_digest(owner_der, device_der)):
             return False, "OWNER_IDENTITY_DENIED"
         ts = h["X-Omega-Timestamp"]
         if not re.fullmatch(r"[0-9]{10}", ts):

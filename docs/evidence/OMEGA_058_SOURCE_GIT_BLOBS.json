@@ -1,0 +1,393 @@
+{
+  "schema": "omega-mvi-git-blob-source-v1",
+  "source_commit": "044c558b2b28e05929a9acd79a639a32092ab187",
+  "source_repository": "mehmetcerdik457-ctrl/benim-uygulamam",
+  "notes": "77 original blobs, adapted E2E workflow excluded, Git SHA-1 is not independent signed attestation",
+  "items": [
+    {
+      "path": ".github/copilot-instructions.md",
+      "git_blob_sha1": "9f747551fc0eb9bb910b24f7f8d8ebe502bc19f3",
+      "size": 1432
+    },
+    {
+      "path": "AGENTS.md",
+      "git_blob_sha1": "e67726567aec4b83331f4ace57e51ee784ec8bdb",
+      "size": 2221
+    },
+    {
+      "path": "compose.omega.yml",
+      "git_blob_sha1": "c30e554197552e1230226e126e170bcec3eecc8a",
+      "size": 2296
+    },
+    {
+      "path": "docs/OMEGA_ARCHITECTURE.md",
+      "git_blob_sha1": "7b0766b4155a4876b5e99842d91bfccc85d29dd5",
+      "size": 2299
+    },
+    {
+      "path": "docs/OMEGA_GUARD_CONSOLIDATION.md",
+      "git_blob_sha1": "e1a76f4ff96743c9786e9b0a3360029b91fd680f",
+      "size": 1507
+    },
+    {
+      "path": "docs/OMEGA_REQUIREMENTS_MATRIX.csv",
+      "git_blob_sha1": "325982534787d2667ce17642d145aa32a1ea9564",
+      "size": 40633
+    },
+    {
+      "path": "docs/OMEGA_RUNNER_HOST_AND_VERSION_BOUNDARY.md",
+      "git_blob_sha1": "d82638f2dcafabf0185fc31c2f0aa3eabfb0f980",
+      "size": 6421
+    },
+    {
+      "path": "docs/OMEGA_SCOPE_CONFLICT_REVIEW.md",
+      "git_blob_sha1": "db24c9f532b94e5b3c97c746dc654a480ee15b30",
+      "size": 6343
+    },
+    {
+      "path": "docs/PHASE_0_ACCEPTANCE.md",
+      "git_blob_sha1": "6d44178084c3f5ae4e3aeff6885a0e2a753c7c3d",
+      "size": 2589
+    },
+    {
+      "path": "docs/PROJECT_OMEGA_MASTER_SPEC_V2.md",
+      "git_blob_sha1": "ac6c86a08971fe0f6cf063ef6a17ffff1cc62dee",
+      "size": 18249
+    },
+    {
+      "path": "omega_mvi/.dockerignore",
+      "git_blob_sha1": "fa6cb71c906618bfdd162256fbf014c9c4b2d92c",
+      "size": 64
+    },
+    {
+      "path": "omega_mvi/.env.example",
+      "git_blob_sha1": "25a90ff80cabd2721a69c5943896a66a1741fa06",
+      "size": 391
+    },
+    {
+      "path": "omega_mvi/app/__init__.py",
+      "git_blob_sha1": "6351cf4a6a69c1d874eead0e9991e05d7820ba5d",
+      "size": 76
+    },
+    {
+      "path": "omega_mvi/app/main.py",
+      "git_blob_sha1": "590921d89b949057c86e4cd753c55e9068a2e595",
+      "size": 4659
+    },
+    {
+      "path": "omega_mvi/app/static/dashboard.css",
+      "git_blob_sha1": "f81f3d98f8e0ecd85d78d952eeb40f0140d249fe",
+      "size": 887
+    },
+    {
+      "path": "omega_mvi/app/static/dashboard.js",
+      "git_blob_sha1": "8232dedc1f3f32f5b6727ba1eefb82df02d21ac1",
+      "size": 2627
+    },
+    {
+      "path": "omega_mvi/app/static/index.html",
+      "git_blob_sha1": "f94be4be365853ad17a778274ab92ed754389eaa",
+      "size": 1736
+    },
+    {
+      "path": "omega_mvi/approval/__init__.py",
+      "git_blob_sha1": "78079b604f924fa3eb6f0d7f0db5d6c8d72afb6e",
+      "size": 76
+    },
+    {
+      "path": "omega_mvi/approval/contract.py",
+      "git_blob_sha1": "874df1c7481151a4bb3ea2c03bb7933d9cc5751a",
+      "size": 2556
+    },
+    {
+      "path": "omega_mvi/approval/README.md",
+      "git_blob_sha1": "52f9739ae83e0ca379311e427c2917488272b560",
+      "size": 1036
+    },
+    {
+      "path": "omega_mvi/approval/test_contract.py",
+      "git_blob_sha1": "21fb997986f1fdc154e717e32a14d5f349475051",
+      "size": 2094
+    },
+    {
+      "path": "omega_mvi/db/__init__.py",
+      "git_blob_sha1": "d00614287efc0e28ea6e8347a1e400480c04487e",
+      "size": 88
+    },
+    {
+      "path": "omega_mvi/db/migrate.py",
+      "git_blob_sha1": "10fc1ed14fbfff1a6b372608721ddb732d12fea4",
+      "size": 3776
+    },
+    {
+      "path": "omega_mvi/db/migrations/001_tasks.down.sql",
+      "git_blob_sha1": "76ff304dfbd18ec86203cd48bfc0fa76095a3797",
+      "size": 179
+    },
+    {
+      "path": "omega_mvi/db/migrations/001_tasks.up.sql",
+      "git_blob_sha1": "c0956d4e6491363f92049daf54b4283a134d4117",
+      "size": 2735
+    },
+    {
+      "path": "omega_mvi/db/migrations/002_security.down.sql",
+      "git_blob_sha1": "6af51978a180c54129bc757dc55cab3f27d770ba",
+      "size": 625
+    },
+    {
+      "path": "omega_mvi/db/migrations/002_security.up.sql",
+      "git_blob_sha1": "769683a29bb82df1becaea30ad82662b218f2952",
+      "size": 4143
+    },
+    {
+      "path": "omega_mvi/db/migrations/003_task_controls.down.sql",
+      "git_blob_sha1": "751e3f503194ad0e06ceefbe97d8c6b4c54ccb7d",
+      "size": 455
+    },
+    {
+      "path": "omega_mvi/db/migrations/003_task_controls.up.sql",
+      "git_blob_sha1": "4eba7551fe3e7e2e976b6e835278c8190417c4b5",
+      "size": 976
+    },
+    {
+      "path": "omega_mvi/db/migrations/004_demo_reader.down.sql",
+      "git_blob_sha1": "dd85cc06a823b985ab79558744b5bd2c19950ed8",
+      "size": 291
+    },
+    {
+      "path": "omega_mvi/db/migrations/004_demo_reader.up.sql",
+      "git_blob_sha1": "2c41301380561066e3ce8a9cce4a0e84a64c0698",
+      "size": 1037
+    },
+    {
+      "path": "omega_mvi/db/README.md",
+      "git_blob_sha1": "a9fcacfd01b8c0f20ce7d3fd476580829d95251b",
+      "size": 1769
+    },
+    {
+      "path": "omega_mvi/db/store.py",
+      "git_blob_sha1": "f0c7d75f2df7188d67c698a1785a0857e57c6790",
+      "size": 4735
+    },
+    {
+      "path": "omega_mvi/db/test_api.py",
+      "git_blob_sha1": "94e37b31c41965d74b2973e5b7529cd0f674ced7",
+      "size": 2655
+    },
+    {
+      "path": "omega_mvi/Dockerfile",
+      "git_blob_sha1": "ec1b9f8b8f32d7e8279a08fae87b6d0b99d3544d",
+      "size": 372
+    },
+    {
+      "path": "omega_mvi/Dockerfile.test",
+      "git_blob_sha1": "005dd417de6c18459b25a21854750d6a234cee6b",
+      "size": 750
+    },
+    {
+      "path": "omega_mvi/inspection/__init__.py",
+      "git_blob_sha1": "4017805c71ece538685d808de06ce585d77fe49d",
+      "size": 72
+    },
+    {
+      "path": "omega_mvi/inspection/github_inventory/__init__.py",
+      "git_blob_sha1": "2e86c88ba863b04507db0bf25023def522616035",
+      "size": 1540
+    },
+    {
+      "path": "omega_mvi/inspection/github_inventory/test_github_inventory.py",
+      "git_blob_sha1": "6fa3cf29b56e703c436f8baad4a4ee38bd18ecae",
+      "size": 1897
+    },
+    {
+      "path": "omega_mvi/inspection/pipeline.py",
+      "git_blob_sha1": "5c2b2aaa93176be8426cff770c124077f38a84f4",
+      "size": 2275
+    },
+    {
+      "path": "omega_mvi/inspection/pr_review/__init__.py",
+      "git_blob_sha1": "3bc661524d671a3656ba6f6ede6da7a2de1d5da4",
+      "size": 149
+    },
+    {
+      "path": "omega_mvi/inspection/pr_review/engine.py",
+      "git_blob_sha1": "a9327ea38312314139b30a978681ddc9e10db0f4",
+      "size": 4113
+    },
+    {
+      "path": "omega_mvi/inspection/redaction/__init__.py",
+      "git_blob_sha1": "455a25980085a28602ea3e15105a6956a644f30a",
+      "size": 1956
+    },
+    {
+      "path": "omega_mvi/inspection/redaction/test_redaction.py",
+      "git_blob_sha1": "d3642d3679c2877bb75880396f242bd294a457e7",
+      "size": 1489
+    },
+    {
+      "path": "omega_mvi/inspection/retrieval/__init__.py",
+      "git_blob_sha1": "28b3b20c6458d59d997783eef945e6b08d50de6f",
+      "size": 3770
+    },
+    {
+      "path": "omega_mvi/inspection/task_policy.py",
+      "git_blob_sha1": "7d70dcc894d22ef225694a3e13c9a49f5b048854",
+      "size": 2029
+    },
+    {
+      "path": "omega_mvi/Makefile",
+      "git_blob_sha1": "9d5d522529b794cd33128341c875ad66292e917e",
+      "size": 314
+    },
+    {
+      "path": "omega_mvi/model_adapter/__init__.py",
+      "git_blob_sha1": "bee842d493fb44f94ac2e8206d706961d373650c",
+      "size": 125
+    },
+    {
+      "path": "omega_mvi/model_adapter/protocol.py",
+      "git_blob_sha1": "b25deea58d78b060b478514a659da97659ad1b94",
+      "size": 381
+    },
+    {
+      "path": "omega_mvi/model_adapter/test_adapter.py",
+      "git_blob_sha1": "6faefaf5b3263d391a2dc1d278187d0065408939",
+      "size": 1053
+    },
+    {
+      "path": "omega_mvi/model_adapter/testing.py",
+      "git_blob_sha1": "d1604f81b414e7aae4b7e21e367be97ceda92c43",
+      "size": 720
+    },
+    {
+      "path": "omega_mvi/README.md",
+      "git_blob_sha1": "526f55f6ff8de95f69131128c53d7559bd0217c4",
+      "size": 2575
+    },
+    {
+      "path": "omega_mvi/requirements-test.txt",
+      "git_blob_sha1": "005035496e2ec9f8c0263172bcee84fcbe8819d4",
+      "size": 62
+    },
+    {
+      "path": "omega_mvi/requirements.txt",
+      "git_blob_sha1": "b1c6b469ce7088a4f9cae33fc508cc27626f19dc",
+      "size": 128
+    },
+    {
+      "path": "omega_mvi/tests/test_dashboard_security.py",
+      "git_blob_sha1": "d28a625d5c2923f34e9f083ac1f4503a5d202fca",
+      "size": 2103
+    },
+    {
+      "path": "omega_mvi/tests/test_dashboard_tr.py",
+      "git_blob_sha1": "e8fd920fbdb836cd0ffbffed4e61fb64441b24ad",
+      "size": 525
+    },
+    {
+      "path": "omega_mvi/tests/test_db_readonly_api.py",
+      "git_blob_sha1": "41d586ee542cfd04c2a5505b896b7fa2cd59275d",
+      "size": 6172
+    },
+    {
+      "path": "omega_mvi/tests/test_mvi_health.py",
+      "git_blob_sha1": "2f5e10d3bf1475f65f1906fd860bdfec35c2c9b4",
+      "size": 1746
+    },
+    {
+      "path": "omega_mvi/tests/test_p0_security.py",
+      "git_blob_sha1": "d3364e451993fcbc3af73047fca20d2f6d585157",
+      "size": 5740
+    },
+    {
+      "path": "omega_mvi/tests/test_pipeline_integration.py",
+      "git_blob_sha1": "fadb4605c849afa6b1317e129f2ecac5a235f903",
+      "size": 738
+    },
+    {
+      "path": "omega_mvi/tests/test_postgres_integration.py",
+      "git_blob_sha1": "604b6fd3dd5057220537f373b05ecd005f6f95ca",
+      "size": 3694
+    },
+    {
+      "path": "omega_mvi/tests/test_task_controls.py",
+      "git_blob_sha1": "74667e1a23c5266510d8979ea27a507017d1fe2b",
+      "size": 3579
+    },
+    {
+      "path": "omega_mvi/tests/test_task_policy.py",
+      "git_blob_sha1": "4cdc30bdfb253c629159edc0fba830ed79b9f792",
+      "size": 2374
+    },
+    {
+      "path": "scripts/omega_privacy_filename_check.py",
+      "git_blob_sha1": "5e38feb02d019b786eabb158336ffba286f6cf45",
+      "size": 1372
+    },
+    {
+      "path": "scripts/omega_probe_runner_loopback.py",
+      "git_blob_sha1": "b7e122f954453b68a694be0f439bd1b090e19c60",
+      "size": 1800
+    },
+    {
+      "path": "scripts/omega_runner_host_diagnostic.py",
+      "git_blob_sha1": "c1aaa6dc30c16d180f4f589fdf5871c0ed79b0f4",
+      "size": 5849
+    },
+    {
+      "path": "scripts/omega_safe_secret_scan.py",
+      "git_blob_sha1": "646101f48f0b0e6e19be0627dd77daf59793849e",
+      "size": 1414
+    },
+    {
+      "path": "tests/test_inspection_retrieval.py",
+      "git_blob_sha1": "a8f5c0eabf99db1385a0e90432e8f96fc0f919a1",
+      "size": 1564
+    },
+    {
+      "path": "tests/test_omega_matrix.py",
+      "git_blob_sha1": "0a702696874cba13f2dad6942d103160910daf13",
+      "size": 2453
+    },
+    {
+      "path": "tests/test_omega_privacy_filename_runtime.py",
+      "git_blob_sha1": "6d0d25401311dce4854753eed2738beae1738d4c",
+      "size": 2166
+    },
+    {
+      "path": "tests/test_omega_privacy_guard_contract.py",
+      "git_blob_sha1": "87d26d471bff22c15ec6ff9c55eec9e142f6e242",
+      "size": 1455
+    },
+    {
+      "path": "tests/test_omega_runner_host_diagnostic.py",
+      "git_blob_sha1": "057c1e17c8f85d58d99693f2755d724a0f70fdd7",
+      "size": 4645
+    },
+    {
+      "path": "tests/test_omega_runner_host_probe.py",
+      "git_blob_sha1": "c02058c83be6ca24a31b505f1cb21a3e97bdf87e",
+      "size": 1960
+    },
+    {
+      "path": "tests/test_omega_runtime_isolation.py",
+      "git_blob_sha1": "6d67594678e0e8c290c85c2eb4aece45f9045168",
+      "size": 790
+    },
+    {
+      "path": "tests/test_omega_safe_secret_scan.py",
+      "git_blob_sha1": "133cb905ff55a747fdd04759427ff12186cd1052",
+      "size": 2884
+    },
+    {
+      "path": "tests/test_omega_secret_scan_binary.py",
+      "git_blob_sha1": "19e1370466b415644d84b261acf41226167b0d96",
+      "size": 2243
+    },
+    {
+      "path": "tests/test_pr_review.py",
+      "git_blob_sha1": "e392ab1b24eccf3000b936dddb00872cfa6e8d2f",
+      "size": 2201
+    }
+  ]
+}

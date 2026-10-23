@@ -68,6 +68,8 @@ def test_configured_true_with_key(monkeypatch):
 def test_fetch_openai_model_ids_uses_authenticated_models_endpoint(monkeypatch):
     import io
 
+    # Unit-test only: fake upstream requests remain isolated.
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
     captured = {}
 
@@ -107,6 +109,8 @@ def test_fetch_openai_model_ids_requires_api_key(monkeypatch):
 def test_fetch_openai_model_ids_rejects_invalid_shape(monkeypatch):
     import io
 
+    # Unit-test only: fake upstream requests remain isolated.
+    monkeypatch.setattr(server, "owner_execution_authorized", lambda: True)
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
 
     class FakeResponse:

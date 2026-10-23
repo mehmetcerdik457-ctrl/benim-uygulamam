@@ -1,0 +1,37 @@
+# CI-only, separate opt-in overlay. Original Compose source is untouched.
+# No real Owner/device or external model routing. Limited mock diagnostics only.
+services:
+  api:
+    ports: !reset []  # Remove original host mapping; no direct API bypass.
+
+  host-gateway:
+    build:
+      context: ./omega_host_gateway
+    ports:
+      - "127.0.0.1:18081:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - isolated_demo
+      - host_probe
+    environment: {}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=8m
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "python", "-B", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 4s
+      retries: 3
+      start_period: 10s
+
+networks:
+  host_probe:
+    internal: false

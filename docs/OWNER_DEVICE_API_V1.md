@@ -26,3 +26,46 @@ Errors are fixed: OWNER_IDENTITY_NOT_PROVISIONED, OWNER_AUTH_REQUIRED, OWNER_AUT
 - Persistent nonce SQLite file must reside on a filesystem surviving restarts, with restricted write permissions; never replace this with an in-memory cache.
 - Do not expose local-only Compose service beyond 127.0.0.1 without approved TLS termination, reverse-proxy authentication and independent review.
 - No shell/phone action is authorized by /api/v1/owner/chat; no privilege escalation is exposed.
+
+## Integration hold — Owner authority remains unprovisioned
+The source-level `owner_execution_authorized()` returns `False` unconditionally.
+**Neither valid test signatures, environment flags nor an API key authorize egress.**
+All HTTP provider routes (`/api/chat`, `/api/models`, `/api/v1/owner/chat`)
+and direct adapter functions deny before a network request without independently
+reviewed Owner enrollment. Tests explicitly monkeypatch the deny function for
+simulated provider coverage; this is not a deployable enrollment mechanism.
+Do not replace the deny function with a config toggle or accept this PR as Owner enrollment.
+
+## Separately restored MVI code is NOT an Owner egress grant
+The recovered `omega_mvi/` FastAPI demo from PR #58 uses a different HTTP
+server, mocks all identities and denies operations. It must not use the Owner
+v1 proof as an approval token or bypass the fixed-false backend runtime policy.
+
+### Updated signed device ID validation (PR #94, 23 Oct 2026)
+The request envelope requires an Owner ID matching `[A-Za-z0-9_-]{1,64}` and a device identifier matching `[a-f0-9]{64}`. A matching configured string alone is NOT enrollment. The runtime provider-execution gate stays disabled. Tests use a synthetic 64-character digest only.
+
+### Android device public-key binding (23 October 2026)
+The Android TrustedDeviceManager.deviceId() returns hex SHA-256 of the device
+Keystore public-key SubjectPublicKeyInfo DER. OMEGA now requires the asserted
+device identifier to equal SHA-256(pinned device DER) and rejects using the same
+public key for both Owner and Device. This closes a real wire-identity
+misconfiguration gap without activating any provider call or enrolling anyone.
+The Python wire-vector test directly matches Gpt-asistan Java test source
+commit `639ac11db15ea658992c5b91b9c33c1a767902f6`;
+the physical Android device, signing key and release remain unverified.
+
+## Signed KRAL Android model-list route — structural compatibility only
+
+OMEGA recognizes `POST /api/v1/owner/models`, matching existing KRAL
+`OmegaEnvelope.MODELS`. The signed envelope has the **exact request path** in
+its canonical bytes and reuses pinned dual P-256 proofs, nonce replay DB,
+30-second freshness and SHA-256(DER) device identity rules.
+
+Even with both signatures valid, this route returns **403
+OWNER_EXECUTION_NOT_APPROVED**. It cannot enumerate models, call a provider,
+change Owner provisioning or activate task execution. This fixes the earlier
+404 route mismatch, **not** Owner enrollment, actual model availability or
+KRAL's complete signed model protocol. The signed `/api/v1/owner/chat`
+route and original `main` remain unchanged. Real Android Keystore signing,
+physical device, secure server enrollment and authorized model catalog still
+need independent acceptance.

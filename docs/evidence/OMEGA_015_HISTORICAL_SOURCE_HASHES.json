@@ -1,0 +1,15 @@
+{
+  "schema": "omega-recovered-bytes-v1",
+  "source_version": "0.1.5-dev",
+  "source_description": "Private 0.1.5 freeze receipt, preserved as a historical claim until bytes are independently rechecked",
+  "items": [
+    {
+      "relative_path": "artifacts/project-omega-mvi-0.1.5-dev.tar.gz",
+      "sha256": "366ea7bdb55ce8c76e84d9d7e058cdd9cefb68cb3c4c2c85008724ce11647fb7"
+    },
+    {
+      "relative_path": "artifacts/project-omega-mvi-0.1.5-dev.manifest.json",
+      "sha256": "6d21b5939f1780a2cbd0f723ff478063c4e32a524d8125e9d04249840f3cad72"
+    }
+  ]
+}
