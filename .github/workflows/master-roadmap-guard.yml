@@ -13,7 +13,7 @@ jobs:
   roadmap-guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Verify master control files
         shell: bash
