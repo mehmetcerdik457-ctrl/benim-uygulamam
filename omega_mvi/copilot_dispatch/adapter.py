@@ -34,7 +34,7 @@ def validate(m):
 
 def api(method, path, token, body=None):
     headers = {"Accept": "application/vnd.github+json",
-               "X-GitHub-Api-Version": "2022-11-28",
+               "X-GitHub-Api-Version": "2026-03-10",
                "Authorization": "Bearer " + token,
                "User-Agent": "omega-copilot-dispatch/1"}
     data = json.dumps(body).encode("utf-8") if body is not None else None
