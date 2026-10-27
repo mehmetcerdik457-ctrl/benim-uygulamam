@@ -13,7 +13,7 @@ from urllib.request import ProxyHandler, build_opener
 from omega_probe_runner_loopback import BLOCKED, RUNNER_ONLY, probe
 
 EXPECTED = "127.0.0.1:18080"
-CONTAINER_PORT = "8000/tcp"
+CONTAINER_PORT = "8080/tcp"
 
 
 def _run(args, runner=subprocess.run):
@@ -27,7 +27,7 @@ def _run(args, runner=subprocess.run):
 
 
 def _docker_evidence(runner=subprocess.run):
-    cid = _run(["docker", "compose", "-f", "compose.omega.yml", "ps", "-q", "api"], runner)
+    cid = _run(["docker", "compose", "-f", "compose.omega.yml", "ps", "-q", "ingress"], runner)
     if not cid or len(cid.splitlines()) != 1:
         return "UNVERIFIED", "UNVERIFIED", "UNVERIFIED"
 
@@ -53,7 +53,7 @@ def _docker_evidence(runner=subprocess.run):
 
     try:
         networks = json.loads(networks_raw) if networks_raw is not None else None
-        if isinstance(networks, dict) and networks and len(networks) <= 8:
+        if isinstance(networks, dict) and len(networks) == 2:
             states = []
             for name in networks:
                 raw = _run(["docker", "network", "inspect", "--format",
@@ -62,8 +62,12 @@ def _docker_evidence(runner=subprocess.run):
                     states = []
                     break
                 states.append(json.loads(raw))
-            if states:
-                network = "INTERNAL" if all(x is True for x in states) else "UNSAFE"
+            if len(states) == 2:
+                expected = {name.rsplit("_", 2)[-2] + "_" + name.rsplit("_", 2)[-1]: state
+                            for name, state in zip(networks, states)}
+                network = ("SEGMENTED_INGRESS"
+                           if expected == {"isolated_demo": True, "loopback_ingress": False}
+                           else "UNSAFE")
     except (ValueError, TypeError, AttributeError):
         pass
 
@@ -104,7 +108,7 @@ def diagnose(*, runner=subprocess.run, connector=socket.create_connection,
             http_status = "UNSAFE"
     unsafe = binding == "UNSAFE" or network == "UNSAFE" or http_status == "UNSAFE"
     accepted = (not unsafe and binding == "LOOPBACK_ONLY"
-                and network == "INTERNAL" and inside == "PASS"
+                and network == "SEGMENTED_INGRESS" and inside == "PASS"
                 and tcp == "CONNECTED" and http_status == "PASS")
     if unsafe:
         verdict = "UNSAFE"
