@@ -51,24 +51,40 @@ def _binding(table):
 
 
 def _networks(table, runner):
-    # A second attachment is an unreviewed route, even if both are internal.
-    if not isinstance(table, dict) or len(table) != 2:
+    # A suffix-matching name is not an authorized Compose network.
+    expected = {"omega-mvi-demo_isolated_demo": True,
+                "omega-mvi-demo_loopback_ingress": False}
+    if not isinstance(table, dict):
         return "UNVERIFIED"
+    if set(table) != set(expected):
+        return "UNSAFE"
     states = {}
-    for name in table:
-        if not isinstance(name, str) or not name:
-            return "UNVERIFIED"
+    for name in expected:
         internal = _json(["docker", "network", "inspect", "--format",
                           "{{json .Internal}}", name], runner)
         if type(internal) is not bool:
             return "UNVERIFIED"
-        if name.endswith("_isolated_demo"):
-            states["isolated_demo"] = internal
-        elif name.endswith("_loopback_ingress"):
-            states["loopback_ingress"] = internal
-        else:
+        states[name] = internal
+    return "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
+
+
+def _private_services_isolated(runner):
+    """Require live API and DB to have only the internal network, no host ports."""
+    for service in ("api", "db"):
+        cid = _read((*COMPOSE, "ps", "-q", service), runner)
+        if not cid or len(cid.splitlines()) != 1:
+            return "UNVERIFIED"
+        networks = _json(["docker", "inspect", "--format",
+                          "{{json .NetworkSettings.Networks}}", cid], runner)
+        ports = _json(["docker", "inspect", "--format",
+                       "{{json .NetworkSettings.Ports}}", cid], runner)
+        if not isinstance(networks, dict) or not isinstance(ports, dict):
+            return "UNVERIFIED"
+        if set(networks) != {"omega-mvi-demo_isolated_demo"}:
             return "UNSAFE"
-    return "SEGMENTED_INGRESS" if states == {"isolated_demo": True, "loopback_ingress": False} else "UNSAFE"
+        if any(binding not in (None, []) for binding in ports.values()):
+            return "UNSAFE"
+    return "ISOLATED"
 
 
 def audit(runner=subprocess.run):
@@ -92,6 +108,11 @@ def audit(runner=subprocess.run):
     result["requested"] = _binding(requested)
     result["effective"] = _binding(effective)
     result["network"] = _networks(attached, runner)
+    private_services = _private_services_isolated(runner)
+    if private_services == "UNSAFE":
+        result["network"] = "UNSAFE"
+    elif private_services != "ISOLATED" and result["network"] == "SEGMENTED_INGRESS":
+        result["network"] = "UNVERIFIED"
     compose_port = _read((*COMPOSE, "port", "ingress", "8080"), runner)
     if not compose_port:
         result["compose_port"] = "MISSING"

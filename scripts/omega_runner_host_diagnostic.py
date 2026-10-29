@@ -26,6 +26,31 @@ def _run(args, runner=subprocess.run):
     return result.stdout.strip()[:16000]
 
 
+def _private_services_isolated(runner):
+    """Check the *running* API and DB, rather than only Compose declarations."""
+    for service in ("api", "db"):
+        cid = _run(["docker", "compose", "-f", "compose.omega.yml",
+                    "ps", "-q", service], runner)
+        if not cid or len(cid.splitlines()) != 1:
+            return "UNVERIFIED"
+        raw_nets = _run(["docker", "inspect", "--format",
+                         "{{json .NetworkSettings.Networks}}", cid], runner)
+        raw_ports = _run(["docker", "inspect", "--format",
+                          "{{json .NetworkSettings.Ports}}", cid], runner)
+        try:
+            nets = json.loads(raw_nets) if raw_nets is not None else None
+            ports = json.loads(raw_ports) if raw_ports is not None else None
+        except (ValueError, TypeError):
+            return "UNVERIFIED"
+        if not isinstance(nets, dict) or not isinstance(ports, dict):
+            return "UNVERIFIED"
+        if set(nets) != {"omega-mvi-demo_isolated_demo"}:
+            return "UNSAFE"
+        if any(binding not in (None, []) for binding in ports.values()):
+            return "UNSAFE"
+    return "ISOLATED"
+
+
 def _docker_evidence(runner=subprocess.run):
     cid = _run(["docker", "compose", "-f", "compose.omega.yml", "ps", "-q", "ingress"], runner)
     if not cid or len(cid.splitlines()) != 1:
@@ -39,12 +64,20 @@ def _docker_evidence(runner=subprocess.run):
     network = "UNVERIFIED"
     try:
         ports = json.loads(ports_raw) if ports_raw is not None else None
-        published = ports.get(CONTAINER_PORT) if isinstance(ports, dict) else None
-        if published is None:
-            binding = "MISSING"
-        elif isinstance(published, list) and published:
-            if all(x.get("HostIp") == "127.0.0.1" and
-                   str(x.get("HostPort")) == "18080" for x in published):
+        if isinstance(ports, dict):
+            # Fail closed on extra published ports and duplicated/malformed binds.
+            # Merely finding one allowed listener must never approve another one.
+            extras = any(port != CONTAINER_PORT and bindings not in (None, [])
+                         for port, bindings in ports.items())
+            published = ports.get(CONTAINER_PORT)
+            if extras:
+                binding = "UNSAFE"
+            elif published is None or published == []:
+                binding = "MISSING"
+            elif (isinstance(published, list) and len(published) == 1
+                  and isinstance(published[0], dict)
+                  and published[0] == {"HostIp": "127.0.0.1",
+                                       "HostPort": "18080"}):
                 binding = "LOOPBACK_ONLY"
             else:
                 binding = "UNSAFE"
@@ -53,23 +86,33 @@ def _docker_evidence(runner=subprocess.run):
 
     try:
         networks = json.loads(networks_raw) if networks_raw is not None else None
-        if isinstance(networks, dict) and len(networks) == 2:
-            states = []
-            for name in networks:
-                raw = _run(["docker", "network", "inspect", "--format",
-                            "{{json .Internal}}", name], runner)
-                if raw is None:
-                    states = []
-                    break
-                states.append(json.loads(raw))
-            if len(states) == 2:
-                expected = {name.rsplit("_", 2)[-2] + "_" + name.rsplit("_", 2)[-1]: state
-                            for name, state in zip(networks, states)}
-                network = ("SEGMENTED_INGRESS"
-                           if expected == {"isolated_demo": True, "loopback_ingress": False}
-                           else "UNSAFE")
+        if isinstance(networks, dict):
+            # Verify the exact project-qualified network names, not suffixes.
+            expected = {"omega-mvi-demo_isolated_demo": True,
+                        "omega-mvi-demo_loopback_ingress": False}
+            if set(networks) != set(expected):
+                network = "UNSAFE"
+            else:
+                states = {}
+                for name in expected:
+                    raw = _run(["docker", "network", "inspect", "--format",
+                                "{{json .Internal}}", name], runner)
+                    if raw is None:
+                        break
+                    state = json.loads(raw)
+                    if type(state) is not bool:
+                        break
+                    states[name] = state
+                if len(states) == len(expected):
+                    network = "SEGMENTED_INGRESS" if states == expected else "UNSAFE"
     except (ValueError, TypeError, AttributeError):
         pass
+
+    private_services = _private_services_isolated(runner)
+    if private_services == "UNSAFE":
+        network = "UNSAFE"
+    elif private_services != "ISOLATED" and network == "SEGMENTED_INGRESS":
+        network = "UNVERIFIED"
 
     healthy = _run(
         ["docker", "compose", "-f", "compose.omega.yml", "exec", "-T", "api",
