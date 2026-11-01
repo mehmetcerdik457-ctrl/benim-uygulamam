@@ -21,15 +21,7 @@ import owner_p256
 
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
-DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
-ALLOWED_MODELS = tuple(
-    x.strip()
-    for x in os.getenv(
-        "OPENAI_ALLOWED_MODELS",
-        "gpt-5.6-luna,gpt-5.6-terra,gpt-5.6-sol",
-    ).split(",")
-    if x.strip()
-)
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1").strip()
 MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "65536"))
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "32000"))
 MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
@@ -125,7 +117,10 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     if not api_key:
         raise RuntimeError("PROVIDER_NOT_CONFIGURED")
 
-    model = DEFAULT_MODEL if DEFAULT_MODEL in ALLOWED_MODELS else ALLOWED_MODELS[0]
+    # Honor the operator's model exactly. Provider errors never trigger a downgrade.
+    model = DEFAULT_MODEL
+    if not model:
+        raise RuntimeError("PROVIDER_MODEL_NOT_CONFIGURED")
     payload = {
         "model": model,
         "input": [
@@ -233,7 +228,8 @@ class Handler(BaseHTTPRequestHandler):
                 200,
                 {
                     "default": DEFAULT_MODEL,
-                    "allowed": list(ALLOWED_MODELS),
+                    "selection_restricted": False,
+                    "automatic_fallback": False,
                 },
             )
             return
@@ -398,16 +394,19 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, AttributeError):
                 provider_code = "UNCLASSIFIED_PROVIDER_ERROR"
             print(f"UPSTREAM_HTTP_ERROR request_id={request_id} status={exc.code} provider_code={provider_code}", flush=True)
-            self._send(
-                502,
-                {
-                    "error": "UPSTREAM_PROVIDER_ERROR",
-                    "upstream_status": exc.code,
-                    "upstream_code": provider_code,
-                    "request_id": request_id,
-                },
-                request_id,
-            )
+            quota_exhausted = provider_code in {"insufficient_quota", "billing_hard_limit_reached"}
+            payload = {
+                "error": "PROVIDER_QUOTA_EXHAUSTED" if quota_exhausted else "UPSTREAM_PROVIDER_ERROR",
+                "upstream_status": exc.code,
+                "upstream_code": provider_code,
+                "model": DEFAULT_MODEL,
+                "fallback_attempted": False,
+                "request_id": request_id,
+            }
+            if quota_exhausted:
+                payload["message"] = "Hesaba bakiye yükle. OpenAI API organizasyonu/projesinin bakiyesini ve harcama limitini kontrol et. Model değiştirilmedi."
+                payload["action"] = "CHECK_API_CREDIT_AND_SPEND_LIMIT"
+            self._send(429 if quota_exhausted else 502, payload, request_id)
             return
         except (urllib.error.URLError, TimeoutError) as exc:
             print(f"UPSTREAM_NETWORK_ERROR request_id={request_id} type={type(exc).__name__}", flush=True)
@@ -454,3 +453,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -9,13 +9,18 @@ Server-side bridge for the existing PWA contract.
 - GET /api/vault/status
 - GET /api/owner/status
 - POST /api/chat
+- POST /api/v1/owner/chat (proxy token plus enrolled P-256 owner signature)
 - POST /api/research (fail-closed until P3)
 
 ## Secrets
 OPENAI_API_KEY and AI_BACKEND_PROXY_TOKEN must exist only in the deployment environment. Never commit either value.
 
 ## Default model
-OPENAI_MODEL defaults to gpt-5.6-luna. Allowed models are controlled with OPENAI_ALLOWED_MODELS.
+OPENAI_MODEL defaults to the full gpt-4.1 model. Set it to another model supported by your OpenAI API project when desired. There is no application model allowlist; the old OPENAI_ALLOWED_MODELS variable is ignored. The configured model is sent exactly as selected, without a fallback to a different model or provider.
+
+GET /api/models reports the configured default, selection_restricted=false and automatic_fallback=false. A model appearing in the provider's catalog does not prove available billing quota.
+
+An insufficient_quota or billing_hard_limit_reached response returns HTTP 429 with PROVIDER_QUOTA_EXHAUSTED and the explicit instruction “Hesaba bakiye yükle”. Check API credit and organization/project spend limits. The backend does not retry on a cheaper model.
 
 ## Security posture
 - request body and message caps
@@ -24,7 +29,8 @@ OPENAI_MODEL defaults to gpt-5.6-luna. Allowed models are controlled with OPENAI
 - fail-closed runtime-to-backend proxy authentication for POST /api/chat
 - provider errors do not leak response bodies
 - no API key in browser/PWA
-- research and owner auth remain fail-closed until their dedicated phases
+- research remains fail-closed until its dedicated phase; owner chat requires its enrolled P-256 key and the proxy token
 
 ## AI acceptance gate
 A healthy container is not sufficient for AI acceptance. POST /api/chat is accepted only when both the private proxy token and OpenAI provider credential are configured. Missing proxy authentication fails closed before any provider call.
+

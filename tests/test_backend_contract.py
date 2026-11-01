@@ -1,4 +1,6 @@
 import os
+import json
+import urllib.request
 import sys
 from pathlib import Path
 
@@ -75,3 +77,30 @@ def test_proxy_configured_and_authorized(monkeypatch):
     assert server.proxy_configured() is True
     assert server.proxy_authorized({"X-MEH-Proxy-Token": "test-proxy-token"}) is True
     assert server.proxy_authorized({"X-MEH-Proxy-Token": "wrong"}) is False
+
+
+def test_configured_full_model_is_sent_without_allowlist_fallback(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-not-a-real-key")
+    monkeypatch.setenv("OPENAI_ALLOWED_MODELS", "gpt-4.1-mini")
+    monkeypatch.setattr(server, "DEFAULT_MODEL", "gpt-4o")
+    requests = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            return False
+
+        def read(self):
+            return b'{"output_text":"FULL_MODEL_TEST"}'
+
+    def provider_call(request, **_):
+        requests.append(json.loads(request.data))
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", provider_call)
+    text, model = server.call_openai("test", [])
+    assert text == "FULL_MODEL_TEST" and model == "gpt-4o"
+    assert len(requests) == 1 and requests[0]["model"] == "gpt-4o"
+

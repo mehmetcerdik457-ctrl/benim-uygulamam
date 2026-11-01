@@ -1,6 +1,7 @@
 """HTTP-level owner gateway tests; provider calls are mocked, never live."""
 import base64
 import json
+import io
 import sys
 import threading
 import time
@@ -89,3 +90,32 @@ def test_owner_endpoint_fail_closed_and_legacy_proxy(monkeypatch):
         assert status == 200 and data["text"] == "LEGACY_MOCK"
         status, data = call(base, "/api/chat", body, {})
         assert status == 401 and data["error"] == "UNAUTHORIZED_PROXY"
+
+
+def test_owner_quota_error_is_actionable_without_model_retry(monkeypatch):
+    owner_p256._SEEN.clear()
+    key = ec.generate_private_key(ec.SECP256R1())
+    pub = key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    monkeypatch.setenv("OWNER_P256_PUBLIC_KEY_PEM", pub)
+    monkeypatch.setenv("OPENAI_API_KEY", "unit-test-fake-provider-token")
+    monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "proxy-test-secret")
+    monkeypatch.setattr(server, "DEFAULT_MODEL", "gpt-4.1")
+    attempts = []
+
+    def quota_error(*_):
+        attempts.append(server.DEFAULT_MODEL)
+        raise urllib.error.HTTPError(
+            server.OPENAI_URL, 429, "quota exhausted", {},
+            io.BytesIO(b'{"error":{"code":"insufficient_quota"}}'),
+        )
+
+    monkeypatch.setattr(server, "call_openai", quota_error)
+    body = b'{"message":"hello","provider":"openai"}'
+    with running_server() as base:
+        status, data = call(base, "/api/v1/owner/chat", body, headers_for(key, body, "owner-quota-nonce-001"))
+    assert status == 429 and data["error"] == "PROVIDER_QUOTA_EXHAUSTED"
+    assert data["upstream_code"] == "insufficient_quota"
+    assert "Hesaba bakiye yükle" in data["message"]
+    assert data["model"] == "gpt-4.1" and data["fallback_attempted"] is False
+    assert attempts == ["gpt-4.1"]
+
