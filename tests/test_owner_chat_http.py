@@ -61,13 +61,14 @@ def test_signed_owner_chat_real_http_mock_provider(monkeypatch):
     monkeypatch.setenv("OWNER_P256_PUBLIC_KEY_PEM", pub)
     monkeypatch.setenv("OPENAI_API_KEY", "unit-test-fake-provider-token")
     monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "proxy-test-secret")
-    monkeypatch.setattr(server, "call_openai", lambda *_: ("MOCK_ONLY", "test-model"))
+    monkeypatch.setattr(server, "call_openai", lambda *_: ("MOCK_ONLY", "test-model", "resp_mock_owner"))
     body = b'{"message":"hello","provider":"openai"}'
     headers = headers_for(key, body, "owner-http-nonce-001")
     with running_server() as base:
         status, data = call(base, "/api/v1/owner/chat", body, headers)
         assert status == 200 and data["text"] == "MOCK_ONLY"
         assert data["model"] == "test-model"
+        assert data["responseId"] == "resp_mock_owner"
         replay_status, data = call(base, "/api/v1/owner/chat", body, headers)
         assert replay_status == 401 and data["error"] == "OWNER_SIGNATURE_INVALID"
         bad_status, _ = call(base, "/api/v1/owner/chat", b'{"message":"changed"}', headers)
@@ -82,7 +83,7 @@ def test_owner_endpoint_fail_closed_and_legacy_proxy(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "unit-test-fake-provider-token")
     monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "proxy-test-secret")
     monkeypatch.delenv("OWNER_P256_PUBLIC_KEY_PEM", raising=False)
-    monkeypatch.setattr(server, "call_openai", lambda *_: ("LEGACY_MOCK", "test-model"))
+    monkeypatch.setattr(server, "call_openai", lambda *_: ("LEGACY_MOCK", "test-model", "resp_mock_legacy"))
     with running_server() as base:
         status, data = call(base, "/api/v1/owner/chat", body, headers)
         assert status == 503 and data["error"] == "OWNER_P256_NOT_CONFIGURED"
@@ -118,4 +119,26 @@ def test_owner_quota_error_is_actionable_without_model_retry(monkeypatch):
     assert "Hesaba bakiye yükle" in data["message"]
     assert data["model"] == "gpt-4.1" and data["fallback_attempted"] is False
     assert attempts == ["gpt-4.1"]
+
+
+def test_owner_route_uses_guide_adapter_and_correlates_request_id(monkeypatch):
+    owner_p256._SEEN.clear()
+    key = ec.generate_private_key(ec.SECP256R1())
+    pub = key.public_key().public_bytes(serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+    monkeypatch.setenv("OWNER_P256_PUBLIC_KEY_PEM", pub)
+    monkeypatch.setenv("OPENAI_API_KEY", "unit-test-fake-provider-token")
+    monkeypatch.setenv("AI_BACKEND_PROXY_TOKEN", "proxy-test-secret")
+    tasks = []
+
+    def adapter(task, attachments):
+        tasks.append(task)
+        return {"text": "KRAL_MOCK_ONLY", "model": "gpt-4.1", "responseId": "resp_kral_mock"}
+
+    monkeypatch.setattr(server, "runKralAiTask", adapter)
+    body = b'{"message":"KRAL task","provider":"openai"}'
+    with running_server() as base:
+        status, data = call(base, "/api/v1/owner/chat", body, headers_for(key, body, "owner-kral-adapter-001"))
+    assert status == 200 and data["text"] == "KRAL_MOCK_ONLY"
+    assert data["responseId"] == "resp_kral_mock"
+    assert tasks == [{"userMessage": "KRAL task", "requestId": data["request_id"]}]
 

@@ -22,6 +22,10 @@ import owner_p256
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1").strip()
+KRAL_SYSTEM_PROMPT = (
+    "You are the OpenAI task engine for this app. Follow existing app policy, "
+    "avoid side effects unless approved, and return concise results."
+)
 MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", "65536"))
 MAX_MESSAGE_CHARS = int(os.getenv("MAX_MESSAGE_CHARS", "32000"))
 MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "2048"))
@@ -112,10 +116,26 @@ def build_input(message: str, attachments: list[dict[str, Any]]) -> str:
     )
 
 
-def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, str]:
+class KralOpenAIError(RuntimeError):
+    def __init__(self, code: str, upstream_status: int):
+        super().__init__(code)
+        self.code = code
+        self.upstream_status = upstream_status
+
+
+def runKralAiTask(
+    task: dict[str, str], attachments: list[dict[str, Any]] | None = None,
+) -> dict[str, str]:
+    """Python port of the owner's KRAL guide; no client-owned tools are executed."""
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("PROVIDER_NOT_CONFIGURED")
+        raise RuntimeError("OPENAI_NOT_CONFIGURED")
+    message = task.get("userMessage")
+    request_id = task.get("requestId")
+    if not isinstance(message, str) or not message.strip():
+        raise ValueError("MESSAGE_REQUIRED")
+    if not isinstance(request_id, str) or not request_id.strip() or len(request_id) > 128:
+        raise ValueError("REQUEST_ID_REQUIRED")
 
     # Honor the operator's model exactly. Provider errors never trigger a downgrade.
     model = DEFAULT_MODEL
@@ -124,16 +144,18 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
     payload = {
         "model": model,
         "input": [
+            {"role": "system", "content": KRAL_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "input_text",
-                        "text": build_input(message, attachments),
+                        "text": build_input(message, attachments or []),
                     }
                 ],
             }
         ],
+        "metadata": {"request_id": request_id},
         "max_output_tokens": MAX_OUTPUT_TOKENS,
         "store": False,
     }
@@ -147,13 +169,33 @@ def call_openai(message: str, attachments: list[dict[str, Any]]) -> tuple[str, s
             "User-Agent": f"mehmet-ai-backend/{VERSION}",
         },
     )
-    with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
-        raw = response.read()
+    try:
+        with urllib.request.urlopen(req, timeout=UPSTREAM_TIMEOUT_SECONDS) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        code = {401: "OPENAI_ACCESS_DENIED", 403: "OPENAI_MODEL_NOT_AVAILABLE",
+                404: "OPENAI_MODEL_NOT_AVAILABLE"}.get(exc.code)
+        if code:
+            exc.close()
+            raise KralOpenAIError(code, exc.code) from None
+        raise
     data = json.loads(raw)
     text = extract_response_text(data)
     if not text:
         raise RuntimeError("EMPTY_PROVIDER_RESPONSE")
-    return text, model
+    response_id = data.get("id")
+    if not isinstance(response_id, str) or not response_id.strip():
+        raise RuntimeError("PROVIDER_RESPONSE_ID_MISSING")
+    return {"text": text, "model": model, "responseId": response_id}
+
+
+def call_openai(
+    message: str, attachments: list[dict[str, Any]], request_id: str | None = None,
+) -> tuple[str, str, str]:
+    result = runKralAiTask(
+        {"userMessage": message, "requestId": request_id or str(uuid.uuid4())}, attachments,
+    )
+    return result["text"], result["model"], result["responseId"]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -379,7 +421,12 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            reply, model = call_openai(message, attachments)
+            reply, model, response_id = call_openai(message, attachments, request_id)
+        except KralOpenAIError as exc:
+            self._send(502, {"error": exc.code, "upstream_status": exc.upstream_status,
+                            "model": DEFAULT_MODEL, "fallback_attempted": False,
+                            "request_id": request_id}, request_id)
+            return
         except urllib.error.HTTPError as exc:
             # Log only a bounded provider error code; never keys or raw response bodies.
             try:
@@ -424,6 +471,7 @@ class Handler(BaseHTTPRequestHandler):
                 "text": reply,
                 "provider": "openai",
                 "model": model,
+                "responseId": response_id,
                 "request_id": request_id,
             },
             request_id,

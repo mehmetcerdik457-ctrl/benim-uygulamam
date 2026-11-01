@@ -93,14 +93,15 @@ def test_configured_full_model_is_sent_without_allowlist_fallback(monkeypatch):
             return False
 
         def read(self):
-            return b'{"output_text":"FULL_MODEL_TEST"}'
+            return b'{"id":"resp_full_model_test","output_text":"FULL_MODEL_TEST"}'
 
     def provider_call(request, **_):
         requests.append(json.loads(request.data))
         return Response()
 
     monkeypatch.setattr(urllib.request, "urlopen", provider_call)
-    text, model = server.call_openai("test", [])
+    text, model, response_id = server.call_openai("test", [])
     assert text == "FULL_MODEL_TEST" and model == "gpt-4o"
+    assert response_id == "resp_full_model_test"
     assert len(requests) == 1 and requests[0]["model"] == "gpt-4o"
 

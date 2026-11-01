@@ -22,6 +22,14 @@ GET /api/models reports the configured default, selection_restricted=false and a
 
 An insufficient_quota or billing_hard_limit_reached response returns HTTP 429 with PROVIDER_QUOTA_EXHAUSTED and the explicit instruction “Hesaba bakiye yükle”. Check API credit and organization/project spend limits. The backend does not retry on a cheaper model.
 
+## KRAL guide adapter
+
+runKralAiTask accepts userMessage and requestId, sends the owner's guide's exact trusted system prompt and metadata.request_id to the Responses API, and returns text/model/responseId. The existing HTTP routes call this adapter; their server-generated request_id is preserved and responseId is the actual provider response ID. The existing output cap, store:false policy and attachment-metadata boundary remain unchanged.
+
+An upstream 401 maps to OPENAI_ACCESS_DENIED; upstream 403/404 maps to OPENAI_MODEL_NOT_AVAILABLE. These are provider failures, distinct from the gateway's own owner/proxy authentication failures. Quota errors retain the explicit quota instruction without fallback.
+
+The adapter does not advertise tools or execute model/user-supplied tool requests. Adding real side-effect capabilities requires a separate backend-owned registry and verified approval mechanism; a prompt alone is not permission to execute actions. Client-supplied system prompts, tools and approval fields are not copied into provider configuration.
+
 ## Security posture
 - request body and message caps
 - in-memory rate limiting
