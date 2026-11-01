@@ -1,0 +1,32 @@
+name: Owner P256 Signed Chat
+on:
+  push:
+    branches:
+      - fix/owner-p256-failclosed-20261101
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'tests/**'
+      - 'requirements.txt'
+      - 'docs/OWNER_P256_BACKEND_CONTRACT.md'
+      - '.github/workflows/owner-p256-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-p256:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Compile and test
+        run: |
+          python -m compileall -q backend tests scripts
+          python -m pytest -q tests/test_owner_p256.py tests/test_owner_chat_http.py tests/test_backend_contract.py
+          python scripts/security_selftest.py

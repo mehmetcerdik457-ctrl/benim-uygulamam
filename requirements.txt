@@ -1,1 +1,2 @@
-# P1 backend uses Python standard library only.
+# P1 backend cryptographic owner proof; no secrets in source.
+cryptography>=44,<47
