@@ -17,6 +17,8 @@ from collections import defaultdict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+import owner_p256
+
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
 DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.6-luna").strip()
@@ -174,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def _read_json(self) -> dict[str, Any]:
+    def _read_json(self, *, return_raw: bool = False) -> dict[str, Any] | tuple[dict[str, Any], bytes]:
         raw_len = self.headers.get("Content-Length")
         try:
             length = int(raw_len or "0")
@@ -191,7 +193,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("INVALID_JSON") from exc
         if not isinstance(value, dict):
             raise ValueError("JSON_OBJECT_REQUIRED")
-        return value
+        return (value, raw) if return_raw else value
 
     def do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
@@ -203,6 +205,7 @@ class Handler(BaseHTTPRequestHandler):
                     "version": VERSION,
                     "provider_configured": configured(),
                     "proxy_auth_configured": proxy_configured(),
+                    "owner_p256_configured": owner_p256.configured(),
                     "default_model": DEFAULT_MODEL,
                 },
             )
@@ -278,7 +281,8 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        if path != "/api/chat":
+        is_owner_chat = path == "/api/v1/owner/chat"
+        if path != "/api/chat" and not is_owner_chat:
             self._send(404, {"error": "NOT_FOUND", "request_id": request_id}, request_id)
             return
 
@@ -320,13 +324,24 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
-            body = self._read_json()
+            if is_owner_chat:
+                body, signed_raw_body = self._read_json(return_raw=True)
+            else:
+                body = self._read_json()
         except OverflowError:
             self._send(413, {"error": "BODY_TOO_LARGE", "request_id": request_id}, request_id)
             return
         except ValueError as exc:
             self._send(400, {"error": str(exc), "request_id": request_id}, request_id)
             return
+
+        if is_owner_chat:
+            if not owner_p256.configured():
+                self._send(503, {"error": "OWNER_P256_NOT_CONFIGURED", "request_id": request_id}, request_id)
+                return
+            if not owner_p256.verify(self.headers, signed_raw_body):
+                self._send(401, {"error": "OWNER_SIGNATURE_INVALID", "request_id": request_id}, request_id)
+                return
 
         provider = body.get("provider")
         if provider not in (None, "", "openai"):
