@@ -146,7 +146,7 @@ public final class MainActivity extends Activity {
         resultView.setText("Dosya yalnızca cihazda okunuyor, özet hesaplanıyor…");
 
         io.execute(() -> {
-            final String message;
+            String pendingMessage;
             try (InputStream stream = getContentResolver().openInputStream(uri)) {
                 if (stream == null) throw new IOException("No readable stream");
                 EvidenceHasher.Result result = EvidenceHasher.calculate(stream);
@@ -155,12 +155,13 @@ public final class MainActivity extends Activity {
                     : EvidenceHasher.matches(expected, result.sha256)
                         ? "EŞLEŞİYOR: Dosya özeti girilen değere eşit."
                         : "UYUŞMUYOR: Dosya özeti girilen değerden farklı.";
-                message = "Boyut: " + result.bytes + " bayt\nSHA-256:\n" +
+                pendingMessage = "Boyut: " + result.bytes + " bayt\nSHA-256:\n" +
                     result.sha256 + "\n" + comparison +
                     "\nBu yalnızca yerel bayt bütünlüğü kontrolüdür.";
             } catch (IOException | SecurityException | IllegalArgumentException ignored) {
-                message = "RET: Dosya okunamadı, erişim reddedildi veya 64 MiB sınırı aşıldı. Kaynak ya da gizli değer kaydedilmedi.";
+                pendingMessage = "RET: Dosya okunamadı, erişim reddedildi veya 64 MiB sınırı aşıldı. Kaynak ya da gizli değer kaydedilmedi.";
             }
+            final String message = pendingMessage;
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) return;
                 busy = false;
