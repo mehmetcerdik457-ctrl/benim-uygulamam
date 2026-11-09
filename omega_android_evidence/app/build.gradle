@@ -1,0 +1,38 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.omega.offline.evidence'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'org.omega.offline.evidence'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0-evidence'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        debug {
+            // Android development key only; NOT a production signing or upgrade identity.
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+            // No production signing key is embedded, used or distributed.
+        }
+    }
+
+    testOptions { unitTests.returnDefaultValues = true }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}
