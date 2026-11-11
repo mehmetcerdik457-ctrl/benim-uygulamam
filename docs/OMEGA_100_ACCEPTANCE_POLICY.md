@@ -31,3 +31,23 @@ whether to approve any actual deployment.
 The JSON parser now rejects duplicate property names (including nested
 objects), NaN and infinity. The evidence receipt rejects unsigned extra fields.
 These are control hardening measures, not proof that the system is production-ready.
+
+## Safety correction — requirement proofs are not deployment proofs
+
+The offline gate now reports two deliberately different signals:
+
+- `requirements_verified` is true only if every one of OMEGA-001..100
+  contains verifiable signed requirement evidence. Use
+  `--enforce-requirements` in an authorized private verification environment
+  to enforce this standard alone. It does **not** authorize deployment.
+- `production_accepted` remains **false** and `--enforce` denies the release.
+  This public repository does not yet implement a trusted independent
+  deployment/build/smoke/rollback attestation verifier. Even 100 correctly
+  signed test receipts cannot substitute for a deployed, monitored service.
+
+The new positive cryptographic regression deliberately signs all 100
+requirement test receipts with **ephemeral test keys** and verifies that
+`--enforce-requirements` succeeds while `--enforce` still refuses production.
+These are synthetic fixtures, not owner credentials or actual product tests.
+The Ed25519 positive unit tests are now required, never skipped for a missing
+cryptography package; fail closed if it is unavailable.

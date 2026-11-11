@@ -4,7 +4,6 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from importlib.util import find_spec
 from unittest.mock import patch
 
 from scripts.omega_acceptance_gate import EvidenceError, evaluate, _local_file, _hash_file, _bounded_json_file, main
@@ -114,7 +113,6 @@ class ProofGateTests(unittest.TestCase):
             'signature':base64.b64encode(b'fake-signature').decode(), 'owner_signature':base64.b64encode(b'fake-signature').decode()})
         self.assertEqual(evaluate(m,self.root,key,owner_key)['verified'],0)
 
-    @unittest.skipUnless(find_spec("cryptography"), "optional Ed25519 verifier dependency unavailable")
     def test_correct_external_ed25519_signature(self):
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -139,6 +137,40 @@ class ProofGateTests(unittest.TestCase):
         self.assertEqual(evaluate(m,self.root,key,owner_key)['verified'],1)
         p['test_log_sha256']='0'*64
         self.assertEqual(evaluate(m,self.root,key,owner_key)['verified'],0)
+
+    def test_100_signatures_cannot_certify_production_without_deploy_proof(self):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+        m = manifest()
+        logfile = self.root/'test.log'
+        logfile.write_text('controlled positive proof fixture only, NOT DEPLOYMENT\n')
+        auditor = Ed25519PrivateKey.generate()
+        owner = Ed25519PrivateKey.generate()
+        auditor_key = self.root/'auditor.pub.pem'
+        owner_key = self.root/'owner.pub.pem'
+        auditor_key.write_bytes(auditor.public_key().public_bytes(Encoding.PEM,PublicFormat.SubjectPublicKeyInfo))
+        owner_key.write_bytes(owner.public_key().public_bytes(Encoding.PEM,PublicFormat.SubjectPublicKeyInfo))
+        for row in m['requirements']:
+            signed = {'source_commit':'a'*40,'test_log_path':'test.log',
+                'test_log_sha256':_hash_file(logfile),'run_id':'fixture-run',
+                'reviewer':'test-auditor','device':'test-fixture','owner_accepted':True}
+            message = json.dumps({'requirement_id':row['id'],'proof':signed},
+                sort_keys=True,separators=(',',':')).encode('utf-8')
+            signed['signature'] = base64.b64encode(auditor.sign(message)).decode('ascii')
+            signed['owner_signature'] = base64.b64encode(owner.sign(message)).decode('ascii')
+            row.update(status='VERIFIED',proof=signed)
+        result = evaluate(m,self.root,auditor_key,owner_key)
+        self.assertEqual(result['verified'],100)
+        self.assertTrue(result['requirements_verified'])
+        self.assertFalse(result['production_accepted'])
+        self.assertEqual(result['production_admission'],'DENIED_NO_DEPLOYMENT_ATTESTATION')
+        manifest_path = self.root/'fixture-manifest.json'
+        manifest_path.write_text(json.dumps(m))
+        cli = ['--manifest',str(manifest_path),'--evidence-root',str(self.root),
+               '--trusted-pubkey',str(auditor_key),'--owner-pubkey',str(owner_key)]
+        with patch('sys.stdout'):
+            self.assertEqual(main(cli+['--enforce-requirements']),0)
+            self.assertEqual(main(cli+['--enforce']),1)
 
     def test_no_owner_approval(self):
         m=manifest();m['requirements'][0].update(status='VERIFIED',proof={

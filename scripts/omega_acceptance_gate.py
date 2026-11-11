@@ -157,7 +157,11 @@ def evaluate(manifest: object, root: Path, trusted_key_path: Path | None = None,
         findings.append({"id": row["id"], "verdict": verdict, "reason": reason})
     return {"schema": "omega.acceptance.verdict.v1", "evaluated": 100,
             "verified": accepted, "blocked": 100 - accepted,
-            "production_accepted": accepted == 100,
+            "requirements_verified": accepted == 100,
+            # No signed build/deploy/smoke/rollback receipt verifier exists in this
+            # repository. Signed per-requirement test logs do not prove deployment.
+            "production_accepted": False,
+            "production_admission": "DENIED_NO_DEPLOYMENT_ATTESTATION",
             "findings": findings}
 
 
@@ -167,12 +171,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--evidence-root", type=Path, default=Path("."))
     parser.add_argument("--trusted-pubkey", type=Path, help="independent auditor Ed25519 PEM, not bundled")
     parser.add_argument("--owner-pubkey", type=Path, help="owner Ed25519 PEM, not bundled")
-    parser.add_argument("--enforce", action="store_true", help="exit nonzero unless 100 independently verified")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--enforce", action="store_true", help="production admission: deny until signed deployment/rollback attestation is implemented")
+    modes.add_argument("--enforce-requirements", action="store_true", help="exit nonzero unless all 100 requirement proofs verify (never grants production)")
     args = parser.parse_args(argv)
     try:
         result = evaluate(_bounded_json_file(args.manifest), args.evidence_root, args.trusted_pubkey, args.owner_pubkey)
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-        return 0 if not args.enforce or result["production_accepted"] else 1
+        if args.enforce:
+            return 0 if result["production_accepted"] else 1
+        if args.enforce_requirements:
+            return 0 if result["requirements_verified"] else 1
+        return 0
     except EvidenceError as exc:
         print(json.dumps({"schema": "omega.acceptance.verdict.v1", "error": str(exc),
                           "production_accepted": False}, ensure_ascii=False), file=sys.stdout)
