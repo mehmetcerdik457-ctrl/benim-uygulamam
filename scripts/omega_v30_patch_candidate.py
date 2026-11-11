@@ -10,23 +10,26 @@ import hashlib
 SOURCE = Path(__file__).resolve().parents[1] / "v30_pg16_original" / "omega_postgres.py"
 EXPECTED_ORIGINAL_SHA256 = "d1d4960b11a23ecf34fad017ec670c117c96fffb44a2adfb61550c3c24b38d8e"
 
-OLD = """    def complete(self, ident, token, success=True):
-        if type(success) is not bool or not isinstance(token, str) or not token:
-            raise ValueError('invalid completion')
-        with self.db.transaction():
+OLD = """        with self.db.transaction():
+            row = self.db.execute('''UPDATE omega_jobs SET status=%s,token=NULL,expires=NULL
+                WHERE id=%s AND token=%s AND status='LEASED' AND expires>now()
+                RETURNING id''', ('DONE' if success else 'FAILED', ident, token)).fetchone()
+            if not row:
+                raise PermissionError('invalid or expired lease')
 """
-NEW = """    def complete(self, ident, token, success=True):
-        if type(success) is not bool or not isinstance(token, str) or not token:
-            raise ValueError('invalid completion')
-        # PostgreSQL stores UUID leases. A malformed untrusted token must be
-        # rejected BEFORE SQL; do not leak psycopg InvalidTextRepresentation.
-        # Keep the original valid-token path and lease checks unchanged.
-        try:
-            uuid.UUID(str(ident))
-            uuid.UUID(token)
-        except (TypeError, AttributeError, ValueError) as exc:
-            raise PermissionError('invalid or expired lease') from exc
-        with self.db.transaction():
+NEW = """        try:
+            with self.db.transaction():
+                row = self.db.execute('''UPDATE omega_jobs SET status=%s,token=NULL,expires=NULL
+                    WHERE id=%s AND token=%s AND status='LEASED' AND expires>now()
+                    RETURNING id''', ('DONE' if success else 'FAILED', ident, token)).fetchone()
+                if not row:
+                    raise PermissionError('invalid or expired lease')
+        except Exception as exc:
+            # PostgreSQL SQLSTATE 22P02 is invalid UUID syntax. Keep DB-API
+            # fake-connection tests unchanged; rollback precedes translation.
+            if getattr(exc, 'sqlstate', None) == '22P02':
+                raise PermissionError('invalid or expired lease') from exc
+            raise
 """
 
 def main() -> None:

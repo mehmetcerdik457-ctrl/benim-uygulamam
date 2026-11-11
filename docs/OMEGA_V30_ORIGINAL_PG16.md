@@ -38,3 +38,19 @@ A second run requires all 16 tests to PASS with zero skips/errors before
 reporting the **patched candidate** as successful. Passing those 16 is NOT
 identical to running the entire original V30 297-test suite on the patch,
 and does not establish paid monetization or production deployment.
+
+## V30 fix candidate revision: preserve the 281 historical unit-test contract
+
+A first UUID-prevalidation candidate changed the fake-connection adapter contract
+(`test_postgres.PgTests.test_complete` passes synthetic non-UUID values),
+causing a regression (local 280 PASS / 1 ERROR / 16 SKIP). That candidate is
+**rejected**. The revised candidate translates only PostgreSQL **SQLSTATE 22P02**
+from the already-rolled-back database transaction to
+`PermissionError('invalid or expired lease')`; unrelated driver errors
+are re-raised. The exact-source archive remains unchanged.
+
+On the revised candidate, all 297 original tests were locally rediscovered:
+**281 PASS / 16 SKIP, 0 failures** (no local PostgreSQL server).
+Candidate patched `omega_postgres.py` SHA-256:
+`e508d4062a896c0fb11b64fca43b6ad4046abd7133ed22c7bfdc010866fa74c1`.
+The CI PostgreSQL job is the authoritative test for the remaining 16.
