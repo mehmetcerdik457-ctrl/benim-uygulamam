@@ -56,10 +56,10 @@ jobs:
           tail -n 37 ../v30-original-negative.log
           test "$code" -ne 0
           grep -Eq '^Ran 16 tests in ' ../v30-original-negative.log
-          grep -Eq '^FAILED \(errors=1\) ../v30-original-negative.log
+          grep -F 'FAILED (errors=1)' ../v30-original-negative.log
           grep -q 'test_lease_and_completion' ../v30-original-negative.log
           grep -q 'psycopg.errors.InvalidTextRepresentation' ../v30-original-negative.log
-          test "$(grep -Ec '\.\.\. ok ../v30-original-negative.log)" -eq 15
+          python -c 'from pathlib import Path; assert Path("../v30-original-negative.log").read_text().count("... ok") == 15'
           echo 'V30_ORIGINAL_UNPATCHED=15_PASS_1_ERROR'
       - name: Apply independently visible checksum-locked candidate patch
         run: python scripts/omega_v30_patch_candidate.py
@@ -70,7 +70,7 @@ jobs:
           cd v30_pg16_original
           python -m unittest discover -s tests -p 'test_postgres*live.py' -v 2>&1 | tee ../v30-patched-candidate.log
           grep -Eq '^Ran 16 tests in ' ../v30-patched-candidate.log
-          grep -Eq '^OK ../v30-patched-candidate.log
+          grep -x 'OK' ../v30-patched-candidate.log
           if grep -Eq 'skipped|SKIP|FAILED|ERROR' ../v30-patched-candidate.log; then
             echo 'V30 PATCHED CANDIDATE NOT ACCEPTED'
             exit 1
