@@ -58,6 +58,14 @@ class DeploymentPreflightTests(unittest.TestCase):
         self.record["override"] = True
         self.assertTrue(any("unknown fields" in s for s in self.verdict()["structural_findings"]))
 
+    def test_nonhex_digest_rejected(self):
+        self.record["artifact_sha256"] = "z" * 64
+        self.assertIn("missing artifact metadata", self.verdict()["structural_findings"])
+
+    def test_boolean_postgres_counter_rejected(self):
+        self.record["postgres_tests"]["failed"] = False
+        self.assertIn("16 PostgreSQL tests not fully evidenced", self.verdict()["structural_findings"])
+
     def test_duplicate_keys_rejected(self):
         path = self.root / "duplicate.json"
         path.write_text('{"x":1,"x":2}')
