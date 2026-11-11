@@ -15,3 +15,19 @@ python scripts/omega_acceptance_gate.py --manifest evidence/omega-100-acceptance
 The first two commands should succeed on a valid blocked baseline. `--enforce` **must fail** until all 100 independently verified. Logs may disclose sensitive content; only sanitized, explicitly authorized evidence should be copied into a future controlled evidence root.
 
 The status report is a separate control, not an auto-deploy trigger. A complete signed release additionally requires the exact integrated commit, security/owner review, tests on approved platforms, reproducible artifact digest, rollback rehearsal and live deployment receipt. No branch merge, production release, or privilege broadening is authorized by this gate.
+
+## Independent findings addressed (11 Nov 2026)
+
+The inventory job may succeed while 100/100 production acceptance is denied. It is
+**not** a deployment check. A separate `workflow_dispatch` job,
+`release-admission-deny-only`, runs the CLI with `--enforce` as a hard-failing
+command. The job has no secrets, no provider access and no deployment actions;
+given the public blocked manifest, its failure is the expected result.
+It cannot issue release approval. A trusted, private acceptance runner would
+have to supply the exact approved artifact, signed logs, independent auditor
+and owner public keys and authenticated test-device receipts before deciding
+whether to approve any actual deployment.
+
+The JSON parser now rejects duplicate property names (including nested
+objects), NaN and infinity. The evidence receipt rejects unsigned extra fields.
+These are control hardening measures, not proof that the system is production-ready.

@@ -24,11 +24,29 @@ class EvidenceError(ValueError):
     pass
 
 
+def _unique_object_pairs(pairs: list[tuple[str, object]]) -> dict:
+    """Fail closed on ambiguous JSON keys at every nested object level."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise EvidenceError("duplicate JSON property")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite(value: str) -> object:
+    raise EvidenceError("nonfinite JSON value forbidden")
+
+
 def _bounded_json_file(path: Path, max_bytes: int = 1024 * 1024) -> object:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > max_bytes:
         raise EvidenceError("missing, symlink, or oversized manifest")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(
+            path.read_text(encoding="utf-8"),
+            object_pairs_hook=_unique_object_pairs,
+            parse_constant=_reject_nonfinite,
+        )
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise EvidenceError("invalid manifest JSON") from exc
 
@@ -69,6 +87,8 @@ def _verified(row: dict, root: Path, trusted_key_path: Path | None, owner_key_pa
     keys = {"source_commit", "test_log_path", "test_log_sha256", "run_id", "reviewer", "device", "owner_accepted", "signature", "owner_signature"}
     if keys - proof.keys():
         return "incomplete evidence receipt"
+    if proof.keys() - keys:
+        return "unexpected unsigned proof fields"
     if not isinstance(proof["source_commit"], str) or not COMMIT.fullmatch(proof["source_commit"]):
         return "invalid source commit SHA"
     if not isinstance(proof["test_log_sha256"], str) or not SHA256.fullmatch(proof["test_log_sha256"]):

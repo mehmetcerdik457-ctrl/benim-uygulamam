@@ -7,7 +7,7 @@ from pathlib import Path
 from importlib.util import find_spec
 from unittest.mock import patch
 
-from scripts.omega_acceptance_gate import EvidenceError, evaluate, _local_file, _hash_file, main
+from scripts.omega_acceptance_gate import EvidenceError, evaluate, _local_file, _hash_file, _bounded_json_file, main
 
 
 def manifest():
@@ -30,6 +30,37 @@ class ProofGateTests(unittest.TestCase):
     def test_official_default_manifest(self):
         path = Path(__file__).resolve().parents[1] / 'evidence/omega-100-acceptance.json'
         self.assertEqual(evaluate(json.loads(path.read_text()), self.root)['verified'], 0)
+
+    def test_duplicated_json_property_denied(self):
+        bad = self.root/'bad.json'
+        bad.write_text('{"schema":"omega.acceptance.v1","schema":"other"}')
+        with self.assertRaisesRegex(EvidenceError, "duplicate JSON property"):
+            _bounded_json_file(bad)
+
+    def test_nested_json_property_ambiguity_denied(self):
+        bad = self.root/'bad.json'
+        bad.write_text('{"schema":"omega.acceptance.v1","requirements":[{"id":"A","id":"B"}]}')
+        with self.assertRaisesRegex(EvidenceError, "duplicate JSON property"):
+            _bounded_json_file(bad)
+
+    def test_nonfinite_json_value_denied(self):
+        bad = self.root/'bad.json'
+        bad.write_text('{"schema":"omega.acceptance.v1","requirements":NaN}')
+        with self.assertRaisesRegex(EvidenceError, "nonfinite JSON"):
+            _bounded_json_file(bad)
+
+    def test_unexpected_unsigned_proof_field_denied(self):
+        m = manifest()
+        m["requirements"][0].update(status="VERIFIED", proof={
+            "source_commit":"a"*40, "test_log_path":"test.log",
+            "test_log_sha256":"0"*64, "run_id":"run-1",
+            "reviewer":"independent-auditor","device":"linux-x86_64",
+            "owner_accepted":True,"signature":"not-signed",
+            "owner_signature":"not-signed","override_release":True
+        })
+        report = evaluate(m,self.root)
+        self.assertEqual(report["verified"],0)
+        self.assertIn("unexpected unsigned",report["findings"][0]["reason"])
 
     def test_missing_rejected(self):
         m = manifest(); m['requirements'].pop();
