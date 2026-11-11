@@ -33,3 +33,18 @@ events, privacy/security controls and license-tester evidence.
 Do not merge/publish without independent owner/security review and a
 production acceptance process. This file does not override PROJECT OMEGA's
 deny-by-default release controls.
+
+
+## 11 November 2026: PostgreSQL identity and isolation controls
+
+The original 16 synthetic subscription tests remain intact. Four additional
+negative tests guard the actual PostgreSQL session identity and the effect
+of changing the search_path away from the randomized mock-only schema.
+Both read and write operations now deny unless PostgreSQL reports database
+omega_mock, role omega_mock, and a strictly formatted omega_mock_<32 hex>
+schema. The test harness validates the DSN (local loopback) before connecting
+and checks the authenticated role/database before CREATE SCHEMA.
+
+These checks reduce accidental cross-environment execution, but cannot make
+this mock module suitable for production billing. Test harnesses still need
+an ephemeral instance. CI now requires 20 tests, with 0 skips/errors.

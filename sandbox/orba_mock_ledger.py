@@ -15,6 +15,24 @@ class MockBillingError(ValueError):
 class MockReplayConflict(MockBillingError):
     pass
 
+def require_disposable_postgres(conn) -> None:
+    """Deny queries outside the CI-only database, role and random test schema.
+
+    This protects against an accidentally supplied production connection or
+    a changed search_path. It is not a production-grade billing authorization
+    mechanism and must not be used as one.
+    """
+    identity = conn.execute(
+        "SELECT current_database(), current_user, current_schema()"
+    ).fetchone()
+    if (not identity or len(identity) != 3
+            or identity[0] != "omega_mock"
+            or identity[1] != "omega_mock"
+            or not isinstance(identity[2], str)
+            or not re.fullmatch(r"omega_mock_[0-9a-f]{32}", identity[2])):
+        raise MockBillingError("not a disposable PostgreSQL CI test session")
+
+
 @dataclass(frozen=True)
 class MockEvent:
     event_id: str
@@ -28,6 +46,7 @@ def apply_mock_event(conn, event: MockEvent, *, actor_owner: str,
     """Can modify ONLY a disposable test schema, not real-world entitlements."""
     if mode != MOCK_ONLY or not isinstance(event, MockEvent):
         raise MockBillingError("production billing disabled")
+    require_disposable_postgres(conn)
     for value in (event.event_id, event.owner_id, event.user_id, event.product_id):
         if not isinstance(value,str) or not ID.fullmatch(value):
             raise MockBillingError("invalid mock identifier")
@@ -70,6 +89,7 @@ def apply_mock_event(conn, event: MockEvent, *, actor_owner: str,
         return "MOCK_ACTIVE" if state == "ACTIVE" else "MOCK_INACTIVE"
 
 def mock_entitlement_state(conn, owner_id: str, user_id: str, product_id: str) -> str | None:
+    require_disposable_postgres(conn)
     for item in (owner_id,user_id,product_id):
         if not isinstance(item,str) or not ID.fullmatch(item):
             raise MockBillingError("invalid mock identifier")

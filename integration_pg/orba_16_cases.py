@@ -7,7 +7,8 @@ import uuid
 from pathlib import Path
 import psycopg
 from psycopg import sql
-from sandbox.orba_mock_ledger import MockEvent, apply_mock_event, mock_entitlement_state, MockBillingError, MockReplayConflict
+from psycopg.conninfo import conninfo_to_dict
+from sandbox.orba_mock_ledger import MockEvent, apply_mock_event, mock_entitlement_state, MockBillingError, MockReplayConflict, require_disposable_postgres
 
 SCHEMA = (Path(__file__).resolve().parents[1] / "sandbox/orba_mock_schema.sql").read_text(encoding="utf-8")
 
@@ -16,8 +17,22 @@ class TestOrbaMockPostgres(unittest.TestCase):
         self.dsn = os.environ.get("OMEGA_ORBA_MOCK_PG_DSN")
         if not self.dsn:
             raise RuntimeError("Must configure disposable PostgreSQL: OMEGA_ORBA_MOCK_PG_DSN; SKIP forbidden")
+        # Deny unexpected destinations BEFORE attempting a database connection.
+        # conninfo parsing understands PostgreSQL URLs and key-value DSNs.
+        cfg = conninfo_to_dict(self.dsn)
+        if (cfg.get("dbname") != "omega_mock"
+                or cfg.get("user") != "omega_mock"
+                or cfg.get("host") != "127.0.0.1"
+                or cfg.get("hostaddr") not in (None, "127.0.0.1")
+                or cfg.get("service") is not None):
+            raise RuntimeError("unsafe database DSN; only local CI omega_mock is allowed")
         self.namespace = "omega_mock_" + uuid.uuid4().hex
         self.conn = psycopg.connect(self.dsn,autocommit=True)
+        # Guard the actual authenticated database identity before DDL.
+        identity = self.conn.execute("SELECT current_database(), current_user").fetchone()
+        if identity != ("omega_mock", "omega_mock"):
+            self.conn.close()
+            raise RuntimeError("unexpected authenticated CI database identity")
         self.conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(self.namespace)))
         self.conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.namespace)))
         self.conn.execute(SCHEMA)
@@ -125,3 +140,36 @@ class TestOrbaMockPostgres(unittest.TestCase):
             self.apply(self.event(owner="ownerB"),owner="ownerB")
         self.assertEqual(self.count(),1)
         self.assertIsNone(self.state(owner="ownerB"))
+
+
+class TestOrbaMockIsolation(unittest.TestCase):
+    """Four additional DB-backed negative controls; no production semantics."""
+    setUp = TestOrbaMockPostgres.setUp
+    tearDown = TestOrbaMockPostgres.tearDown
+    event = TestOrbaMockPostgres.event
+    apply = TestOrbaMockPostgres.apply
+    state = TestOrbaMockPostgres.state
+    count = TestOrbaMockPostgres.count
+
+    def test_17_mock_connection_identity(self):
+        require_disposable_postgres(self.conn)
+        row = self.conn.execute("SELECT current_database(), current_user, current_schema()").fetchone()
+        self.assertEqual(row[0:2],("omega_mock","omega_mock"))
+        self.assertEqual(row[2],self.namespace)
+
+    def test_18_mock_write_disallowed_after_search_path_escape(self):
+        self.conn.execute("SET search_path TO public")
+        with self.assertRaisesRegex(MockBillingError, "disposable"):
+            self.apply()
+        self.conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(self.namespace)))
+        self.assertEqual(self.count(),0)
+
+    def test_19_mock_read_disallowed_after_search_path_escape(self):
+        self.conn.execute("SET search_path TO public")
+        with self.assertRaisesRegex(MockBillingError, "disposable"):
+            self.state()
+
+    def test_20_mock_write_rejects_nonrandom_test_namespace(self):
+        self.conn.execute("SET search_path TO pg_catalog")
+        with self.assertRaisesRegex(MockBillingError, "disposable"):
+            self.apply()
