@@ -1,0 +1,75 @@
+name: OMEGA V34 patched FULL 354 isolated PostgreSQL
+on:
+  push:
+    branches: [audit/omega-v34-play-354-postgres-20261112]
+    paths:
+      - 'evidence/omega_v34_sourceonly.tar.br.b64'
+      - 'evidence/omega_v34_source_manifest.json'
+      - 'scripts/omega_v34_full354_ci.py'
+      - '.github/workflows/omega-v34-full354-postgres.yml'
+  pull_request:
+    paths:
+      - 'evidence/omega_v34_sourceonly.tar.br.b64'
+      - 'evidence/omega_v34_source_manifest.json'
+      - 'scripts/omega_v34_full354_ci.py'
+      - '.github/workflows/omega-v34-full354-postgres.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-v34-postgresql-full-suite:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: postgres
+          POSTGRES_USER: ci_admin
+          POSTGRES_PASSWORD: ci-admin-ephemeral-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci_admin -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      OMEGA_TEST_POSTGRES_DSN: postgresql://omega_v34:ci-ephemeral-only@127.0.0.1:5432/omega_test_v34
+      OMEGA_TEST_ALLOW_DESTRUCTIVE: 'YES'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout exact PR branch commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install isolated Python test dependencies
+        run: python -m pip install 'brotli>=1.1,<2' 'fastapi>=0.110,<1' 'httpx>=0.27,<1' 'psycopg[binary]>=3.2,<3.4'
+      - name: Provision new non-superuser isolated PostgreSQL test database
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import psycopg
+          with psycopg.connect('postgresql://ci_admin:ci-admin-ephemeral-only@127.0.0.1:5432/postgres', autocommit=True) as conn:
+              conn.execute("CREATE ROLE omega_v34 LOGIN PASSWORD 'ci-ephemeral-only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION")
+              conn.execute('CREATE DATABASE omega_test_v34 OWNER omega_v34')
+          with psycopg.connect('postgresql://omega_v34:ci-ephemeral-only@127.0.0.1:5432/omega_test_v34') as conn:
+              actual = conn.execute("SELECT current_database(), current_user, (SELECT rolsuper FROM pg_roles WHERE rolname=current_user)").fetchone()
+              assert actual == ('omega_test_v34','omega_v34',False),actual
+          print('V34_NON_SUPERUSER_DISPOSABLE_POSTGRES=TRUE')
+          PY
+      - name: Execute 354 original V34 tests with checksum-pinned PG candidate patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/omega_v34_full354_ci.py --live 2>&1 | tee v34-full354.log
+          grep -Eq '^Ran 354 tests in ' v34-full354.log
+          grep -x 'OK' v34-full354.log
+          grep -q 'V34_PATCHED_FULL_354=354_PASS_0_SKIP' v34-full354.log
+          grep -q 'V34_ISOLATED_NON_SUPERUSER_DB=PASS' v34-full354.log
+          if grep -Eq 'skipped=|\.\.\. skipped |FAILED \(|Traceback \(most recent call last\)' v34-full354.log; then
+            echo 'V34 LIVE FULL SUITE NOT ACCEPTED'
+            exit 1
+          fi
+          echo 'ORBA_PRODUCTION_MONETIZATION=NOT_DEPLOYED'
