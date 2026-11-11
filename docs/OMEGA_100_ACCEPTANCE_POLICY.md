@@ -1,0 +1,17 @@
+# PROJECT OMEGA: independent 100-requirement acceptance gate
+
+Status: **NOT PRODUCTION ACCEPTED.** This is an acceptance-control contribution, not the implementation of the original 100 requirements.
+
+The `evidence/omega-100-acceptance.json` manifest has exactly `OMEGA-001` through `OMEGA-100`. All entries are explicitly `BLOCKED` with reasons until evidence is reviewed. The authoritative requirements remain in the owner's master specification; this public repository does not receive private evidence, secret values, model weights, or user data.
+
+The offline CLI validates the full ID set and per-record state. `BLOCKED` is an explicit negative verdict, not a fabricated success. `VERIFIED` entries require an exact source commit, a bounded locally readable test log matching its SHA-256, an exact run ID, observed device/platform, owner acceptance and two independently signed receipts (auditor and owner). Their separate Ed25519 public keys must be supplied from trusted sources with `--trusted-pubkey` and `--owner-pubkey`; no public or private keys are shipped in the repository. The signature binds requirement ID and the complete proof metadata. **SHA-256 alone is integrity, not signer identity.** A cryptographic signature alone does not prove the test actually ran: reviewers must audit the log, source, device/deployment receipt and chain of custody before signing. Never sign metadata merely to obtain PASS.
+
+```
+PYTHONPATH=. python -m unittest discover -s tests -p 'test_omega_acceptance_gate.py' -v
+python scripts/omega_acceptance_gate.py --manifest evidence/omega-100-acceptance.json
+python scripts/omega_acceptance_gate.py --manifest evidence/omega-100-acceptance.json --enforce
+```
+
+The first two commands should succeed on a valid blocked baseline. `--enforce` **must fail** until all 100 independently verified. Logs may disclose sensitive content; only sanitized, explicitly authorized evidence should be copied into a future controlled evidence root.
+
+The status report is a separate control, not an auto-deploy trigger. A complete signed release additionally requires the exact integrated commit, security/owner review, tests on approved platforms, reproducible artifact digest, rollback rehearsal and live deployment receipt. No branch merge, production release, or privilege broadening is authorized by this gate.
