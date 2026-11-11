@@ -1,0 +1,53 @@
+name: ORBA isolated mock PostgreSQL integration (16 new tests)
+on:
+  push:
+    branches: [feature/orba-postgres-mock-16-integration-20261111]
+    paths:
+      - sandbox/**
+      - integration_pg/**
+      - .github/workflows/orba-postgres-mock-16.yml
+  pull_request:
+    paths:
+      - sandbox/**
+      - integration_pg/**
+      - .github/workflows/orba-postgres-mock-16.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-postgresql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: omega_mock
+          POSTGRES_USER: omega_mock
+          POSTGRES_PASSWORD: mock-ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U omega_mock -d omega_mock"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      OMEGA_ORBA_MOCK_PG_DSN: postgresql://omega_mock:mock-ci-only@127.0.0.1:5432/omega_mock
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install isolated driver
+        run: python -m pip install 'psycopg[binary]>=3.2,<3.4'
+      - name: Run exactly 16 real PostgreSQL integration tests (no skip)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s integration_pg -p orba_16_cases.py -v 2>&1 | tee pg-test.log
+          grep -Eq '^Ran 16 tests in ' pg-test.log
+          grep -Eq '^OK$' pg-test.log
+          if grep -Eq 'SKIP|skipped|FAILED|ERROR' pg-test.log; then
+            exit 1
+          fi
+          echo 'ORBA_POSTGRES_16_NEW_MOCK_TESTS=PASS'
+          echo 'ORBA_PRODUCTION_REVENUE=NOT_CONFIGURED'
