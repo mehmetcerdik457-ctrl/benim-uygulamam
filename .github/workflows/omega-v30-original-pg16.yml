@@ -5,11 +5,13 @@ on:
     paths:
       - 'evidence/omega_v30_pg16_source.tar.br.b64'
       - 'scripts/omega_v30_original_pg16.py'
+      - 'scripts/omega_v30_patch_candidate.py'
       - '.github/workflows/omega-v30-original-pg16.yml'
   pull_request:
     paths:
       - 'evidence/omega_v30_pg16_source.tar.br.b64'
       - 'scripts/omega_v30_original_pg16.py'
+      - 'scripts/omega_v30_patch_candidate.py'
       - '.github/workflows/omega-v30-original-pg16.yml'
   workflow_dispatch:
 permissions:
@@ -42,17 +44,37 @@ jobs:
         run: python -m pip install 'psycopg[binary]>=3.2,<3.4' 'brotli>=1.1,<2'
       - name: Verify SHA-256 and reconstruct 8 unchanged V30 files
         run: python scripts/omega_v30_original_pg16.py
-      - name: Run original V30 8 queue + 8 audit PostgreSQL tests
+      - name: Preserve exact original V30 failing baseline (never call PASS)
         shell: bash
         run: |
           set -euo pipefail
           cd v30_pg16_original
-          python -m unittest discover -s tests -p 'test_postgres*live.py' -v 2>&1 | tee ../v30-pg16.log
-          grep -Eq '^Ran 16 tests in ' ../v30-pg16.log
-          grep -Eq '^OK$' ../v30-pg16.log
-          if grep -Eq 'skipped|SKIP|FAILED|ERROR' ../v30-pg16.log; then
-            echo 'V30 ORIGINAL 16 TESTS NOT ACCEPTED'
+          set +e
+          python -m unittest discover -s tests -p 'test_postgres*live.py' -v > ../v30-original-negative.log 2>&1
+          code=$?
+          set -e
+          tail -n 37 ../v30-original-negative.log
+          test "$code" -ne 0
+          grep -Eq '^Ran 16 tests in ' ../v30-original-negative.log
+          grep -Eq '^FAILED \(errors=1\) ../v30-original-negative.log
+          grep -q 'test_lease_and_completion' ../v30-original-negative.log
+          grep -q 'psycopg.errors.InvalidTextRepresentation' ../v30-original-negative.log
+          test "$(grep -Ec '\.\.\. ok ../v30-original-negative.log)" -eq 15
+          echo 'V30_ORIGINAL_UNPATCHED=15_PASS_1_ERROR'
+      - name: Apply independently visible checksum-locked candidate patch
+        run: python scripts/omega_v30_patch_candidate.py
+      - name: Run original 16 tests against patched queue candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd v30_pg16_original
+          python -m unittest discover -s tests -p 'test_postgres*live.py' -v 2>&1 | tee ../v30-patched-candidate.log
+          grep -Eq '^Ran 16 tests in ' ../v30-patched-candidate.log
+          grep -Eq '^OK ../v30-patched-candidate.log
+          if grep -Eq 'skipped|SKIP|FAILED|ERROR' ../v30-patched-candidate.log; then
+            echo 'V30 PATCHED CANDIDATE NOT ACCEPTED'
             exit 1
           fi
-          echo 'V30_ORIGINAL_POSTGRES_16=PASS_NO_SKIP'
+          echo 'V30_PATCHED_CANDIDATE_POSTGRES_16=PASS_NO_SKIP'
+          echo 'V30_ORIGINAL_UNPATCHED=15_PASS_1_ERROR'
           echo 'ORBA_MONETIZATION_PRODUCTION=NOT_VERIFIED'
