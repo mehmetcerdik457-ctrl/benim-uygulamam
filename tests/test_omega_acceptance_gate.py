@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.omega_acceptance_gate import EvidenceError, evaluate, _local_file, _hash_file, _bounded_json_file, main
+from scripts.omega_acceptance_gate import EvidenceError, evaluate, _local_file, _hash_file, _bounded_json_file, _load_catalog, _verify_master_csv, main
 
 
 def manifest():
@@ -20,6 +20,27 @@ class ProofGateTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
+
+    def test_all_100_fingerprints_are_pinned(self):
+        catalog = _load_catalog()
+        self.assertEqual(len(catalog), 100)
+        self.assertEqual(catalog["OMEGA-001"]["description_sha256"], "e7996a9da3de32805c5b7b7efbe3b08563d730c45b8aac18a9c0a536f78dd2a5")
+        self.assertEqual(catalog["OMEGA-100"]["description_sha256"], "526a868e7e698213560e81a3df7d07b5ac993a4834854430f3e19188f6d58f3b")
+
+    def test_wrong_private_master_csv_phase_denied(self):
+        p = self.root / "master.csv"
+        p.write_text("MADDE,FAZ,ÖZGÜN GEREKSİNİM\n1,Fake,Fake\n",encoding="utf-8")
+        with self.assertRaisesRegex(EvidenceError, "phase mismatch"):
+            _verify_master_csv(p,_load_catalog())
+
+    def test_wrong_private_master_csv_description_denied(self):
+        import csv
+        p = self.root / "master.csv"
+        with p.open("w",encoding="utf-8",newline="") as f:
+            w = csv.writer(f); w.writerow(["MADDE","FAZ","ÖZGÜN GEREKSİNİM"])
+            w.writerow(["1",_load_catalog()["OMEGA-001"]["phase"],"changed requirement text"])
+        with self.assertRaisesRegex(EvidenceError,"fingerprint mismatch"):
+            _verify_master_csv(p,_load_catalog())
 
     def test_100_unique_blocked(self):
         report = evaluate(manifest(), self.root)
@@ -55,7 +76,7 @@ class ProofGateTests(unittest.TestCase):
             "test_log_sha256":"0"*64, "run_id":"run-1",
             "reviewer":"independent-auditor","device":"linux-x86_64",
             "owner_accepted":True,"signature":"not-signed",
-            "owner_signature":"not-signed","override_release":True
+            "owner_signature":"not-signed","requirement_sha256":_load_catalog()["OMEGA-001"]["description_sha256"],"override_release":True
         })
         report = evaluate(m,self.root)
         self.assertEqual(report["verified"],0)
@@ -96,7 +117,7 @@ class ProofGateTests(unittest.TestCase):
         m['requirements'][0].update(status='VERIFIED', proof={
             'source_commit':'a'*40, 'test_log_path':'test.log',
             'test_log_sha256':_hash_file(log),'run_id':'run-1',
-            'reviewer':'auditor-A','device':'linux-x86_64',
+            'reviewer':'auditor-A','device':'linux-x86_64','requirement_sha256':_load_catalog()['OMEGA-001']['description_sha256'],
             'owner_accepted':True,'signature':'garbage','owner_signature':'garbage'})
         r = evaluate(m, self.root)
         self.assertEqual(r['verified'],0)
@@ -109,7 +130,7 @@ class ProofGateTests(unittest.TestCase):
         m['requirements'][0].update(status='VERIFIED',proof={
             'source_commit':'a'*40,'test_log_path':'test.log',
             'test_log_sha256':_hash_file(log),'run_id':'run-1',
-            'reviewer':'auditor-B','device':'linux','owner_accepted':True,
+            'reviewer':'auditor-B','device':'linux','owner_accepted':True,'requirement_sha256':_load_catalog()['OMEGA-001']['description_sha256'],
             'signature':base64.b64encode(b'fake-signature').decode(), 'owner_signature':base64.b64encode(b'fake-signature').decode()})
         self.assertEqual(evaluate(m,self.root,key,owner_key)['verified'],0)
 
@@ -118,7 +139,7 @@ class ProofGateTests(unittest.TestCase):
         from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
         m = manifest(); log=self.root/'test.log'; log.write_text('PASS\n')
         p={'source_commit':'a'*40,'test_log_path':'test.log','test_log_sha256':_hash_file(log),
-           'run_id':'run-1','reviewer':'auditor','device':'linux','owner_accepted':True}
+           'run_id':'run-1','reviewer':'auditor','device':'linux','owner_accepted':True,'requirement_sha256':_load_catalog()['OMEGA-001']['description_sha256']}
         priv=Ed25519PrivateKey.generate();key=self.root/'pub.pem'
         owner=Ed25519PrivateKey.generate();owner_key=self.root/'owner.pem'
         key.write_bytes(priv.public_key().public_bytes(Encoding.PEM,PublicFormat.SubjectPublicKeyInfo))
@@ -153,7 +174,7 @@ class ProofGateTests(unittest.TestCase):
         for row in m['requirements']:
             signed = {'source_commit':'a'*40,'test_log_path':'test.log',
                 'test_log_sha256':_hash_file(logfile),'run_id':'fixture-run',
-                'reviewer':'test-auditor','device':'test-fixture','owner_accepted':True}
+                'reviewer':'test-auditor','device':'test-fixture','owner_accepted':True,'requirement_sha256':_load_catalog()[row['id']]['description_sha256']}
             message = json.dumps({'requirement_id':row['id'],'proof':signed},
                 sort_keys=True,separators=(',',':')).encode('utf-8')
             signed['signature'] = base64.b64encode(auditor.sign(message)).decode('ascii')
@@ -175,7 +196,7 @@ class ProofGateTests(unittest.TestCase):
     def test_no_owner_approval(self):
         m=manifest();m['requirements'][0].update(status='VERIFIED',proof={
             'source_commit':'a'*40,'test_log_path':'test.log','test_log_sha256':'0'*64,
-            'run_id':'run','reviewer':'rev','device':'linux','owner_accepted':False,'signature':'foo','owner_signature':'foo'})
+            'run_id':'run','reviewer':'rev','device':'linux','owner_accepted':False,'requirement_sha256':_load_catalog()['OMEGA-001']['description_sha256'],'signature':'foo','owner_signature':'foo'})
         self.assertIn('owner',evaluate(m,self.root)['findings'][0]['reason'])
 
     def test_traversal_denied(self):

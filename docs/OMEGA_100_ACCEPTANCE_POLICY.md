@@ -51,3 +51,17 @@ requirement test receipts with **ephemeral test keys** and verifies that
 These are synthetic fixtures, not owner credentials or actual product tests.
 The Ed25519 positive unit tests are now required, never skipped for a missing
 cryptography package; fail closed if it is unavailable.
+
+## 100-text SHA-256 source binding (11 Nov 2026)
+
+The original Google Doc and private Google Sheet were independently compared: 100/100 numbered phase+description entries match exactly; mismatches: zero. Public `evidence/omega-100-spec-fingerprints.json` contains only SHA-256 digests and phases, not requirement texts or private evidence. Canonical digest pin: `d5a3a415efbfbf12eefd862f30d59ca33755add2f1a2859c76fc03b3c49824fc`.
+
+Each signed proof now includes `requirement_sha256` in the cryptographic message, and the verifier rejects a signature applied to a different requirement description. The public catalog is checksum pinned by reviewed Python code. A future private-source update requires an independently reviewed new catalog SHA and new signatures; this is not an automatic authorization.
+
+To verify a CSV export locally, without uploading its contents, run:
+
+```sh
+python scripts/omega_acceptance_gate.py --master-csv /authorized/local/master.csv
+```
+
+The CSV must contain exactly 100 rows and columns `MADDE,FAZ,ÖZGÜN GEREKSİNİM`; comparison requires identical UTF-8 requirement text. Normal GitHub CI does not read a private CSV and reports `master_source_verified=false`. Source integrity is separate from requirement acceptance and production deployment.
