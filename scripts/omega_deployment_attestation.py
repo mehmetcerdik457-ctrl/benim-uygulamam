@@ -38,7 +38,7 @@ def evaluate(record, evidence_root):
         findings.append("invalid source commit")
     artifact = record.get("artifact_path")
     digest = record.get("artifact_sha256")
-    if not isinstance(artifact, str) or not artifact or not isinstance(digest, str) or len(digest) != 64:
+    if not isinstance(artifact, str) or not artifact or not isinstance(digest, str) or len(digest) != 64 or any(c not in "0123456789abcdefABCDEF" for c in digest):
         findings.append("missing artifact metadata")
     else:
         root = Path(evidence_root).resolve()
@@ -48,7 +48,7 @@ def evaluate(record, evidence_root):
         elif _sha256(candidate) != digest.lower():
             findings.append("artifact SHA-256 mismatch")
     pg = record.get("postgres_tests")
-    if not isinstance(pg, dict) or pg.get("historical_skips_executed") != 16 or pg.get("failed") != 0 or pg.get("skipped") != 0:
+    if (not isinstance(pg, dict) or any(type(pg.get(k)) is not int for k in ("historical_skips_executed", "failed", "skipped"))\n            or pg["historical_skips_executed"] != 16 or pg["failed"] != 0 or pg["skipped"] != 0):
         findings.append("16 PostgreSQL tests not fully evidenced")
     for field in ("owner_approval", "auditor_approval", "deployment_receipt", "rollback_receipt", "billing_receipt"):
         if not isinstance(record.get(field), dict) or not record[field]:
