@@ -1,0 +1,308 @@
+{
+  "v34_original_zip_sha256": "8ccea387dc9e8c7fc9150b0b29244755d1c04b34797a2e19a4f6c4fb93cb1924",
+  "compressed_tar_sha256": "77a24839587f8cb705f050fd0705578cabc96a8ab02b0c154d79bb7441e6111a",
+  "original_manifest_files": 62,
+  "source_files": 60,
+  "source_manifest": [
+    {
+      "path": "omega_anchor_store.py",
+      "sha256": "840e8d2138c12d0f944c123cf8e3c4d13a38541ef843b39ef212911d4172bcf3",
+      "bytes": 2795
+    },
+    {
+      "path": "omega_api.py",
+      "sha256": "2c32053b08f403259a3377fe8fe8f46917f72f606a6849d494eba234ddb52acb",
+      "bytes": 6326
+    },
+    {
+      "path": "omega_atomic_worker.py",
+      "sha256": "2e232ba57a0fbe6483680a640319f4a5b101644e813ec2c5961cf6b1934dba70",
+      "bytes": 3352
+    },
+    {
+      "path": "omega_audit_chain.py",
+      "sha256": "5f9144739dab360f1efd02ebf0aeb838507f6097598a75cede20c70499e873d6",
+      "bytes": 3503
+    },
+    {
+      "path": "omega_audit_checkpoint.py",
+      "sha256": "bc7d333b43cc1c5b213db3004933610b19a21550996ca236dce1d312577eaa3d",
+      "bytes": 3518
+    },
+    {
+      "path": "omega_audit_reader.py",
+      "sha256": "f69421d30d4c0c7ba81754d23ce24d17daf1ae0e5c392e4f334edfb76272b470",
+      "bytes": 1926
+    },
+    {
+      "path": "omega_audited_worker.py",
+      "sha256": "76bbba97f4d6f90dbffb35a459cdb604b3e736e387ad3f6209ab0ea841cc21c0",
+      "bytes": 958
+    },
+    {
+      "path": "omega_checkpoint_registry.py",
+      "sha256": "a359a14b30128253a4bf68c7080be62a2d84df672138f4106995a70470b8f645",
+      "bytes": 2461
+    },
+    {
+      "path": "omega_manifest.py",
+      "sha256": "1f2859342dadc5f2c27663be91a8853c6eb416e2142aab80d48df3233fbe87ea",
+      "bytes": 2644
+    },
+    {
+      "path": "omega_mcp_local.py",
+      "sha256": "2a4808e7554297b298fb120bfaf89390853eb3d30af4802fe7e962b4385afd3d",
+      "bytes": 3831
+    },
+    {
+      "path": "omega_pg_test_guard.py",
+      "sha256": "ba53e8c27fcef65f354fd5e48041ee4e7d047a2436225175eb5427e99f39e1cc",
+      "bytes": 1629
+    },
+    {
+      "path": "omega_pipeline.py",
+      "sha256": "be2164b62cb9fa6a26e67aab81dfb98f2fd8e7985da219b59855a4ab2c2c77f8",
+      "bytes": 3686
+    },
+    {
+      "path": "omega_policy.py",
+      "sha256": "6c26fb027a185bf4c871cd1247f42be153cc5461db6980bf4468f7c81eb12c98",
+      "bytes": 1958
+    },
+    {
+      "path": "omega_postgres.py",
+      "sha256": "d1d4960b11a23ecf34fad017ec670c117c96fffb44a2adfb61550c3c24b38d8e",
+      "bytes": 4768
+    },
+    {
+      "path": "omega_postgres_audit.py",
+      "sha256": "7b5d21f8f7c755567d45a1367f1588099bac3cef15bea41e8c7deda05958ed77",
+      "bytes": 3669
+    },
+    {
+      "path": "omega_postgres_integrity.py",
+      "sha256": "2f1cc977f241cfbd7482c9f21602a318595872ebe7acdce6922b23b77e653b88",
+      "bytes": 2964
+    },
+    {
+      "path": "omega_postgres_reader.py",
+      "sha256": "a3ee636ca70b492bdb09fa81d216e24bbd6c319d3f4ac81c4dd241c70a462d2b",
+      "bytes": 2648
+    },
+    {
+      "path": "omega_queue.py",
+      "sha256": "5f96ef5f3def20d8e84626544ce11f9da579d27f2ed237513d1f98cf6a6a1c57",
+      "bytes": 6848
+    },
+    {
+      "path": "omega_scope.py",
+      "sha256": "7ed0bfff452b8b69d91a604bcb8831012ba0ee4a7b9160414af96367967981f1",
+      "bytes": 2214
+    },
+    {
+      "path": "omega_tasks.py",
+      "sha256": "c9f5f2a54937ab5dd3836a076939315d6f3c3f0d686a532cfd82fdd3a1ffed1d",
+      "bytes": 4824
+    },
+    {
+      "path": "omega_verify.py",
+      "sha256": "fc0e198e25689f20b531a70d629b87fb6ae80e54dcd02baebd241ec0f4f43412",
+      "bytes": 1172
+    },
+    {
+      "path": "omega_worker.py",
+      "sha256": "515a88589e8b0d1c8ada1e0ad481b4868d7d886a5fb9a46ee43396677a955bee",
+      "bytes": 1196
+    },
+    {
+      "path": "orba_billing.py",
+      "sha256": "e408df44a5c6690e476b03f2610adae70c78f011d3a2e36a2ab1a2cd733c0402",
+      "bytes": 4562
+    },
+    {
+      "path": "orba_play_bridge.py",
+      "sha256": "dd2826cad9c932a2d728ab62216f5e7444b1f94e98793aee78ffc6d24355454f",
+      "bytes": 4491
+    },
+    {
+      "path": "postgres_audit_schema.sql",
+      "sha256": "662589a916a04ae3d5c42513a97e66e784a2ddb3074c0fa8b58e28d46f58c529",
+      "bytes": 926
+    },
+    {
+      "path": "postgres_schema.sql",
+      "sha256": "4f2559128736cf0519701b6f7642206923dd923f8215dd3312b931c5a7a16caf",
+      "bytes": 1081
+    },
+    {
+      "path": "scope.yaml",
+      "sha256": "ee02f0fe1e0a95896e530817e34e71e84f29f672b00d082ae2e91a24ab56418b",
+      "bytes": 172
+    },
+    {
+      "path": "tests/test_anchor_store.py",
+      "sha256": "69fa726aa56e7fac193fcb2ea87c4e2144eb6430b35ce475ccafaa1dda5bc010",
+      "bytes": 3422
+    },
+    {
+      "path": "tests/test_api.py",
+      "sha256": "94db346ee519029353fa29a5ffb63a2d480a56e41541a6d6230770bd09ad54f3",
+      "bytes": 2793
+    },
+    {
+      "path": "tests/test_atomic_worker.py",
+      "sha256": "b57b6f850704c81bf631da29ee1489de98813a2e4233a71d2befec7e9e55fc4f",
+      "bytes": 3524
+    },
+    {
+      "path": "tests/test_audit_api.py",
+      "sha256": "60a83b4a2de56bd521b4145dbe687c4408958c3042689646eda02a142c7c0ee5",
+      "bytes": 3304
+    },
+    {
+      "path": "tests/test_audit_chain.py",
+      "sha256": "60b34982dfcf8876d7e4199b79de7325bb1f0cd0410e030900e9a6efa0ca7964",
+      "bytes": 2473
+    },
+    {
+      "path": "tests/test_audit_checkpoint.py",
+      "sha256": "3840e2effe59d62046eee5432e3a954e4dcda19be499c661e235033aba199cfc",
+      "bytes": 2712
+    },
+    {
+      "path": "tests/test_audited_worker.py",
+      "sha256": "8a7ef82feba60d31b65d15c9a5b818c24cd6cf0663c1b3ed8fb0ad76a1969268",
+      "bytes": 2195
+    },
+    {
+      "path": "tests/test_checkpoint_registry.py",
+      "sha256": "1b8fe49226882c9ec1ceae82f68cab2649b28cf7bc49705e33c2d130f0b56023",
+      "bytes": 2755
+    },
+    {
+      "path": "tests/test_manifest.py",
+      "sha256": "5b6e3183899b6ae4c77b217af43344a4fac54753e3b9a293b779b4a672b62cad",
+      "bytes": 1380
+    },
+    {
+      "path": "tests/test_mcp_hardening.py",
+      "sha256": "93c29e5ec6191e1bfe8b201dd6f2d371065ac82712601d80509d017aaba331cf",
+      "bytes": 3220
+    },
+    {
+      "path": "tests/test_mcp_local.py",
+      "sha256": "4ef7cdc5245fb11028ae06c97757b61b2d9389c4c0bf405098995abd7e3d2294",
+      "bytes": 1450
+    },
+    {
+      "path": "tests/test_mcp_subprocess.py",
+      "sha256": "a54d66861f6d6acb86ad494c319d6f92e943176f5c2ebf1fd01fba4d83153864",
+      "bytes": 2199
+    },
+    {
+      "path": "tests/test_mcp_v7.py",
+      "sha256": "f5cd2def4315ad8a25aa71c51b1c1f92067c4339ff071a6970791f1a41ecfdd3",
+      "bytes": 933
+    },
+    {
+      "path": "tests/test_orba_billing.py",
+      "sha256": "8e800c42377ac53c43c4a750a7b3f85ffe40bef661f329e3ab154de1b6241a9a",
+      "bytes": 3172
+    },
+    {
+      "path": "tests/test_orba_play_bridge.py",
+      "sha256": "2e9b31ec8322311ac8ffd54add14e30c4a3a8ac35dc675790854dabbb93c89d8",
+      "bytes": 3637
+    },
+    {
+      "path": "tests/test_pg_test_guard.py",
+      "sha256": "343dc61529cfcf252f4da3283e9a34dd8e7dc89d4e48238edd3351fc96001d6d",
+      "bytes": 2315
+    },
+    {
+      "path": "tests/test_pipeline.py",
+      "sha256": "32bde940fec4a53f34c9c50808794a60a20439c1270225d8f669cbfd8e2287e6",
+      "bytes": 2628
+    },
+    {
+      "path": "tests/test_plan_binding.py",
+      "sha256": "a27d51530a9687bdc873ae8a5f84e554fe7446a8b4e738822fdbc12e6c301066",
+      "bytes": 2439
+    },
+    {
+      "path": "tests/test_policy.py",
+      "sha256": "749f9d2ef046c5fe7d908d4d842d87d6a256377f1ed8e0323dd25e565cd40e83",
+      "bytes": 2417
+    },
+    {
+      "path": "tests/test_postgres.py",
+      "sha256": "5385ade4de2bfea63d1e59f609f58e0951e5c023b47009b89afefbd2fa49c4bb",
+      "bytes": 2838
+    },
+    {
+      "path": "tests/test_postgres_api_contract.py",
+      "sha256": "148d92ef1871a73b6b700795bb890f9f54ef6a5565c27c41576beffb987d9f6f",
+      "bytes": 4083
+    },
+    {
+      "path": "tests/test_postgres_audit.py",
+      "sha256": "e55630d3747867d0c7b93df52fa0bb761afd32c40ad73cc601efbf7df7bfef0c",
+      "bytes": 4268
+    },
+    {
+      "path": "tests/test_postgres_audit_live.py",
+      "sha256": "7ddbc748bc243693db301cff587237367e4db320b66d69cd59a9dc3a46da6a39",
+      "bytes": 4904
+    },
+    {
+      "path": "tests/test_postgres_integrity.py",
+      "sha256": "e4e0f646aee1f0b4be73b631976fb244dab3210d430135b85a496ba85cbf8519",
+      "bytes": 3135
+    },
+    {
+      "path": "tests/test_postgres_live.py",
+      "sha256": "6d048cf9f10f39151a47401f4c8076ed90e5b3433946ea858796145fa97f1333",
+      "bytes": 4001
+    },
+    {
+      "path": "tests/test_postgres_reader.py",
+      "sha256": "6d05eb5e6c0589e6c60b1114152bc72cf1797e69b99b6faa04ed27677a752c5a",
+      "bytes": 3694
+    },
+    {
+      "path": "tests/test_queue.py",
+      "sha256": "c3d7dd781b17e9f87ec8863d5f88d90d6ea8f377194b82ddc3fc83dc9f307ee1",
+      "bytes": 3035
+    },
+    {
+      "path": "tests/test_queue_api.py",
+      "sha256": "6e3716bf94c385ceef8a57eb86692fa6ba497daabf6581829a5a1627baebb2d1",
+      "bytes": 2718
+    },
+    {
+      "path": "tests/test_scope.py",
+      "sha256": "1b6570ae1b3ba90f7257530bb604a0fa3de5d16a494b0ba597fd942702885819",
+      "bytes": 1544
+    },
+    {
+      "path": "tests/test_task_owner_api.py",
+      "sha256": "f803ea160d0ede16e99faa41883db1e4c4e3fab37f496c36fd6df428922d85de",
+      "bytes": 2499
+    },
+    {
+      "path": "tests/test_tasks.py",
+      "sha256": "86140b3672885f21abeba35caf34c06765a481e13785e556a314de96138401c4",
+      "bytes": 2105
+    },
+    {
+      "path": "tests/test_verify.py",
+      "sha256": "b4ffb62a8a18f85ab2e0beae6ba44e27df218252e42b58afbe14d1bab2743698",
+      "bytes": 1091
+    },
+    {
+      "path": "tests/test_worker.py",
+      "sha256": "a24e8d9ada343dbf0b51ee91fe22619fe6be1250bc217d172789abb6872adb4a",
+      "bytes": 2255
+    }
+  ]
+}
