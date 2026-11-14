@@ -1,0 +1,36 @@
+name: OMEGA Deployment Preflight Tests
+
+on:
+  push:
+    paths:
+      - 'scripts/omega_deployment_attestation.py'
+      - 'tests/test_omega_deployment_attestation.py'
+      - '.github/workflows/omega-deployment-preflight.yml'
+  pull_request:
+    paths:
+      - 'scripts/omega_deployment_attestation.py'
+      - 'tests/test_omega_deployment_attestation.py'
+      - '.github/workflows/omega-deployment-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run fail-closed preflight regressions
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_omega_deployment_attestation.py' -v
+      - name: Assert that preflight never grants production approval
+        run: |
+          python - <<'PY'
+          from scripts.omega_deployment_attestation import evaluate
+          result = evaluate({}, '.')
+          assert result['production_accepted'] is False
+          assert result['production_admission'] == 'DENIED_UNVERIFIED_ATTESTATION'
+          print('PREFLIGHT_DENY_ONLY=PASS')
+          PY
