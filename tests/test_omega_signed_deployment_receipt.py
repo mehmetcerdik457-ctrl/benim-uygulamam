@@ -76,6 +76,22 @@ class SignedDeploymentReceiptTests(unittest.TestCase):
         with self.assertRaises(ReceiptError):
             self.verify()
 
+    def test_tampered_smoke_digest_rejected(self):
+        self.receipt["smoke_sha256"] = "e" * 64
+        with self.assertRaises(ReceiptError):
+            self.verify()
+
+    def test_tampered_rollback_digest_rejected(self):
+        self.receipt["rollback_sha256"] = "e" * 64
+        with self.assertRaises(ReceiptError):
+            self.verify()
+
+    def test_swapped_role_signatures_rejected(self):
+        self.receipt["owner_signature"], self.receipt["auditor_signature"] = (
+            self.receipt["auditor_signature"], self.receipt["owner_signature"])
+        with self.assertRaises(ReceiptError):
+            self.verify()
+
     def test_missing_signature_rejected(self):
         del self.receipt["auditor_signature"]
         with self.assertRaises(ReceiptError):
