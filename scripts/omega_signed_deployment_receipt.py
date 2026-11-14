@@ -4,6 +4,7 @@ Keys must be supplied from an independently trusted source. A valid signature
 authenticates a receipt, NOT the truth of the deployment or test assertions.
 """
 import base64
+import binascii
 import json
 import re
 from pathlib import Path
@@ -61,7 +62,7 @@ def verify_receipt(receipt, owner_key_pem, auditor_key_pem, *, commit, artifact_
             if len(sig) != 64:
                 raise ReceiptError("invalid signature length")
             key.verify(sig, message)
-    except (ValueError, TypeError, InvalidSignature, KeyError) as exc:
+    except (ValueError, TypeError, binascii.Error, InvalidSignature, KeyError) as exc:
         raise ReceiptError("receipt signature verification failed") from exc
     return {"authenticated": True, "deployment_id": receipt["deployment_id"],
             "environment": environment, "production_accepted": False}
