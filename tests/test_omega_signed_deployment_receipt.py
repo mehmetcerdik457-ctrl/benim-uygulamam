@@ -71,6 +71,11 @@ class SignedDeploymentReceiptTests(unittest.TestCase):
         with self.assertRaises(ReceiptError):
             self.verify()
 
+    def test_malformed_base64_signature_rejected(self):
+        self.receipt["owner_signature"] = "!!!not-base64!!!"
+        with self.assertRaises(ReceiptError):
+            self.verify()
+
     def test_missing_signature_rejected(self):
         del self.receipt["auditor_signature"]
         with self.assertRaises(ReceiptError):
