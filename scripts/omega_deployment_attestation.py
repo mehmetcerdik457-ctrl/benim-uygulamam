@@ -48,7 +48,8 @@ def evaluate(record, evidence_root):
         elif _sha256(candidate) != digest.lower():
             findings.append("artifact SHA-256 mismatch")
     pg = record.get("postgres_tests")
-    if (not isinstance(pg, dict) or any(type(pg.get(k)) is not int for k in ("historical_skips_executed", "failed", "skipped"))\n            or pg["historical_skips_executed"] != 16 or pg["failed"] != 0 or pg["skipped"] != 0):
+    if (not isinstance(pg, dict) or any(type(pg.get(k)) is not int for k in ("historical_skips_executed", "failed", "skipped"))
+            or pg["historical_skips_executed"] != 16 or pg["failed"] != 0 or pg["skipped"] != 0):
         findings.append("16 PostgreSQL tests not fully evidenced")
     for field in ("owner_approval", "auditor_approval", "deployment_receipt", "rollback_receipt", "billing_receipt"):
         if not isinstance(record.get(field), dict) or not record[field]:
