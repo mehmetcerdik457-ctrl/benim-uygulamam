@@ -1,0 +1,46 @@
+name: Railway Offline Predeploy Evidence
+
+on:
+  push:
+    branches:
+      - integration/railway-predeploy-offline-proof-20261025
+  pull_request:
+    branches:
+      - real-ai-backend-p1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-predeploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      # Dummy placeholders only: NEVER read real Railway/OpenAI secrets in this job.
+      OPENAI_API_KEY: unit-test-only-not-a-real-key
+      AI_BACKEND_PROXY_TOKEN: unit-test-only-not-a-real-token
+      OPENAI_MODEL: gpt-5.6-luna
+      OPENAI_ALLOWED_MODELS: gpt-5.6-luna
+      MAX_OUTPUT_TOKENS: "32"
+    steps:
+      - name: Exact source checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax and existing security self-test
+        run: |
+          python -m compileall -q backend tests scripts
+          python scripts/security_selftest.py
+      - name: Test the existing staged Railway expression against real source
+        run: python -m unittest discover -s tests -p 'test_railway_staged_predeploy_offline.py' -v
+      - name: Mark actual provider and production deployment not tested
+        if: always()
+        run: |
+          echo "RAILWAY_PREDEPLOY_TEST_SCOPE=OFFLINE_SOURCE_ONLY"
+          echo "LIVE_OPENAI_PROVIDER=NOT_TESTED"
+          echo "RAILWAY_PRODUCTION_DEPLOY=NOT_PERFORMED"
