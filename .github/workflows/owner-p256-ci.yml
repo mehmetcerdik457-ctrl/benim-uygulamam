@@ -4,11 +4,13 @@ on:
     branches:
       - fix/owner-p256-failclosed-20261101
       - real-ai-backend-p1
+      - integration/kral-omega-runtime-20261117
   pull_request:
     paths:
       - 'backend/**'
       - 'tests/**'
       - 'requirements.txt'
+      - 'scripts/omega_provider_acceptance.py'
       - 'docs/OWNER_P256_BACKEND_CONTRACT.md'
       - '.github/workflows/owner-p256-ci.yml'
   workflow_dispatch:
@@ -28,7 +30,17 @@ jobs:
         run: python -m pip install -r requirements.txt pytest
       - name: Compile and test
         run: |
+          set -o pipefail
+          mkdir -p build/runtime-evidence
           python -m compileall -q backend tests scripts
-          python -m pytest -q tests/test_owner_p256.py tests/test_owner_chat_http.py tests/test_backend_contract.py tests/test_kral_ai_adapter.py tests/test_predeploy_gate.py
-          python scripts/security_selftest.py
+          python -m pytest -q tests --junitxml=build/runtime-evidence/tests.xml 2>&1 | tee build/runtime-evidence/tests.log
+          python scripts/security_selftest.py | tee build/runtime-evidence/security-selftest.log
+          git rev-parse HEAD > build/runtime-evidence/source-commit.txt
+      - name: Upload runtime validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kral-omega-runtime-tests
+          path: build/runtime-evidence/
+          if-no-files-found: error
 

@@ -1,0 +1,59 @@
+{
+  "source_repository": "https://github.com/mehmetcerdik457-ctrl/Gpt-asistan",
+  "source_commit": "c5ff163227ac9c52e15f6affd9bb60fb19cf03fb",
+  "runtime_base_commit": "400f319d953f732b4b767c9a229472088dff095a",
+  "private_omega_equivalence": false,
+  "files": [
+    {
+      "source_path": "server/__init__.py",
+      "source_sha256": "b141cff6fd7223f061bf1b734185800fa0cc94769a74420cfedef4aee8a775ed",
+      "destination_path": "backend/omega/__init__.py",
+      "destination_sha256": "b141cff6fd7223f061bf1b734185800fa0cc94769a74420cfedef4aee8a775ed",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/enroll.py",
+      "source_sha256": "2260880ddeefe84f3e85af9619446228a63200f578a0a2c6e51918256ffa150e",
+      "destination_path": "backend/omega/enroll.py",
+      "destination_sha256": "2260880ddeefe84f3e85af9619446228a63200f578a0a2c6e51918256ffa150e",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/gateway.py",
+      "source_sha256": "a33a0b44426499833ce69ccc9c86b976021194eb07d925909907132e75e23f03",
+      "destination_path": "backend/omega/gateway.py",
+      "destination_sha256": "a33a0b44426499833ce69ccc9c86b976021194eb07d925909907132e75e23f03",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/idempotency.py",
+      "source_sha256": "c69a05eac6fd40a1d22774c24476a3872852cc6bb88b3f629ed159dd23a8d588",
+      "destination_path": "backend/omega/idempotency.py",
+      "destination_sha256": "c69a05eac6fd40a1d22774c24476a3872852cc6bb88b3f629ed159dd23a8d588",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/kral_memory.py",
+      "source_sha256": "5d47b909cb815dc0de3afd5aa152f54b9b233035f0e6da71969ce1a8c414c978",
+      "destination_path": "backend/omega/kral_memory.py",
+      "destination_sha256": "5d47b909cb815dc0de3afd5aa152f54b9b233035f0e6da71969ce1a8c414c978",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/owner_auth_v1.py",
+      "source_sha256": "8784a9217277b27a8bc69a19a0d8ebf4a76662eff7a12d82eeb534d46bc1327f",
+      "destination_path": "backend/omega/owner_auth_v1.py",
+      "destination_sha256": "8784a9217277b27a8bc69a19a0d8ebf4a76662eff7a12d82eeb534d46bc1327f",
+      "byte_identical": true
+    },
+    {
+      "source_path": "server/owner_workers.py",
+      "source_sha256": "42d9509ff4d7a1ad715591bbb38c4d2920c51c6fc9af819c52870e15d271984c",
+      "destination_path": "backend/omega/owner_workers.py",
+      "destination_sha256": "42d9509ff4d7a1ad715591bbb38c4d2920c51c6fc9af819c52870e15d271984c",
+      "byte_identical": true
+    }
+  ],
+  "adapter": "backend/omega_bridge.py",
+  "authorization": "User-directed reuse of existing source in the same GitHub account; no third-party APK keys used"
+}

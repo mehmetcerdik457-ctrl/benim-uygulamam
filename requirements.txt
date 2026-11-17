@@ -1,2 +1,3 @@
 # P1 backend cryptographic owner proof; no secrets in source.
 cryptography>=44,<47
+sqlite-vec==0.1.6

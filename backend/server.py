@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 import owner_p256
+import omega_bridge
 
 VERSION = "0.1.0"
 OPENAI_URL = "https://api.openai.com/v1/responses"
@@ -198,7 +199,7 @@ def call_openai(
     return result["text"], result["model"], result["responseId"]
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(omega_bridge.OmegaRoutes, BaseHTTPRequestHandler):
     server_version = "MEHMET-AI-Backend/" + VERSION
 
     def _send(self, status: int, payload: dict[str, Any], request_id: str | None = None) -> None:
@@ -304,6 +305,8 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, {"error": "NOT_FOUND"})
 
     def do_POST(self) -> None:
+        if self.handle_omega():
+            return
         path = self.path.split("?", 1)[0]
         request_id = str(uuid.uuid4())
 
@@ -482,6 +485,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    # New durable owner nonce/data stores and SQLite WAL files are private.
+    os.umask(0o077)
     port = int(os.getenv("PORT", "8080"))
     print(
         json.dumps(
