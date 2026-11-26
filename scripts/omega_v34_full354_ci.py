@@ -24,29 +24,7 @@ DEST = ROOT / "v34_source_run"
 ARCHIVE = ROOT / "evidence" / "omega_v34_sourceonly.tar.br.b64"
 MANIFEST = ROOT / "evidence" / "omega_v34_source_manifest.json"
 ORIGINAL_QUEUE_HASH = "d1d4960b11a23ecf34fad017ec670c117c96fffb44a2adfb61550c3c24b38d8e"
-PATCHED_QUEUE_HASH = "3a8a40089a6f9d2a72c2ffb220052cdf427d8677897f936fc5fb4eec5f22c88a"
 ALLOWED_DSN = "postgresql://omega_v34:ci-ephemeral-only@127.0.0.1:5432/omega_test_v34"
-
-OLD = """        with self.db.transaction():
-            row = self.db.execute('''UPDATE omega_jobs SET status=%s,token=NULL,expires=NULL
-                WHERE id=%s AND token=%s AND status='LEASED' AND expires>now()
-                RETURNING id''', ('DONE' if success else 'FAILED', ident, token)).fetchone()
-            if not row:
-                raise PermissionError('invalid or expired lease')
-"""
-NEW = """        try:
-            with self.db.transaction():
-                row = self.db.execute('''UPDATE omega_jobs SET status=%s,token=NULL,expires=NULL
-                    WHERE id=%s AND token=%s AND status='LEASED' AND expires>now()
-                    RETURNING id''', ('DONE' if success else 'FAILED', ident, token)).fetchone()
-                if not row:
-                    raise PermissionError('invalid or expired lease')
-        except Exception as exc:
-            # SQLSTATE 22P02: reject malformed UUID lease tokens; other errors stay intact.
-            if getattr(exc, 'sqlstate', None) == '22P02':
-                raise PermissionError('invalid or expired lease') from exc
-            raise
-"""
 
 
 def verify_environment(mode: str) -> None:
@@ -117,15 +95,10 @@ def reconstruct() -> None:
 
 
 def apply_candidate_fix() -> None:
-    path = DEST / "omega_postgres.py"
-    source = path.read_text("utf-8")
-    if source.count(OLD) != 1:
-        raise RuntimeError("patch anchor is absent or ambiguous")
-    corrected = source.replace(OLD, NEW).encode("utf-8")
-    if hashlib.sha256(corrected).hexdigest() != PATCHED_QUEUE_HASH:
-        raise RuntimeError("V34 candidate checksum mismatch")
-    path.write_bytes(corrected)
-    print("V34_PATCHED_QUEUE_SHA256=" + PATCHED_QUEUE_HASH, flush=True)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from omega_postgres_uuid_patch import apply
+    digest = apply(DEST / "omega_postgres.py", ORIGINAL_QUEUE_HASH)
+    print("V34_PATCHED_QUEUE_SHA256=" + digest, flush=True)
 
 
 def execute(mode: str) -> None:
