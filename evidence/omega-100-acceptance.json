@@ -1,0 +1,506 @@
+{
+  "schema": "omega.acceptance.v1",
+  "notice": "No production acceptance; original specification remains authoritative. SHA256 does not prove author identity.",
+  "requirements": [
+    {
+      "id": "OMEGA-001",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-002",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-003",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-004",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-005",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-006",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-007",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-008",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-009",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-010",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-011",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-012",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-013",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-014",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-015",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-016",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-017",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-018",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-019",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-020",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-021",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-022",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-023",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-024",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-025",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-026",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-027",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-028",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-029",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-030",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-031",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-032",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-033",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-034",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-035",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-036",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-037",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-038",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-039",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-040",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-041",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-042",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-043",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-044",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-045",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-046",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-047",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-048",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-049",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-050",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-051",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-052",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-053",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-054",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-055",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-056",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-057",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-058",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-059",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-060",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-061",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-062",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-063",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-064",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-065",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-066",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-067",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-068",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-069",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-070",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-071",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-072",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-073",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-074",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-075",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-076",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-077",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-078",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-079",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-080",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-081",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-082",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-083",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-084",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-085",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-086",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-087",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-088",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-089",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-090",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-091",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-092",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-093",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-094",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-095",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-096",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-097",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-098",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-099",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    },
+    {
+      "id": "OMEGA-100",
+      "status": "BLOCKED",
+      "reason": "Independent per-requirement acceptance evidence, owner authorization and production integration have not been verified"
+    }
+  ]
+}
