@@ -506,16 +506,16 @@
   "implementation_test_evidence": [
     {
       "suite": "V30 original PostgreSQL suite",
-      "run_id": "45905502091",
-      "commit": "44aaa8600e3f80675fa7269e7075ffe230bfe9cc",
+      "run_id": "45905631419",
+      "commit": "f29f76ec2e4f79245a106e2bfddbde82a1ea2548",
       "result": "297_PASS_0_SKIP",
       "canonical_patch_sha256": "125c69fbdce826631f76aba5f1a76cdfcd07915b5cd9dc1bccf6d1b544fb2779",
       "scope": "isolated PostgreSQL 16 CI; no production acceptance"
     },
     {
       "suite": "V34 original PostgreSQL suite",
-      "run_id": "45905502020",
-      "commit": "44aaa8600e3f80675fa7269e7075ffe230bfe9cc",
+      "run_id": "45905631554",
+      "commit": "f29f76ec2e4f79245a106e2bfddbde82a1ea2548",
       "result": "354_PASS_0_SKIP",
       "canonical_patch_sha256": "125c69fbdce826631f76aba5f1a76cdfcd07915b5cd9dc1bccf6d1b544fb2779",
       "scope": "isolated non-superuser PostgreSQL 16 CI; no production acceptance"

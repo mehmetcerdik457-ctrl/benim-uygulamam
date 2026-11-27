@@ -1,0 +1,507 @@
+{
+  "schema": "omega.requirement.fingerprints.v1",
+  "source": "Original 100-step spec; contents intentionally omitted from public repo",
+  "normalization": "sha256 exact UTF-8 requirement text without normalization",
+  "requirements": [
+    {
+      "id": "OMEGA-001",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "e7996a9da3de32805c5b7b7efbe3b08563d730c45b8aac18a9c0a536f78dd2a5"
+    },
+    {
+      "id": "OMEGA-002",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "df4e45676b3c287cfe821508a78d84d875a42922e337301851f23260b1892c5c"
+    },
+    {
+      "id": "OMEGA-003",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "e9eab179e29bf2ce6d1004cb7d808fd9f6913cc88010eebb1f119c22e34282b5"
+    },
+    {
+      "id": "OMEGA-004",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "c74c3b6df461beac7dbc8cc0c3efff70e54d79145437cefa5398bb0a426743e5"
+    },
+    {
+      "id": "OMEGA-005",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "214cacec8a43b3dc565795a5d1ae7f961c360355e463b2b96cd16a77909876a9"
+    },
+    {
+      "id": "OMEGA-006",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "6e42e432e703bc3dd34da5f534f2e19e1c9e4f98f34929004fb848dfb79efd17"
+    },
+    {
+      "id": "OMEGA-007",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "90a1b4e268c435e96108d7e65dd2cdf4e387066b7103abe88a61945454b59d68"
+    },
+    {
+      "id": "OMEGA-008",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "8584333285c39daa39d3eb6525280aa1a970fdbc800835707662b46832c8c7bc"
+    },
+    {
+      "id": "OMEGA-009",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "0aecb30462c5ded7854ea8d595d52b4c7f54f140f105724b8c2a549b038b010c"
+    },
+    {
+      "id": "OMEGA-010",
+      "phase": "FAZ 0 — PROJE KEŞFİ VE TEMEL YÖNETİŞİM",
+      "description_sha256": "13662c49da41c8a744ca98d6ba28fe43389dbd889b9995096ec73c101c73da66"
+    },
+    {
+      "id": "OMEGA-011",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "06f1ae2c6807b77a89abf83a8e31b4ff687cb3af00e774ab2cc9dbf376096874"
+    },
+    {
+      "id": "OMEGA-012",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "b1c634d849bd51d388f2d8b75cd326d532f34701e1dccdb12af1c3feaf38d77a"
+    },
+    {
+      "id": "OMEGA-013",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "8fb292d3e7bb57624ad858e836c0530fc08c23637319c1509358d4be71e4eff0"
+    },
+    {
+      "id": "OMEGA-014",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "6bbead7ddcfbd09dcf1b38b3e20ad82a999e8879c49f2c9c84ed90351bad593b"
+    },
+    {
+      "id": "OMEGA-015",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "20a20fd5205d9aa1d7dec58790a4da2ff6c9b43cc960899563d1f1498c6721d6"
+    },
+    {
+      "id": "OMEGA-016",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "85aacddffa3171e0c97bdcbc6c7fb1e732212d97638e5ba9b748871f727c167c"
+    },
+    {
+      "id": "OMEGA-017",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "0fdbb24d6cfca051e5d6906a2a02ac3fa21163feab1ab54088637e7a6558d3a1"
+    },
+    {
+      "id": "OMEGA-018",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "4b785f700cc0968a789d35a836f4e276ba317d8a33989a2e989a9f1eb71860ee"
+    },
+    {
+      "id": "OMEGA-019",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "bebe26e3b93e8eb3cf026b7ad2269b83f017fd7c9b3c6387c14fee3e72e6fe0d"
+    },
+    {
+      "id": "OMEGA-020",
+      "phase": "FAZ I — DİJİTAL ENVANTER VE GÜVENLİ VERİ KEŞFİ",
+      "description_sha256": "d3dec78495bfc79c983b5b050eb5d64d2b8d51ccfa89cf512302dcaf57a821d6"
+    },
+    {
+      "id": "OMEGA-021",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "6f8496b806d16a157164460b9b81c7cab63d39dd1dad327f72bc30f1c2e5248a"
+    },
+    {
+      "id": "OMEGA-022",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "04b6f678c7ee8b2f26cb2d68cf1ed0b2e3f031b6ad665de26eaeb3dfbda7ba44"
+    },
+    {
+      "id": "OMEGA-023",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "ff2c97791c4102c4a44f3015e8fcb51de8ccb50e2710d1c1298a0d675789cf6f"
+    },
+    {
+      "id": "OMEGA-024",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "392d587aa0dacba39eff926bace0638141806a5b0c6575dc8e9c0096f06f3886"
+    },
+    {
+      "id": "OMEGA-025",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "40f799ff4cecd0eafe4808bdda0cd407b85d8eadf4253d3f12c123725db2d148"
+    },
+    {
+      "id": "OMEGA-026",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "e774432643037372caeea3645d2f2c18568203da6bf5758c39b09c3af41d3a4e"
+    },
+    {
+      "id": "OMEGA-027",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "9aac210c776dac7c6e90e1505e476f930881c36322e81cb7a310944bd9afb2b3"
+    },
+    {
+      "id": "OMEGA-028",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "fcc715e4baebeb6f1b4b790c65d5bc227c8dfa20e96a0192f0cfad4f8f752f39"
+    },
+    {
+      "id": "OMEGA-029",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "5b2c83a0e7902c404a7b23fdc7c7425071e984eb8520aadd5e47c726f79e7016"
+    },
+    {
+      "id": "OMEGA-030",
+      "phase": "FAZ II — GÜVENLİ KASA VE KİMLİK YÖNETİMİ",
+      "description_sha256": "64deab6a90792400f193e4d97ace1b65bf9c11c23d3a241e3c01fe44f304c20a"
+    },
+    {
+      "id": "OMEGA-031",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "f7d98878ee6a1d636455c8f95a61f6509fa238c03afd978184ae538e280418b8"
+    },
+    {
+      "id": "OMEGA-032",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "bf1601dd94714faf6c022dd2a839575cc64e12c9658f9d80956125e2876968af"
+    },
+    {
+      "id": "OMEGA-033",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "8b2abc22069c63a80bf9e41be25141dee80de36afba55f107e89200593a3ac9f"
+    },
+    {
+      "id": "OMEGA-034",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "30a02eb8ac1abfb3784f8ce819bfe664fd8d683af2e134a121052e16248da756"
+    },
+    {
+      "id": "OMEGA-035",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "7784ad6f58a49b27d7d7b98153ace57f39af2ea96735b99e3160b743bdefd31d"
+    },
+    {
+      "id": "OMEGA-036",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "9ac789d906c0e1ca05224c9ba7dd47582840e10ebb4e8beef77912dff64978f6"
+    },
+    {
+      "id": "OMEGA-037",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "861d99ab19a58656e5937056e3520a98f9d473a998a45c99c66d10b5f66acbde"
+    },
+    {
+      "id": "OMEGA-038",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "9ba99cb942d25d5576e8307c2f350440659a4f5d698e7d89abb9ef581cd6f77a"
+    },
+    {
+      "id": "OMEGA-039",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "6d3b22b11f05ca2db2389a3734d38334b2538f8618ba0350ffb4ec565219fb6a"
+    },
+    {
+      "id": "OMEGA-040",
+      "phase": "FAZ III — BİLGİ KATMANI VE UZUN SÜRELİ HAFIZA",
+      "description_sha256": "1403b284c5fbf9d3d34903a3991b42867daacf3f2219ab44188721d1cabd7f66"
+    },
+    {
+      "id": "OMEGA-041",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "e984bda5c5142db8d9181b02e0c85dda43a7a9203ae69d3aa2cca1f49538cef6"
+    },
+    {
+      "id": "OMEGA-042",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "49f93c2e65e01c188d5896ebeb197b131423d085aa32e6a56ac24a777380cd0f"
+    },
+    {
+      "id": "OMEGA-043",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "1447c0c8335c24b16b70be97dae96e0e162f58ab6defff1e31a92bc7efffd6bf"
+    },
+    {
+      "id": "OMEGA-044",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "c25d3cba1d84204ccd473420d10fe77d5d82ce16a7cfcae31ea5b9cf744a44b3"
+    },
+    {
+      "id": "OMEGA-045",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "97f6069d3938b12141ac194f047405908cf694ee2b9c7086cb037bc48417a8a0"
+    },
+    {
+      "id": "OMEGA-046",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "ed0627db3c7ef6454e462bc1dc6b25be838390cbd56928ac2bb38143305ab7fb"
+    },
+    {
+      "id": "OMEGA-047",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "d069cb5c39107c1fbe969a6a834f345feb4c2d5bf9c6d55ae8ce5c80deee81b0"
+    },
+    {
+      "id": "OMEGA-048",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "b9c78958a75034d411aea853d2388fa858994e9fa9de93dc9edf136d60275173"
+    },
+    {
+      "id": "OMEGA-049",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "712b48cbc6ba8e7eb3409fe987b8d9203b736c24fa15219db07e4df01919dccf"
+    },
+    {
+      "id": "OMEGA-050",
+      "phase": "FAZ IV — YEREL YAPAY ZEKÂ VE MODEL ROUTER",
+      "description_sha256": "585c7a29fbf0488694273c09c8ae839048489a48f640cd14a69afcd65c189ff9"
+    },
+    {
+      "id": "OMEGA-051",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "4b83916277c1fb72255df74a419c3737968c7c1e03e73d76b55151106f9836a4"
+    },
+    {
+      "id": "OMEGA-052",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "d460a377d17b0e19ba4b4ec9974e72d7f9acd7c6998eeedd16b273ddd4081922"
+    },
+    {
+      "id": "OMEGA-053",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "058df59fbe562da70a9373c54ac2bf38444a20ddcbc6e1009a75f32e2bb40d6d"
+    },
+    {
+      "id": "OMEGA-054",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "f01c9f550e1bee1994ba85bb354e152a7b57e488965b8877416a24aa85a27bf9"
+    },
+    {
+      "id": "OMEGA-055",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "12f76b48b0f0f4d1dad17116cf2ac40e79b34b17917b0e3d20de849b12600b3d"
+    },
+    {
+      "id": "OMEGA-056",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "1a57c43aab6a04c3c55c1632fcffeb66a5859b11d5c1998f86ec68ee97b2fe3a"
+    },
+    {
+      "id": "OMEGA-057",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "62aeae17e4f1ce6a8c8dee172e55254e1a950f17aa08e172216641f63666f047"
+    },
+    {
+      "id": "OMEGA-058",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "8bdbb38ca6e2783a073983653e4a8f139ff1983962f854c7c713e7d51afd5de2"
+    },
+    {
+      "id": "OMEGA-059",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "c5cf2d8a2ade6433c3e7c6ccd92dcc1bf2d61cd0363025b5c9b870aeaa20344b"
+    },
+    {
+      "id": "OMEGA-060",
+      "phase": "FAZ V — BAŞ MÜFETTİŞ ORKESTRASYON ÇEKİRDEĞİ",
+      "description_sha256": "5ed3a97ff196158e0474b8c68cc363b4398ee945956505bcdef8d23a01474d43"
+    },
+    {
+      "id": "OMEGA-061",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "207f48989450bf0725329bbe8654c19834ea6c93b176e4b4ebedc95967ed7d14"
+    },
+    {
+      "id": "OMEGA-062",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "6af56a4e02032ea8693eedbddae0ed7d980f676bb110b679eba6022c7c7c7db9"
+    },
+    {
+      "id": "OMEGA-063",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "d6a3ae39fa6fba858ef312a1582848d0512451abc788f43f656d6457eb449c37"
+    },
+    {
+      "id": "OMEGA-064",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "0e045b89e2653de55748c37ba9168658c5851f615f23e1b0b5425f9c64a51831"
+    },
+    {
+      "id": "OMEGA-065",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "8b999233199959ad566ceb383e4ed371be3cbb68982af22abf73aa702a872669"
+    },
+    {
+      "id": "OMEGA-066",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "42e088fe32a43c3c21906d4ddf7e34feffaeaa5ffe9c8f9d8923910d2a674b4c"
+    },
+    {
+      "id": "OMEGA-067",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "1fa6ac095d7e5934e4440ebe03f0f267d858e95cb243a310d9cb01b833355932"
+    },
+    {
+      "id": "OMEGA-068",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "92dfacc4d787de1ba448d304b4e3136a81efcc5d37e956615a2001956609ad49"
+    },
+    {
+      "id": "OMEGA-069",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "9b9e544319d9814cb016e5c0c7a2105542dbc0fdb555739ee787f9271c533b06"
+    },
+    {
+      "id": "OMEGA-070",
+      "phase": "FAZ VI — GITHUB COPILOT VE KOD DENETİMİ",
+      "description_sha256": "80dc0776d68e08abc99f8c16b7cf31da43f98b8ceba5f9d899425d71652e4c74"
+    },
+    {
+      "id": "OMEGA-071",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "21439a56a9a46e2f18b034b36ab39d3c10f8100ae3b0e5ed454047a39d28241b"
+    },
+    {
+      "id": "OMEGA-072",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "b1dfbf630ba89872aac5f4737d7fdad2243618fe0cc45974a049faee79a1cce6"
+    },
+    {
+      "id": "OMEGA-073",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "1c8f364fe4eccd2dc2eee05f5273577bd187f308386eb437e671278e1450356d"
+    },
+    {
+      "id": "OMEGA-074",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "6591ebdb750ccb15f32fcb17e6470844e56c303683183dd26e2bc49529839b4d"
+    },
+    {
+      "id": "OMEGA-075",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "18b06ea4ff3cffd149d522e5dcb7de38c1cdff70f79e1c9ccdb42dbbc33ccf74"
+    },
+    {
+      "id": "OMEGA-076",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "193ebd6547b8643dd9e8dff7b14b77681ee84a928d674d3c0bbc785cdf576131"
+    },
+    {
+      "id": "OMEGA-077",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "621c358157af8058cfb48d9c27f25363475aa1f9b24c5c3b460e06118481ac85"
+    },
+    {
+      "id": "OMEGA-078",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "aa4c22638a19ae1f9a5c87ac985f8776d61b639ba134a5bbc6e34ceb291466f1"
+    },
+    {
+      "id": "OMEGA-079",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "c7d8897e2ac7560d15d19c7bb89785c43f7229b52f04fea3e7e64d585956da77"
+    },
+    {
+      "id": "OMEGA-080",
+      "phase": "FAZ VII — WEB YÖNETİM PANELİ",
+      "description_sha256": "d1e12eaf009b6bc55c73e346c0d2a5d869160455eeb517a9fe37db93f7177226"
+    },
+    {
+      "id": "OMEGA-081",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "31879cda0ed244ddce8adaa0e3b04db63172feb49c814f7e0ecd1de606690b68"
+    },
+    {
+      "id": "OMEGA-082",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "99fd3f588c748ab2d6306cf889c4a883ac6814d74a29114819e1f950862de6d8"
+    },
+    {
+      "id": "OMEGA-083",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "a726915dfd59d94227745388420ab2efb58e2420b0d1baf861efbb4fe461cc53"
+    },
+    {
+      "id": "OMEGA-084",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "ef34a3ceb66f608397ce80783bba6347e9e948258fc57ca4a8d5a7d5e9d74005"
+    },
+    {
+      "id": "OMEGA-085",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "325f10176bf5dccce6bba5f5ff058452b244945869f3fd520e899a9d8a54d0ba"
+    },
+    {
+      "id": "OMEGA-086",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "27d75ca575fd0d9093edf31397a3505fd5e8de8866f2d7812615bb1873ec9025"
+    },
+    {
+      "id": "OMEGA-087",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "80fff8babc0c536a7d8508f171f21786594be2dca459951482b81e7535295932"
+    },
+    {
+      "id": "OMEGA-088",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "f1f8cf0c915a9e268d511bbd8f2bd5655a8168f8985133189d7d79e7f8890b55"
+    },
+    {
+      "id": "OMEGA-089",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "2d879a80898408e9a14a7b49ad5a25c5378b1836ee9ede55feae5adfc5da9e9f"
+    },
+    {
+      "id": "OMEGA-090",
+      "phase": "FAZ VIII — GÜVENLİ OTONOMİ VE KALİTE DEĞERLENDİRMESİ",
+      "description_sha256": "64442ec8edf257e01dde93c2a986ba25ded4b7474f03728e816c309fc0d0b913"
+    },
+    {
+      "id": "OMEGA-091",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "047abf009a5691321959e4c06f2d64b5f931f02c125747ba41366718c457d06a"
+    },
+    {
+      "id": "OMEGA-092",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "9053f43658ec698d427fa44dd67309e9fc8951c2943b6d2deb0ab1fe2ea7063f"
+    },
+    {
+      "id": "OMEGA-093",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "959273e432e8c01ff3a6ddff9ea4f2d6e88076a7db02ac1ca3e327fb3b499dae"
+    },
+    {
+      "id": "OMEGA-094",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "250d2229dde6981362118e35b593e114f7f02239a5514d2f19549076963b930e"
+    },
+    {
+      "id": "OMEGA-095",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "9a48b4d133a1e042f0f7da00ee101b7407fa06bf24393e7334e56dea5e629820"
+    },
+    {
+      "id": "OMEGA-096",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "171f3b0e1de30bd6d02657f89f14c1207060c0381fad2a7e334209d482b86b9d"
+    },
+    {
+      "id": "OMEGA-097",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "21b77303b28518245a5fda2e4ad8856bf0d7b05ebe4aaa826a862ea51f854837"
+    },
+    {
+      "id": "OMEGA-098",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "ca73ba69247fe71a473a589f3b4c5348b51e86e460b535da8b865437024e376a"
+    },
+    {
+      "id": "OMEGA-099",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "131f78965db95acfb19be63c909967903065c3356ba9ade3fdcb6cf5d79d77eb"
+    },
+    {
+      "id": "OMEGA-100",
+      "phase": "FAZ IX — ÜRETİM, GÖZLEMLENEBİLİRLİK VE OPERASYON",
+      "description_sha256": "526a868e7e698213560e81a3df7d07b5ac993a4834854430f3e19188f6d58f3b"
+    }
+  ]
+}

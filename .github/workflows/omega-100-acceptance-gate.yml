@@ -1,0 +1,54 @@
+name: OMEGA 100-step Acceptance Evidence Gate
+
+on:
+  push:
+    paths:
+      - 'scripts/omega_acceptance_gate.py'
+      - 'tests/test_omega_acceptance_gate.py'
+      - 'evidence/omega-100-acceptance.json'
+      - 'evidence/omega-100-spec-fingerprints.json'
+      - '.github/workflows/omega-100-acceptance-gate.yml'
+  pull_request:
+    paths:
+      - 'scripts/omega_acceptance_gate.py'
+      - 'tests/test_omega_acceptance_gate.py'
+      - 'evidence/omega-100-acceptance.json'
+      - 'evidence/omega-100-spec-fingerprints.json'
+      - '.github/workflows/omega-100-acceptance-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Python evidence-inventory tests (never authorizes production)
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_omega_acceptance_gate.py' -v
+      - name: Validate 100 ID records, report actual incomplete acceptance
+        run: |
+          python scripts/omega_acceptance_gate.py --manifest evidence/omega-100-acceptance.json > omega-100-verdict.json
+          python -c 'import json; d=json.load(open("omega-100-verdict.json")); assert d["evaluated"] == 100; print("OMEGA_ACCEPTANCE_VERIFIED="+str(d["verified"])); print("OMEGA_PRODUCTION_ACCEPTED="+str(d["production_accepted"]))'
+      - name: Print explicit inventory verdict (not release permission)
+        run: echo 'This successful job validates the acceptance inventory only; it never authorizes deployment.'
+
+  release-admission-deny-only:
+    # Manual explicit control: a BLOCKED manifest MUST make this job fail.
+    # It does not deploy. Off-repo signed evidence must be evaluated in a
+    # separately authorized environment; no secrets are provisioned here.
+    if: github.event_name == 'workflow_dispatch'
+    needs: acceptance-inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Hard fail unless all requirements have independently verified proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/omega_acceptance_gate.py --manifest evidence/omega-100-acceptance.json --enforce
