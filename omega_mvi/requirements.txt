@@ -1,0 +1,3 @@
+# Prototype only. Review dependency lock/signatures before production.
+fastapi==0.115.12
+uvicorn==0.34.2
