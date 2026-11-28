@@ -146,3 +146,21 @@ Bir madde ancak ilgili kod/değişiklik, başarılı otomatik test veya gerçek 
 - Bilinmeyen yetki varsayılmaz; yıkıcı işlemler ve üretim değişiklikleri uygun onay kapısına tabidir.
 - Fiziksel cihaz, staging deployment, rollback ve Billing kanıtları gerçek ortamdan alınır.
 - Üretime hazır olma beyanı ancak tüm zorunlu kabul kapıları geçildiğinde yapılır.
+
+## Multi-model birleşik platform ve ajan sistemi (genişletilmiş yol haritası)
+
+> Bu üç genişletme, mevcut 100 maddenin kabul ölçütlerini değiştirmez. Yeni maddeler 101–103 olarak izlenir; tasarım veya katalog girdisi tek başına tamamlanma kanıtı değildir.
+
+101. [ ] **YAPILACAK** — **Tüm yapay zekâları tek çatı altında toplama:** OpenAI, Google Gemini, Anthropic Claude, xAI Grok, Groq ve kullanıcı tarafından barındırılan Llama/Mistral/Gemma gibi modelleri tek istemci deneyiminde sun. Her sağlayıcının kimlik doğrulama, model kataloğu, yetenek, kota, bölge, veri saklama ve fiyat koşullarını ayrı kaydet; desteklenmeyen modelleri kullanılabilir gibi gösterme.
+
+102. [ ] **YAPILACAK** — **Multi-Model API Gateway:** Provider-bağımsız adapter sözleşmesi, dinamik model keşfi, model/sağlayıcı allowlist'i, anahtar kasası, timeout, retry/backoff, hata normalizasyonu, maliyet/kota görünürlüğü, iptal, audit ve fail-closed routing uygula. İsteklerin doğrudan cihazdan sağlayıcıya mı yoksa kullanıcının kendi gateway'ine mi gittiğini açıkça belirt; anahtarları kaynak koda veya loglara yazma.
+
+103. [ ] **YAPILACAK** — **Gelişmiş Ajan Sistemi:** Genel, kodlama, dosya analizi ve planlama ajanlarını görev yönlendirici altında birleştir. Ajanlar yalnızca izin verilen araçları çağırabilsin; dosya erişimi kapsam/izin denetimine, kod çalıştırma izole sandbox'a, dış sistem değişiklikleri açık onaya tabi olsun. Her görev için plan, araç çağrısı, çıktı, test/kanıt ve sonuç durumunu audit kaydına bağla.
+
+### Multi-model kabul ölçütleri
+
+- Her bulut sağlayıcısı için geçerli anahtarla başarılı canlı istek ve hatalı/eksik anahtarla fail-closed testi.
+- Her yerel runtime için gerçek cihaz/ağ topolojisinde bağlantı, iptal ve timeout testi.
+- Model kataloğunun sağlayıcıdan keşfedilen model kimlikleriyle senkronizasyonu; eski/deprecated model kimliklerinin otomatik olarak kullanılabilir sayılmaması.
+- Agent Hub için görev sınıflandırma, dosya kapsamı, prompt-injection, sandbox kaçışı, yetki reddi ve açık onay testleri.
+- Hiçbir model veya ajan çıktısının tek başına cihaz, GitHub, Drive, ödeme ya da diğer dış sistemlerde yetki oluşturmadığının kanıtı.
