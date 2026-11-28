@@ -1,0 +1,1 @@
+"""OMEGA AI policy boundary. Tool permissions are enforced outside the model."""

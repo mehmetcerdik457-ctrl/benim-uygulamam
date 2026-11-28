@@ -146,3 +146,94 @@ Bir madde ancak ilgili kod/değişiklik, başarılı otomatik test veya gerçek 
 - Bilinmeyen yetki varsayılmaz; yıkıcı işlemler ve üretim değişiklikleri uygun onay kapısına tabidir.
 - Fiziksel cihaz, staging deployment, rollback ve Billing kanıtları gerçek ortamdan alınır.
 - Üretime hazır olma beyanı ancak tüm zorunlu kabul kapıları geçildiğinde yapılır.
+
+
+---
+
+# 2026-11-28 Müfettiş 9. Tur: Ek hedefler ve kanıt denetimi
+
+Bu ek, mevcut 100 maddenin kapsamını genişletir; 100 maddenin tamamlandığını iddia etmez. Mevcut maddelerin kutuları, her birinin exact-SHA kod/test/ortam kanıtı eşleştirilmeden tamamlandı olarak işaretlenmeyecektir.
+
+## A. Google Play gelir ve payout mutabakatı
+
+- [ ] Mevcut Play Console ödeme profili, birincil banka hesabı, ürün kimlikleri ve abonelik koşullarını değiştirmeden koru.
+- [ ] Play Billing satın alma token'larını güvenilir backend üzerinde Google Play Developer API ile doğrula.
+- [ ] Play finansal/earnings raporlarını salt okunur biçimde içe aktar.
+- [ ] Rapor satırlarını rapor kimliği + satır kimliği ile idempotent kaydet.
+- [ ] Ücret, vergi, iade, chargeback ve para birimi dönüşümünü rapor verisine göre ayrı göster.
+- [ ] Google tarafından bildirilen payout referansını ayrı kaydet ve dönem/para birimi mutabakatı yap.
+- [ ] Banka hesabı, IBAN, kart veya bankacılık kimlik bilgisi saklama.
+- [ ] Google Play adına banka transferi başlatan API veya otomasyon yazma.
+- [ ] Test lisansı ile satın alma, yenileme, restore, iptal ve refund akışlarını doğrula.
+- [ ] Finansal rapor ve banka ekstresi farkı için denetlenebilir mutabakat raporu üret.
+
+## B. OMEGA AI güvenlik çekirdeği
+
+- [ ] Owner kimliğini e-posta/telefon beyanından değil, kayıtlı cihaz anahtarıyla kriptografik doğrula.
+- [ ] Principal nesnesini yalnızca güvenilir sunucu kimlik doğrulama katmanının üretmesini sağla.
+- [ ] Model çıktısını hiçbir zaman yetki veya onay kaynağı kabul etme.
+- [ ] GitHub, Drive ve Play için ayrı, salt okunur ve kapsamı daraltılmış yetenekler tanımla.
+- [ ] Bilinmeyen araç, yazma, silme, merge, deploy ve para hareketi eylemlerini varsayılan olarak reddet.
+- [ ] Repository, web, doküman ve tool içeriklerini güvenilmeyen veri olarak sınırla.
+- [ ] Prompt injection testlerini gerçek tool-call policy katmanında doğrula.
+- [ ] Key rotation, revoke, replay koruması ve cihaz kurtarma prosedürünü uygula.
+- [ ] Her yetki kararını secret içermeyen audit kaydıyla ilişkilendir.
+- [ ] Yetki katmanı ile gerçek GitHub/Drive/Play connector entegrasyonlarını ayrı kabul testlerinden geçir.
+
+## C. 100 madde geçmiş kanıt denetimi
+
+Her madde için ayrı kayıt: madde numarası, main'deki dosya/commit, PR numarası ve merge durumu, exact commit SHA, CI sonucu, gerçek cihaz/deployment kanıtı, sınıflandırma ve eksik kabul testi.
+
+Kanıt sınıfları:
+- MAIN_VERIFIED: main üzerinde mevcut kod + ilgili test/CI kanıtı.
+- MERGED_NON_MAIN: PR merge edilmiş olsa bile hedef dal main değil.
+- CANDIDATE_ONLY: açık veya kapalı fakat merge edilmemiş PR/branch.
+- DOC_ONLY: yalnızca tasarım/rapor mevcut.
+- PARTIAL: kod var, fakat maddenin tüm kabul ölçütleri geçmemiş.
+- NOT_FOUND: incelenen kaynaklarda kanıt bulunamadı.
+- UNVERIFIED: erişim veya exact-SHA doğrulaması eksik.
+
+Başlangıçta doğrulanmış referanslar:
+- PR #4: depo güvenlik temeli ve CODEOWNERS değişiklikleri, main'e merge edilmiş. Bu, branch protection'ın etkin olduğunu tek başına kanıtlamaz.
+- PR #5: yeniden kullanılabilir Python CI, main'e merge edilmiş.
+- PR #6: privacy guard, main'e merge edilmiş.
+- PR #14: master roadmap ve kontrol belgeleri, main'e merge edilmiş.
+- PR #15: P1 backend uçları, rate limit, request ID ve provider allowlist, main'e merge edilmiş.
+- PR #38: Phase 0 mimari/scope belgesi, main'e merge edilmiş.
+- PR #39: Compose geliştirme kurulumu, main'e merge edilmiş.
+- PR #99: P-256 owner-chat çalışması real-ai-backend-p1 dalına merge edilmiş; main'e merge edilmiş sayılmaz.
+- PR #106: predeploy diagnostics real-ai-backend-p1 dalına merge edilmiş; main'e merge edilmiş sayılmaz.
+- PR #69: 91 uzman dosyasını içeren entegrasyon adayı açık draft; main kabulü değildir.
+- PR #108: bu 100 maddelik yol haritasını main'e ekleyen dokümantasyon PR'ı; uygulama kodu veya runtime kabulü değildir.
+
+Bu referanslar tam 100-madde eşlemesi değildir. Her maddenin ayrı exact-SHA incelemesi tamamlanmadan toplam tamamlanma sayısı açıklanmayacaktır.
+
+## D. Demo ve yayın kanıtı
+
+- [ ] Temiz kurulum, açılış, restart ve upgrade akışını gerçek Android cihazda kaydet.
+- [ ] Backend health ile gerçek model/provider durumunu ayrı göster.
+- [ ] AI sohbeti ve adversarial prompt injection testini kaydet.
+- [ ] Play lisans test kullanıcısıyla satın alma/restore/iptal/refund akışını göster.
+- [ ] Payout ekranında yalnızca sentetik finansal veri ve mutabakat göster; gerçek banka bilgisi gösterme.
+- [ ] Owner proof, yetkisiz kullanıcı reddi, bilinmeyen tool reddi ve write-denial kanıtlarını kaydet.
+- [ ] Exact source SHA, workflow run, artifact SHA-256 ve signer fingerprint eşleşmesini göster.
+- [ ] Test edilmeyen özellikleri videoda açıkça NOT TESTED olarak belirt.
+
+## Bu turda eklenen aday dosyalar
+
+Bu dosyalar yalnızca aşağıdaki branch'te yer alır; main'e merge edilmemiştir:
+- backend/omega_ai/policy.py
+- backend/payouts/ledger.py
+- tests/test_omega_ai_policy.py
+- tests/test_payout_ledger.py
+- docs/OMEGA_PAYOUT_AND_PLAY_BILLING.md
+- docs/OMEGA_DEMO_SCRIPT.md
+
+Branch: codex/omega-payout-ai-foundation-20261128
+
+Kabul sınırı: Kodun branch'e yazılması, testlerin GitHub Actions'ta geçmesi veya doküman eklenmesi tek başına production kabulü değildir. Gerçek Play hesabı, gerçek Drive/GitHub yetkileri, kriptografik cihaz kaydı, Android cihaz testi ve bağımsız güvenlik incelemesi ayrıca gereklidir.
+
+
+### Ayrıntılı geçmiş kanıt raporu
+
+100 maddelik geçmiş kanıt taramasının bu turda doğrulanabilen PR/main/branch ayrımı için bkz. docs/OMEGA_HISTORICAL_EVIDENCE_AUDIT_2026-11-28.md. Raporda PR #101'in önceki manifestinde 100 BLOCKED / 0 VERIFIED bildirdiği, PR #59–#68'in merge edilmeden kapatıldığı, PR #69'un draft kaldığı ve #100–#105'in aday/kanıt aşamasında olduğu kaydedilmiştir. Bu nedenle mevcut 100 madde için kabul edilmiş sayı hâlâ 0/100'dür; bu sayı mevcut kodun sıfır olduğu anlamına gelmez, yalnızca tam kabul ölçütlerinin henüz doğrulanmadığı anlamına gelir.
