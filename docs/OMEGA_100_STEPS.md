@@ -286,3 +286,14 @@ Bu ek, mevcut 100 maddeyi tamamlandı olarak işaretlemez ve hiçbir Play Consol
 - `tests/test_backend_contract.py` küçük bir contract test setidir; tam kabul paketi değildir.
 - `docs/PROJECT_OMEGA_PHASE_0.md` ve `scope.yaml` Google Cloud, Drive ve harici entegrasyonların provision edilmediğini/izinlerinin doğrulanmadığını; MVI kabulünün henüz sağlanmadığını kaydeder.
 - Bu kaynaklar, OMEGA main'in bugün %75–99 tamamlandığı iddiasını desteklemez. KRAL deposundaki bazı ileri bileşenler gerçektir, ancak bunlar OMEGA main'e taşınmış ve OMEGA kabul testlerinden geçmiş sayılmaz.
+
+
+### Kapalı PR ve entegrasyon dalları için genişletilmiş tarihsel bulgular
+| Kaynak | Geçmiş çalışma | Durum ve neden OMEGA main'de tamamlandı sayılmıyor |
+|---|---|---|
+| https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/69 | PR #59–#68'den 91 çakışmasız dosya blob'unu birleştiren OMEGA 16 entegrasyon adayı; PR açıklamasında 616 offline test PASS / 19 SKIP | Açık draft, main'e merge edilmemiş. Aynı raporda 11 workflow'dan 1'i FAILURE; Docker runner-host port yayını MISSING ve TCP REFUSED. OIDC, gerçek kullanıcı onayı, owner cihazı ve üretim kabulü BLOCKED. |
+| https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/99 | P-256 imzalı owner chat endpoint'i, exact-body signature, timestamp/nonce/replay koruması ve mock HTTP testleri | PR real-ai-backend-p1 dalına merge edilmiş; main değişmemiş. Sonraki rapor owner public key provision edilmediğini, Railway deploy'un trial expired nedeniyle başarısız kaldığını ve gerçek model HTTP 200'ün doğrulanmadığını söylüyor. |
+| https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/104 | Kaynak arşivinden 297 ve 354 testlik PostgreSQL CI koşuları; 297/297 ve 354/354 PASS, 0 SKIP | Açık draft ve #101'e stack edilmiş; PR açıklaması acceptance manifestinde 100 BLOCKED / 0 VERIFIED olduğunu, Play Billing/gerçek purchase/merchant settlement/production deploy/main merge olmadığını açıkça belirtiyor. |
+| https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/106 | Pre-deploy hata teşhisi için redakte edilmiş fail-closed gate ve testler | Tarihsel kod/CI kanıtı; deployment'ın kendisi başarılı sayılmaz ve OMEGA main'e dahil olduğu ayrıca doğrulanmalıdır. |
+
+**Önemli sonuç:** Kapalı uzman PR'ları ve ayrı entegrasyon dalları ciddi miktarda kod ve test içeriyor. Bunlar “hiçbir şey yapılmadı” demeyi yanlış kılar. Ancak bunları OMEGA main'de çalışan, entegre, production-accepted özellikler gibi saymak da yanlıştır. Mevcut main README ve Phase 0 envanteri küçük stdlib chat backend'i, eksik MVI bileşenleri ve provision edilmemiş dış entegrasyonları kaydediyor. Bu yüzden 100 maddelik sayım için üç ayrı sütun tutulmalıdır: (1) tarihsel branch/PR kod kanıtı, (2) main'e entegre kod, (3) kabul/üretim kanıtı.
