@@ -297,3 +297,14 @@ Bu ek, mevcut 100 maddeyi tamamlandı olarak işaretlemez ve hiçbir Play Consol
 | https://github.com/mehmetcerdik457-ctrl/benim-uygulamam/pull/106 | Pre-deploy hata teşhisi için redakte edilmiş fail-closed gate ve testler | Tarihsel kod/CI kanıtı; deployment'ın kendisi başarılı sayılmaz ve OMEGA main'e dahil olduğu ayrıca doğrulanmalıdır. |
 
 **Önemli sonuç:** Kapalı uzman PR'ları ve ayrı entegrasyon dalları ciddi miktarda kod ve test içeriyor. Bunlar “hiçbir şey yapılmadı” demeyi yanlış kılar. Ancak bunları OMEGA main'de çalışan, entegre, production-accepted özellikler gibi saymak da yanlıştır. Mevcut main README ve Phase 0 envanteri küçük stdlib chat backend'i, eksik MVI bileşenleri ve provision edilmemiş dış entegrasyonları kaydediyor. Bu yüzden 100 maddelik sayım için üç ayrı sütun tutulmalıdır: (1) tarihsel branch/PR kod kanıtı, (2) main'e entegre kod, (3) kabul/üretim kanıtı.
+
+
+### Resmî teknik ve finansal referanslar
+- Google Play merchant bank account / Payments profile: https://support.google.com/googleplay/android-developer/answer/7161440
+- Google Play merchant payout schedule: https://support.google.com/paymentscenter/answer/7159355
+- Google Play order processing and payouts: https://support.google.com/googleplay/android-developer/answer/137997
+- Play Billing + Developer API + RTDN setup: https://developer.android.com/google/play/billing/getting-ready
+- Google Play Developer API reference: https://developers.google.com/android-publisher/api-ref/rest
+- Play financial reports: https://support.google.com/googleplay/android-developer/answer/2482017
+- RevenueCat store payment responsibilities: https://www.revenuecat.com/docs/platform-resources/developer-store-payments
+- RevenueCat Play Store Early Payout requirements: https://www.revenuecat.com/docs/early-payouts/play-store-setup
