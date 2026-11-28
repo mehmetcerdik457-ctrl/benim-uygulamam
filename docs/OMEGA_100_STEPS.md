@@ -271,3 +271,18 @@ Denetim yöntemi:
 
 ## Tur 7 icra notu
 Bu ek, mevcut 100 maddeyi tamamlandı olarak işaretlemez ve hiçbir Play Console, banka, ödeme profili, secret veya üretim ayarını değiştirmez. Yeni kodlama işleri, önce mevcut mimari ve ilgili dosyalar doğrulandıktan sonra ayrı küçük değişiklikler ve testlerle uygulanacaktır.
+
+
+### Finansal sağlayıcı seçimi için ek karar kaydı
+- RevenueCat'in standart rolü mağaza satın alımlarında entitlement/abonelik yönetimidir; mağaza satış gelirini normal akışta ilgili mağaza geliştirici hesabı öder.
+- RevenueCat'in ayrıca Google Play Early Payout programı vardır. Bu program RevenueCat'e Play Console'da Admin yetkisi verilmesini, Payments Center erişimini ve Google Play payout banka hesabının RevenueCat'in sağladığı hesaba değiştirilmesini gerektiren adımlar içerir.
+- Bu nedenle Early Payout programı, "mevcut banka hesabı ve ödeme ayarları kesinlikle değişmeyecek" şartıyla UYUMLU DEĞİLDİR ve bu projede seçilmeyecektir.
+- Google'ın genel dokümantasyonunda Play geliştirici ödemeleri önceki ay satışları için ayın 15'inde başlatılır; banka hesabına yansıma EFT/wire türüne göre ek iş günü alabilir. Gerçek takvim ve eşikler merchant/payment profile ülke ve hesap koşullarından doğrulanmalıdır.
+- Play Developer API ve RTDN satın alma/abonelik durumunu doğrulama ve backend entitlement güncelleme içindir; bunlar geliştirici payout banka hesabını koddan değiştirmez.
+
+### OMEGA main depo gerçeklik kontrolü
+- `README.md` mevcut projeyi küçük Python standard-library backend olarak tanımlar; yerel model runtime, database, task queue, inventory, RAG, web UI ve approval workflow bulunmadığını belirtir.
+- `backend/server.py` mevcut chat yolunu OpenAI Responses API'ye gönderir; `/api/research` henüz 501 / provider unconfigured döndürür; owner status UNPROVISIONED olarak raporlanır.
+- `tests/test_backend_contract.py` küçük bir contract test setidir; tam kabul paketi değildir.
+- `docs/PROJECT_OMEGA_PHASE_0.md` ve `scope.yaml` Google Cloud, Drive ve harici entegrasyonların provision edilmediğini/izinlerinin doğrulanmadığını; MVI kabulünün henüz sağlanmadığını kaydeder.
+- Bu kaynaklar, OMEGA main'in bugün %75–99 tamamlandığı iddiasını desteklemez. KRAL deposundaki bazı ileri bileşenler gerçektir, ancak bunlar OMEGA main'e taşınmış ve OMEGA kabul testlerinden geçmiş sayılmaz.
