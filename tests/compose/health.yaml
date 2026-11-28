@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: python:3.12-slim
+    command: ["python", "/app/server.py"]
+    environment:
+      OPENAI_API_KEY: ""
+      OPENAI_MODEL: gpt-5.6-luna
+      PORT: "8080"
+    expose:
+      - "8080"
+    ports:
+      - "127.0.0.1:${HEALTH_TEST_PORT:-18080}:8080"
+    volumes:
+      - ../../backend:/app:ro
+    networks:
+      - isolated
+
+networks:
+  isolated:
+    internal: true
