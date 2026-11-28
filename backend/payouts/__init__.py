@@ -1,0 +1,1 @@
+"""Read-only payout reconciliation primitives; no bank transfer capability."""
