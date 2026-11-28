@@ -232,3 +232,8 @@ Bu dosyalar yalnızca aşağıdaki branch'te yer alır; main'e merge edilmemişt
 Branch: codex/omega-payout-ai-foundation-20261128
 
 Kabul sınırı: Kodun branch'e yazılması, testlerin GitHub Actions'ta geçmesi veya doküman eklenmesi tek başına production kabulü değildir. Gerçek Play hesabı, gerçek Drive/GitHub yetkileri, kriptografik cihaz kaydı, Android cihaz testi ve bağımsız güvenlik incelemesi ayrıca gereklidir.
+
+
+### Ayrıntılı geçmiş kanıt raporu
+
+100 maddelik geçmiş kanıt taramasının bu turda doğrulanabilen PR/main/branch ayrımı için bkz. docs/OMEGA_HISTORICAL_EVIDENCE_AUDIT_2026-11-28.md. Raporda PR #101'in önceki manifestinde 100 BLOCKED / 0 VERIFIED bildirdiği, PR #59–#68'in merge edilmeden kapatıldığı, PR #69'un draft kaldığı ve #100–#105'in aday/kanıt aşamasında olduğu kaydedilmiştir. Bu nedenle mevcut 100 madde için kabul edilmiş sayı hâlâ 0/100'dür; bu sayı mevcut kodun sıfır olduğu anlamına gelmez, yalnızca tam kabul ölçütlerinin henüz doğrulanmadığı anlamına gelir.
