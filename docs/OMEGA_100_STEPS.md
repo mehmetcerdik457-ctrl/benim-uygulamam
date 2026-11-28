@@ -1,3 +1,13 @@
+> **Çapraz-depo denetim notu — 2026-11-28**  
+> Bu yol haritası PROJECT OMEGA içindir. KRAL Android uygulamasının `mehmetcerdik457-ctrl/Gpt-asistan` deposundaki PR ve APK/AAB kanıtları OMEGA adımlarını otomatik tamamlamaz; bu nedenle aşağıdaki 100 maddenin checkbox durumları kanıt olmadan değiştirilmemiştir.  
+> - KRAL PR #72 ve #88 kapalı/birleştirilmiş durumdadır; hedef dalları sırasıyla `integration/kral-asistan-20261020` ve `fix/kral-genesis-android-delivery-20261103`, **main değildir**.  
+> - KRAL PR #99 ve #104 açık/taslak durumundadır. #99 exact-head CI kayıtları başarılıdır; #104 exact-head CI kayıtları atlanmıştır. Bu nedenle bu dört PR'ın main'e entegre edildiği veya kabul kapılarının geçtiği iddia edilmez.  
+> - 2026-11-28 KRAL `Signed Android Release` run `46116604566` APK/AAB üretmiştir. APK SHA-256: `b4628df3f25aac54ad631aa3258ba1f83cf71febfaadf4db75684c69535980a1`; AAB SHA-256: `adb417b455da9358471e8e50290c23c97b4eef2fc22adfe16c5762e41316918f`. Bu çıktılar KRAL deposuna aittir, OMEGA release kanıtı değildir.  
+> - KRAL APK manifesti `minSdk=24`, `targetSdk=34`, `versionCode=1`, `versionName=1.0.0` gösterir. 2026-08-31 itibarıyla yeni Play uygulaması/güncellemesi için API 36 gerektiğinden bu APK Play gönderimine uygun değildir. APK/AAB sertifika SHA-256 parmak izi eşleşir; Play Console paket eşleşmesi ve gerçek yükleme kontrolü yapılmamıştır.  
+> - GitHub Releases asset yükleme/Release oluşturma bu oturumdaki GitHub bağlantı araçlarında desteklenmediğinden Release oluşturulduğu iddia edilmez.  
+>
+> ---
+>
 # PROJECT OMEGA — 100 Maddelik Uygulama Yol Haritası
 
 **Sürüm:** 1.0  
